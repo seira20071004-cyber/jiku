@@ -32,9 +32,9 @@ export async function authRoute(request,c,fetcher=fetch){const u=new URL(request
     const f=await readSigned(request,'flow',c),code=u.searchParams.get('code');
     if(!f||typeof f.verifier!=='string'||f.state!==u.searchParams.get('state')||!code||u.searchParams.has('error'))return fail(!f?(cookie(request,cookieName('flow',c))?'flow-signature':'flow-cookie'):'flow-state');
     let stage='token-fetch';try{
-      const t=await fetcher('https://oauth2.googleapis.com/token',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),body:new URLSearchParams({code,client_id:c.clientId,client_secret:c.clientSecret,redirect_uri:c.redirectUri,grant_type:'authorization_code',code_verifier:f.verifier})});
+      const t=await fetcher('https://oauth2.googleapis.com/token',{method:'POST',redirect:'manual',signal:AbortSignal.timeout(10000),body:new URLSearchParams({code,client_id:c.clientId,client_secret:c.clientSecret,redirect_uri:c.redirectUri,grant_type:'authorization_code',code_verifier:f.verifier})});
       if(!t.ok){let category='unknown';try{const result=await t.json();if(['invalid_client','invalid_grant','invalid_request','unauthorized_client'].includes(result.error))category=result.error}catch{}return fail('token:'+category)}const tokens=await t.json();if(typeof tokens.access_token!=='string')return fail('token-format');stage='profile-fetch';
-      const r=await fetcher('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token},redirect:'error',signal:AbortSignal.timeout(10000)});if(!r.ok)return fail('profile-status:'+r.status);
+      const r=await fetcher('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token},redirect:'manual',signal:AbortSignal.timeout(10000)});if(!r.ok)return fail('profile-status:'+r.status);
       const profile=await r.json();if(typeof profile.sub!=='string'||!profile.sub||typeof profile.email!=='string'||profile.email_verified!==true)return fail('profile-format');
       const email=profile.email.toLowerCase();if(!c.allowedEmails.includes(email))return redirect(c.origin+'/?login=denied',[clear]);
       return redirect(c.origin+'/#tree',[clear,setCookie('session',await sign({sub:profile.sub,email,name:typeof profile.name==='string'?profile.name.slice(0,100):email,exp:now()+604800},'session',c),604800,c)]);
