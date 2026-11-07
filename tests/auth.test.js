@@ -9,3 +9,16 @@ test('state不一致はGoogleへトークンを送らない',async()=>{const t=a
 test('認証済みプロフィールと許可メールのみセッションを発行',async()=>{const t=await sign({state:'correct',verifier:'v',exp:Math.floor(Date.now()/1000)+60},'flow',c);let calls=0;const r=await authRoute(req('/api/auth/google/callback?state=correct&code=123',t),c,async(url,options)=>{calls++;if(url.endsWith('/token')){assert.equal(options.body.get('code_verifier'),'v');return Response.json({access_token:'test-access'})}assert.equal(options.headers.Authorization,'Bearer test-access');return Response.json({sub:'google-id',email:'owner@example.com',email_verified:true,name:'Owner'})});assert.equal(calls,2);assert.equal(r.headers.get('location'),'https://jiku.example/#tree');const cookies=r.headers.get('set-cookie'),token=cookies.match(/__Host-jiku-session=([^;]+)/)[1];const user=await session(new Request('https://jiku.example',{headers:{Cookie:'__Host-jiku-session='+token}}),c);assert.equal(user.sub,'google-id');assert.equal(user.email,'owner@example.com')});
 test('未許可アカウントはログインできない',async()=>{const t=await sign({state:'s',verifier:'v',exp:Math.floor(Date.now()/1000)+60},'flow',c);const r=await authRoute(req('/api/auth/google/callback?state=s&code=1',t),c,async url=>Response.json(url.endsWith('/token')?{access_token:'a'}:{sub:'other',email:'other@example.com',email_verified:true}));assert.match(r.headers.get('location'),/login=denied/);assert(!r.headers.get('set-cookie').includes('jiku-session='))});
 test('ログアウトは同一オリジンPOSTのみ許可',async()=>{assert.equal((await authRoute(req('/api/auth/logout'),c)).status,405);assert.equal((await authRoute(new Request('https://jiku.example/api/auth/logout',{method:'POST',headers:{Origin:'https://other.example'}}),c)).status,403)});
+
+test('公開Workerは認証設定なし・セッションなしでアプリを返さない',async()=>{
+ const {default:worker}=await import('../dist/server/index.js');
+ const env={JIKU_AUTH_MODE:'google',JIKU_AUTH_ORIGIN:'https://jiku.example',GOOGLE_CLIENT_ID:'test-id',GOOGLE_CLIENT_SECRET:'test-secret',JIKU_SESSION_SECRET:'a'.repeat(40),JIKU_ALLOWED_EMAILS:'owner@example.com'};
+ assert.equal((await worker.fetch(req('/'),{})).status,503);
+ assert.equal((await worker.fetch(req('/app.js'),env)).status,401);
+ assert.equal((await worker.fetch(req('/model.js'),env)).status,401);
+ assert.equal((await worker.fetch(req('/api/session'),env)).status,401);
+ const page=await worker.fetch(req('/'),env);assert.equal(page.status,200);assert.match(await page.text(),/Googleでログイン/);
+ const token=await sign({sub:'owner-id',email:'owner@example.com',name:'Owner',exp:Math.floor(Date.now()/1000)+60},'session',c);
+ const authed=new Request('https://jiku.example/app.js',{headers:{Cookie:'__Host-jiku-session='+token}});
+ const js=await worker.fetch(authed,env);assert.equal(js.status,200);assert.match(await js.text(),/const storageKey/);
+});

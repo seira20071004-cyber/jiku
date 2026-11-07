@@ -2,7 +2,7 @@ import {googleConfig,authRoute,session,loginPage} from './auth.js';
 // ASSET_MAP is embedded at build time. Authentication runs before serving assets.
 export default {async fetch(request,env){
  const u=new URL(request.url);let c;
- try{c=googleConfig(env)}catch{return new Response('Googleログインの設定が未完了です。管理者にお問い合わせください。',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}})}
+ try{c=googleConfig(env);if(!c)throw Error('Authentication required')}catch{return new Response('Googleログインの設定が未完了です。管理者にお問い合わせください。',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}})}
  if(c){
   if(u.origin!==c.origin)return new Response(null,{status:421});
   const auth=await authRoute(request,c);if(auth)return auth;
@@ -11,6 +11,6 @@ export default {async fetch(request,env){
   if(!user){if(u.pathname==='/'||u.pathname==='/index.html')return new Response(loginPage(u.searchParams.get('login')),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}});return new Response(null,{status:401,headers:{'Cache-Control':'no-store'}})}
  }else if(u.pathname==='/api/session')return Response.json({mode:'local'},{headers:{'Cache-Control':'no-store'}});
  if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405});
- const asset=ASSET_MAP[u.pathname==='/'?'/index.html':u.pathname];if(!asset)return new Response('Not found',{status:404});
+ const path=u.pathname==='/'?'/index.html':u.pathname;const asset=Object.hasOwn(ASSET_MAP,path)?ASSET_MAP[path]:null;if(!asset)return new Response('Not found',{status:404});
  return new Response(request.method==='HEAD'?null:asset.body,{headers:{'Content-Type':asset.type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin'}});
 }};
