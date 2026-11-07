@@ -1,0 +1,1 @@
+{"name":"jiku","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"python3 -m http.server 4173 --directory dist","test":"node --test tests/*.test.js","check":"node --check dist/app.js && node --check dist/model.js"}}
