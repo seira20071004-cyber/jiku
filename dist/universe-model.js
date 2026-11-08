@@ -17,7 +17,7 @@ export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurem
  name=String(name||'').trim();purpose=String(purpose||'').trim();if(!name||name.length>80)throw Error('名前を1〜80文字で入力してください');if(!purpose||purpose.length>1000)throw Error('この目標にした目的を入力してください');if(!['goal','action'].includes(kind))throw Error('目標かタスクを選んでください');
  const n=s.nodes.find(n=>n.id===id),isNew=id==='new';if(!isNew&&!n)throw Error('目標が見つかりません');const isRoot=!isNew&&n.parentId===null;
  if(!isRoot){if(!parentId||!s.nodes.some(p=>p.id===parentId))throw Error('つながっている上位目標を選んでください');if((isNew||parentId!==n.parentId)&&!canPlace(s,id,parentId))throw Error('上位目標を確認してください。宇宙から衛星までの5階層以内で、目標につなげられます。')}
- if(kind==='action'){if(isRoot||(!isNew&&s.nodes.some(c=>c.parentId===id)))throw Error('下位目標のあるものは目標として保存してください');validateMeasurement(measurement);if(measurement.dailyAmount==null)throw Error('タスク量を入力してください');if(!['rest','busy','full'].includes(mode))throw Error('タスクのモードを選んでください')}
+ if(kind==='action'){if(isRoot||(!isNew&&s.nodes.some(c=>c.parentId===id)))throw Error('下位目標のあるものは目標として保存してください');validateMeasurement(measurement);if(measurement.dailyAmount==null)throw Error('タスク量を入力してください');if(measurement.weeklyTarget==null)throw Error('1週間の目標を入力してください');if(!['rest','busy','full'].includes(mode))throw Error('タスクのモードを選んでください')}
  const target=isNew?{id:crypto.randomUUID(),parentId,name}:n;target.name=name;target.description=purpose;target.kind=isRoot?'goal':kind;if(!isRoot)target.parentId=parentId;if(symbolName!==undefined)target.symbolName=String(symbolName||name).trim().slice(0,80);if(isNew)s.nodes.push(target);
  if(kind==='action')s.settings[target.id]={...setting(s,target.id),measurement:structuredClone(measurement),modes:modesForLevel(mode)};return target.id;
 }
@@ -33,3 +33,5 @@ export function weeklyTaskSections(s,summary,scope='all'){
  for(const row of summary.rows){const key=row.id+'\0'+row.dimension;if(seen.has(key))continue;const path=nodePath(s,row.id),group=sectionFor(path.map(n=>n.id),path.map(n=>n.name));group.rows.push(row)}
  return [...sections.values()].map(({map,...group})=>group)
 }
+
+export function weeklyAchievement(amount,target){if(!Number.isFinite(target)||target<=0||!Number.isFinite(amount)||amount<0)return null;const percent=Math.round(amount/target*100);return {percent,bar:Math.min(100,percent),complete:amount>=target}}
