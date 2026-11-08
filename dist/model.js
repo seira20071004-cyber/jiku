@@ -1,4 +1,4 @@
-export const MODES={full:{label:'余裕がある日',icon:'☀',color:'#3b7758',description:'じっくり、自分の目標に向き合う'},busy:{label:'忙しい日',icon:'◐',color:'#d5a34b',description:'大切なことを、少しだけ'},rest:{label:'休む日',icon:'☾',color:'#94a9c5',description:'立ち止まる時間も、成長の一部'},none:{label:'何もしなかった日',icon:'—',color:'#d0cbc1',description:'そんな日があっても、大丈夫'}};
+export const MODES={full:{label:'余裕がある日',icon:'☀',color:'#9474f5',description:'じっくり、自分の目標に向き合う'},busy:{label:'忙しい日',icon:'◐',color:'#624bb5',description:'大切なことを、少しだけ'},rest:{label:'休む日',icon:'☾',color:'#342950',description:'立ち止まる時間も、成長の一部'},none:{label:'何もしなかった日',icon:'—',color:'#293043',description:'そんな日があっても、大丈夫'}};
 export const dateKey=(d=new Date())=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(d);
 export function shiftDate(key,n){const d=new Date(key+'T12:00:00+09:00');d.setUTCDate(d.getUTCDate()+n);return dateKey(d)}
 export function weekStart(key){const day=new Date(key+'T12:00:00+09:00').getUTCDay();return shiftDate(key,-((day+6)%7))}
@@ -40,7 +40,7 @@ export function quantitySummary(s,start,end,scope='all',includeConfigured=true){
  const rowFor=(id,name,u)=>{const key=id+'\u0000'+u.dimension;if(!rows.has(key))rows.set(key,{key,id,name,dimension:u.dimension,unit:u.dimension==='time'?'時間':u.label,amount:0,target:null,byDate:{},deleted:!s.nodes.some(n=>n.id===id)});return rows.get(key)};
  for(const [date,logs] of Object.entries(s.logs).sort(([a],[b])=>a.localeCompare(b))){if(date<start||date>end)continue;for(const [id,log] of Object.entries(logs)){if(!inScope(id,log))continue;if(!log.quantity){unknown++;continue}const q=log.quantity,u=unitInfo(q.measurement),factor=u.dimension==='time'?60:1,value=rounded(q.base/factor),row=rowFor(id,log.name,u);
   row.amount=rounded(row.amount+value);row.byDate[date]=rounded((row.byDate[date]||0)+value);if(q.measurement.weeklyTarget!=null)row.target=rounded(q.measurement.weeklyTarget*u.factor/factor);
-  entries.push({date,id,name:log.name,amount:q.amount,unit:u.label,value,dimension:u.dimension,source:log.source||'manual'});
+  entries.push({date,id,name:log.name,amount:q.amount,unit:u.label,value,dimension:u.dimension,source:log.source||'manual',goalIds:log.goalIds||goalIds(s,id),goalPath:log.goalPath||ancestry(s,id)});
  }}
  if(includeConfigured)for(const n of leaves(s)){if(n.kind==='goal')continue;if(currentIds&&!currentIds.has(n.id))continue;const a=setting(s,n.id);if(!a.measurement)continue;const m=measurement(s,n.id),u=unitInfo(m),row=rowFor(n.id,n.name,u);row.name=n.name;if(m.weeklyTarget!=null)row.target=rounded(m.weeklyTarget*u.factor/(u.dimension==='time'?60:1))}
  for(const row of rows.values()){if(!groups.has(row.dimension))groups.set(row.dimension,{dimension:row.dimension,unit:row.unit,total:0,byDate:{}});const g=groups.get(row.dimension);g.total=rounded(g.total+row.amount);for(const [k,v] of Object.entries(row.byDate))g.byDate[k]=rounded((g.byDate[k]||0)+v)}

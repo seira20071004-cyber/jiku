@@ -21,3 +21,15 @@ export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurem
  const target=isNew?{id:crypto.randomUUID(),parentId,name}:n;target.name=name;target.description=purpose;target.kind=isRoot?'goal':kind;if(!isRoot)target.parentId=parentId;if(symbolName!==undefined)target.symbolName=String(symbolName||name).trim().slice(0,80);if(isNew)s.nodes.push(target);
  if(kind==='action')s.settings[target.id]={...setting(s,target.id),measurement:structuredClone(measurement),modes:modesForLevel(mode)};return target.id;
 }
+
+export function statisticsGoals(s){return s.nodes.filter(n=>n.parentId!==null&&nodeKind(s,n.id)==='goal').sort((a,b)=>nodePath(s,a.id).map(n=>n.name).join('/').localeCompare(nodePath(s,b.id).map(n=>n.name).join('/'),'ja'))}
+export function statisticsScope(s,id){if(id==='all')return 'all';const path=nodePath(s,id);for(let i=path.length-1;i>0;i--)if(nodeKind(s,path[i].id)==='goal')return path[i].id;return 'all'}
+export function boundedMonth(month,offset,today){const [y,m]=month.split('-').map(Number),date=new Date(Date.UTC(y,m-1+offset,1)),next=`${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}`;return next>today.slice(0,7)?today.slice(0,7):next}
+export function weeklyTaskSections(s,summary,scope='all'){
+ if(scope!=='all')return [{id:scope,name:s.nodes.find(n=>n.id===scope)?.name||'選んだ目標',rows:summary.rows}];
+ const sections=new Map(),rowMap=new Map(summary.rows.map(r=>[r.id+'\0'+r.dimension,r])),seen=new Set();
+ function sectionFor(ids,path){const nested=ids.length>2||path.length>2,key=nested?(ids[1]||'legacy:'+path[1]):'all',name=nested?(s.nodes.find(n=>n.id===ids[1])?.name||path[1]||'以前の目標'):'宇宙のタスク';if(!sections.has(key))sections.set(key,{id:key,name,rows:[],map:new Map()});return sections.get(key)}
+ for(const entry of summary.entries){const key=entry.id+'\0'+entry.dimension,source=rowMap.get(key);if(!source)continue;const group=sectionFor(entry.goalIds||[],entry.goalPath||[]);if(!group.map.has(key)){const row={...source,amount:0};group.map.set(key,row);group.rows.push(row)}const row=group.map.get(key);row.amount=Math.round((row.amount+entry.value)*1000000)/1000000;seen.add(key)}
+ for(const row of summary.rows){const key=row.id+'\0'+row.dimension;if(seen.has(key))continue;const path=nodePath(s,row.id),group=sectionFor(path.map(n=>n.id),path.map(n=>n.name));group.rows.push(row)}
+ return [...sections.values()].map(({map,...group})=>group)
+}
