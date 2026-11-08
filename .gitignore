@@ -8,3 +8,5 @@ dist/server/
 
 dist/tree3d.js
 dist/three-LICENSE.txt
+
+dist/universe.js
