@@ -9,7 +9,10 @@ export function moveNode(s,id,parentId){const n=s.nodes.find(n=>n.id===id);if(!n
 export function deleteNode(s,id){if(!s.nodes.find(n=>n.id===id)?.parentId)throw Error('根は削除できません');const ids=descendants(s,id);s.nodes=s.nodes.filter(n=>!ids.has(n.id));ids.forEach(id=>delete s.settings[id]);s.pending=s.pending.filter(p=>!ids.has(p.id))}
 export function setting(s,id){return s.settings[id]||{priority:1,type:'continuous',status:'active',modes:['full']}}
 export function applyPending(s,key){s.pending=s.pending.filter(p=>{if(p.effective<=key){if(s.nodes.some(n=>n.id===p.id))s.settings[p.id]={...p.setting,...(s.settings[p.id]?.measurement?{measurement:s.settings[p.id].measurement}:{})};return false}return true})}
-export function plan(s,mode){return leaves(s).filter(n=>{const a=setting(s,n.id);return a.status==='active'&&a.modes.includes(mode)}).sort((a,b)=>setting(s,a.id).priority-setting(s,b.id).priority)}
+export function taskLevel(a){return a.modes.includes('rest')?'rest':a.modes.includes('busy')?'busy':'full'}
+export function modesForLevel(level){return level==='rest'?['full','busy','rest']:level==='busy'?['full','busy']:['full']}
+export function includesMode(a,mode){return modesForLevel(taskLevel(a)).includes(mode)}
+export function plan(s,mode){return leaves(s).filter(n=>{const a=setting(s,n.id);return a.status==='active'&&includesMode(a,mode)}).sort((a,b)=>setting(s,a.id).priority-setting(s,b.id).priority)}
 export function toggleLog(s,key,n){s.logs[key]??={};if(s.logs[key][n.id]){delete s.logs[key][n.id];return}const a=setting(s,n.id);s.logs[key][n.id]={name:n.name,setting:structuredClone(a),goalPath:ancestry(s,n.id),recordedAt:new Date().toISOString()};if(a.type==='once')s.settings[n.id]={...a,status:'completed'}}
 export function ancestry(s,id){const path=[];let n=s.nodes.find(n=>n.id===id);while(n){path.unshift(n.name);n=s.nodes.find(p=>p.id===n.parentId)}return path}
 export function stats(s,start,end){const counts={full:0,busy:0,rest:0,none:0};Object.entries(s.records).forEach(([k,r])=>{if(k>=start&&k<=end&&counts[r.mode]!==undefined)counts[r.mode]++});const logs=Object.entries(s.logs).filter(([k])=>k>=start&&k<=end).flatMap(([,v])=>Object.values(v));return {counts,days:Object.values(counts).reduce((a,b)=>a+b,0),logs}}
@@ -44,7 +47,7 @@ export function quantitySummary(s,start,end,scope='all',includeConfigured=true){
 }
 
 export function fixedMenu(s){return leaves(s).map(n=>({id:n.id,name:n.name,goalPath:ancestry(s,n.id),goalIds:goalIds(s,n.id),setting:structuredClone(setting(s,n.id))}))}
-export function modeItems(menu,mode){return menu.filter(item=>{const a=item.setting,m=a.measurement;return a.status==='active'&&a.modes.includes(mode)&&m&&Number.isFinite(m.dailyAmount)&&m.dailyAmount>=.001})}
+export function modeItems(menu,mode){return menu.filter(item=>{const a=item.setting,m=a.measurement;return a.status==='active'&&includesMode(a,mode)&&m&&Number.isFinite(m.dailyAmount)&&m.dailyAmount>=.001})}
 export function modeTotals(s,mode){const items=modeItems(fixedMenu(s),mode),groups=new Map();for(const item of items){const m=item.setting.measurement,u=unitInfo(m);if(!groups.has(u.dimension))groups.set(u.dimension,{dimension:u.dimension,unit:u.dimension==='time'?'時間':u.label,total:0});const g=groups.get(u.dimension);g.total=rounded(g.total+m.dailyAmount*u.factor/(u.dimension==='time'?60:1))}return {count:items.length,groups:[...groups.values()]}}
 export function applyMode(s,key,mode,todayKey=dateKey()){
  if(!validDateKey(key)||key>todayKey||!Object.hasOwn(MODES,mode))throw Error('モードと今日以前の日付を選んでください');
