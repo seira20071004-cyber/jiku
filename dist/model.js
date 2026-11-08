@@ -4,6 +4,7 @@ export function shiftDate(key,n){const d=new Date(key+'T12:00:00+09:00');d.setUT
 export function weekStart(key){const day=new Date(key+'T12:00:00+09:00').getUTCDay();return shiftDate(key,-((day+6)%7))}
 export function seed(){return {version:1,nodes:[{id:'root',parentId:null,name:'自分らしく、豊かに生きる'},{id:'dev',parentId:'root',name:'つくる力を育てる'},{id:'english',parentId:'root',name:'世界とつながる'},{id:'health',parentId:'root',name:'心と体を整える'},{id:'project',parentId:'dev',name:'個人開発を進める'},{id:'vocab',parentId:'english',name:'英単語を10個覚える'},{id:'shadow',parentId:'english',name:'シャドーイング'},{id:'walk',parentId:'health',name:'外の空気を吸って歩く'},{id:'read',parentId:'health',name:'好きな本を読む'}],settings:{project:{priority:0,type:'continuous',status:'active',modes:['full','busy']},vocab:{priority:1,type:'continuous',status:'active',modes:['full','busy']},shadow:{priority:1,type:'continuous',status:'active',modes:['full']},walk:{priority:1,type:'continuous',status:'active',modes:['full','rest']},read:{priority:2,type:'continuous',status:'active',modes:['full','rest']}},records:{},logs:{},reviews:{},pending:[]}}
 export const leaves=s=>s.nodes.filter(n=>n.parentId&&!s.nodes.some(c=>c.parentId===n.id));
+export function nodeKind(s,id){const n=s.nodes.find(n=>n.id===id);if(!n?.parentId)return 'goal';if(n.kind==='goal'||n.kind==='action')return n.kind;return s.settings[id]&&!s.nodes.some(c=>c.parentId===id)?'action':'goal'}
 export function descendants(s,id){const out=new Set([id]);let size;do{size=out.size;s.nodes.forEach(n=>{if(out.has(n.parentId))out.add(n.id)})}while(size!==out.size);return out}
 export function moveNode(s,id,parentId){const n=s.nodes.find(n=>n.id===id);if(!n?.parentId||!s.nodes.some(n=>n.id===parentId)||descendants(s,id).has(parentId))throw Error('自分自身や子孫へは移動できません');n.parentId=parentId}
 export function deleteNode(s,id){if(!s.nodes.find(n=>n.id===id)?.parentId)throw Error('根は削除できません');const ids=descendants(s,id);s.nodes=s.nodes.filter(n=>!ids.has(n.id));ids.forEach(id=>delete s.settings[id]);s.pending=s.pending.filter(p=>!ids.has(p.id))}
@@ -12,7 +13,7 @@ export function applyPending(s,key){s.pending=s.pending.filter(p=>{if(p.effectiv
 export function taskLevel(a){return a.modes.includes('rest')?'rest':a.modes.includes('busy')?'busy':'full'}
 export function modesForLevel(level){return level==='rest'?['full','busy','rest']:level==='busy'?['full','busy']:['full']}
 export function includesMode(a,mode){return modesForLevel(taskLevel(a)).includes(mode)}
-export function plan(s,mode){return leaves(s).filter(n=>{const a=setting(s,n.id);return a.status==='active'&&includesMode(a,mode)}).sort((a,b)=>setting(s,a.id).priority-setting(s,b.id).priority)}
+export function plan(s,mode){return leaves(s).filter(n=>{const a=setting(s,n.id);return n.kind!=='goal'&&a.status==='active'&&includesMode(a,mode)}).sort((a,b)=>setting(s,a.id).priority-setting(s,b.id).priority)}
 export function toggleLog(s,key,n){s.logs[key]??={};if(s.logs[key][n.id]){delete s.logs[key][n.id];return}const a=setting(s,n.id);s.logs[key][n.id]={name:n.name,setting:structuredClone(a),goalPath:ancestry(s,n.id),recordedAt:new Date().toISOString()};if(a.type==='once')s.settings[n.id]={...a,status:'completed'}}
 export function ancestry(s,id){const path=[];let n=s.nodes.find(n=>n.id===id);while(n){path.unshift(n.name);n=s.nodes.find(p=>p.id===n.parentId)}return path}
 export function stats(s,start,end){const counts={full:0,busy:0,rest:0,none:0};Object.entries(s.records).forEach(([k,r])=>{if(k>=start&&k<=end&&counts[r.mode]!==undefined)counts[r.mode]++});const logs=Object.entries(s.logs).filter(([k])=>k>=start&&k<=end).flatMap(([,v])=>Object.values(v));return {counts,days:Object.values(counts).reduce((a,b)=>a+b,0),logs}}
@@ -27,7 +28,7 @@ export function validDateKey(key){if(typeof key!=='string'||!/^\d{4}-\d{2}-\d{2}
 export function goalIds(s,id){const path=[];let n=s.nodes.find(n=>n.id===id);while(n){path.unshift(n.id);n=s.nodes.find(p=>p.id===n.parentId)}return path}
 export function setQuantity(s,key,id,amount,todayKey=dateKey()){
  if(!validDateKey(key)||key>todayKey)throw Error('今日以前の日付を選んでください');if(!Number.isFinite(amount)||amount<0.001||amount>1000000)throw Error('取り組んだ量を0より大きい数で入力してください');
- const old=s.logs[key]?.[id],node=s.nodes.find(n=>n.id===id);if(!node||(!leaves(s).some(n=>n.id===id)&&!old?.quantity))throw Error('葉っぱの行動を選んでください');
+ const old=s.logs[key]?.[id],node=s.nodes.find(n=>n.id===id);if(!node||((node.kind==='goal'||!leaves(s).some(n=>n.id===id))&&!old?.quantity))throw Error('葉っぱの行動を選んでください');
  const a=setting(s,id),m=old?.quantity?old.quantity.measurement:measurement(s,id),u=unitInfo(m);
  s.logs[key]??={};s.logs[key][id]={name:old?.name||node.name,setting:old?.setting||structuredClone(a),goalPath:old?.goalPath||ancestry(s,id),goalIds:old?.goalIds||goalIds(s,id),recordedAt:old?.recordedAt||new Date().toISOString(),updatedAt:new Date().toISOString(),source:'manual',quantity:{amount:rounded(amount),measurement:structuredClone(m),base:rounded(amount*u.factor)}};
  if(s.records[key]?.quantityExcluded)s.records[key].quantityExcluded=s.records[key].quantityExcluded.filter(x=>x!==id);if(a.type==='once')s.settings[id]={...a,status:'completed'};return s.logs[key][id];
@@ -41,12 +42,12 @@ export function quantitySummary(s,start,end,scope='all',includeConfigured=true){
   row.amount=rounded(row.amount+value);row.byDate[date]=rounded((row.byDate[date]||0)+value);if(q.measurement.weeklyTarget!=null)row.target=rounded(q.measurement.weeklyTarget*u.factor/factor);
   entries.push({date,id,name:log.name,amount:q.amount,unit:u.label,value,dimension:u.dimension,source:log.source||'manual'});
  }}
- if(includeConfigured)for(const n of leaves(s)){if(currentIds&&!currentIds.has(n.id))continue;const a=setting(s,n.id);if(!a.measurement)continue;const m=measurement(s,n.id),u=unitInfo(m),row=rowFor(n.id,n.name,u);row.name=n.name;if(m.weeklyTarget!=null)row.target=rounded(m.weeklyTarget*u.factor/(u.dimension==='time'?60:1))}
+ if(includeConfigured)for(const n of leaves(s)){if(n.kind==='goal')continue;if(currentIds&&!currentIds.has(n.id))continue;const a=setting(s,n.id);if(!a.measurement)continue;const m=measurement(s,n.id),u=unitInfo(m),row=rowFor(n.id,n.name,u);row.name=n.name;if(m.weeklyTarget!=null)row.target=rounded(m.weeklyTarget*u.factor/(u.dimension==='time'?60:1))}
  for(const row of rows.values()){if(!groups.has(row.dimension))groups.set(row.dimension,{dimension:row.dimension,unit:row.unit,total:0,byDate:{}});const g=groups.get(row.dimension);g.total=rounded(g.total+row.amount);for(const [k,v] of Object.entries(row.byDate))g.byDate[k]=rounded((g.byDate[k]||0)+v)}
  return {groups:[...groups.values()],rows:[...rows.values()].sort((a,b)=>a.name.localeCompare(b.name,'ja')),entries,unknown};
 }
 
-export function fixedMenu(s){return leaves(s).map(n=>({id:n.id,name:n.name,goalPath:ancestry(s,n.id),goalIds:goalIds(s,n.id),setting:structuredClone(setting(s,n.id))}))}
+export function fixedMenu(s){return leaves(s).filter(n=>n.kind!=='goal').map(n=>({id:n.id,name:n.name,goalPath:ancestry(s,n.id),goalIds:goalIds(s,n.id),setting:structuredClone(setting(s,n.id))}))}
 export function modeItems(menu,mode){return menu.filter(item=>{const a=item.setting,m=a.measurement;return a.status==='active'&&includesMode(a,mode)&&m&&Number.isFinite(m.dailyAmount)&&m.dailyAmount>=.001})}
 export function modeTotals(s,mode){const items=modeItems(fixedMenu(s),mode),groups=new Map();for(const item of items){const m=item.setting.measurement,u=unitInfo(m);if(!groups.has(u.dimension))groups.set(u.dimension,{dimension:u.dimension,unit:u.dimension==='time'?'時間':u.label,total:0});const g=groups.get(u.dimension);g.total=rounded(g.total+m.dailyAmount*u.factor/(u.dimension==='time'?60:1))}return {count:items.length,groups:[...groups.values()]}}
 export function applyMode(s,key,mode,todayKey=dateKey()){
