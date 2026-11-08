@@ -18,6 +18,7 @@ async function key(c){return crypto.subtle.importKey('raw',encoder.encode(c.secr
 export async function sign(value,kind,c){const payload=base64url(encoder.encode(JSON.stringify(value))),signature=await crypto.subtle.sign('HMAC',await key(c),encoder.encode(kind+'.'+payload));return payload+'.'+base64url(signature)}
 export async function readSigned(request,kind,c){try{const raw=cookie(request,cookieName(kind,c));if(!raw||raw.length>4096||!/^[-\w]+\.[-\w]{43}$/.test(raw))return null;const [payload,sig]=raw.split('.');if(!await crypto.subtle.verify('HMAC',await key(c),unbase64(sig),encoder.encode(kind+'.'+payload)))return null;const value=JSON.parse(new TextDecoder().decode(unbase64(payload)));return Number.isInteger(value.exp)&&value.exp>now()?value:null}catch{return null}}
 function redirect(url,cookies=[]){const h=new Headers({Location:url,'Cache-Control':'no-store','Referrer-Policy':'no-referrer'});cookies.forEach(c=>h.append('Set-Cookie',c));return new Response(null,{status:303,headers:h})}
+export function googlePicture(value){try{const u=new URL(value);return u.protocol==='https:'&&(u.hostname==='lh3.googleusercontent.com'||u.hostname.endsWith('.googleusercontent.com'))&&u.href.length<1000?u.href:null}catch{return null}}
 export async function session(request,c){const s=await readSigned(request,'session',c);return s&&typeof s.sub==='string'&&typeof s.email==='string'&&c.allowedEmails.includes(s.email)?s:null}
 export async function authRoute(request,c,fetcher=fetch){const u=new URL(request.url),p=u.pathname;
   if(p==='/api/auth/google'){
@@ -37,7 +38,7 @@ export async function authRoute(request,c,fetcher=fetch){const u=new URL(request
       const r=await fetcher('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokens.access_token},redirect:'manual',signal:AbortSignal.timeout(10000)});if(!r.ok)return fail('profile-status:'+r.status);
       const profile=await r.json();if(typeof profile.sub!=='string'||!profile.sub||typeof profile.email!=='string'||profile.email_verified!==true)return fail('profile-format');
       const email=profile.email.toLowerCase();if(!c.allowedEmails.includes(email))return redirect(c.origin+'/?login=denied',[clear]);
-      return redirect(c.origin+'/#tree',[clear,setCookie('session',await sign({sub:profile.sub,email,name:typeof profile.name==='string'?profile.name.slice(0,100):email,exp:now()+604800},'session',c),604800,c)]);
+      return redirect(c.origin+'/#tree',[clear,setCookie('session',await sign({sub:profile.sub,email,picture:googlePicture(profile.picture),name:typeof profile.name==='string'?profile.name.slice(0,100):email,exp:now()+604800},'session',c),604800,c)]);
     }catch(error){console.error('Google login exception',{stage,name:error?.name});return fail(stage)}
   }
   if(p==='/api/auth/logout'){
