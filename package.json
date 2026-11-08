@@ -9,5 +9,11 @@
     "check": "node --check dist/app.js && node --check dist/model.js && node --check worker/auth.js && node --check worker/index.js",
     "build": "node scripts/build.mjs",
     "pretest": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.11"
   }
 }

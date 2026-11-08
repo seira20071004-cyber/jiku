@@ -15,7 +15,7 @@ test('公開Workerは認証設定なし・セッションなしでアプリを�
  const env={JIKU_AUTH_MODE:'google',JIKU_AUTH_ORIGIN:'https://jiku.example',GOOGLE_CLIENT_ID:'test-id',GOOGLE_CLIENT_SECRET:'test-secret',JIKU_SESSION_SECRET:'a'.repeat(40),JIKU_ALLOWED_EMAILS:'owner@example.com'};
  assert.equal((await worker.fetch(req('/'),{})).status,503);
  assert.equal((await worker.fetch(req('/app.js'),env)).status,401);
- assert.equal((await worker.fetch(req('/model.js'),env)).status,401);
+ assert.equal((await worker.fetch(req('/model.js'),env)).status,401);assert.equal((await worker.fetch(req('/tree3d.js'),env)).status,401);
  assert.equal((await worker.fetch(req('/api/session'),env)).status,401);
  const page=await worker.fetch(req('/'),env);assert.equal(page.status,200);assert.match(await page.text(),/Googleでログイン/);
  const token=await sign({sub:'owner-id',email:'owner@example.com',name:'Owner',exp:Math.floor(Date.now()/1000)+60},'session',c);
