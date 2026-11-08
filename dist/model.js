@@ -64,3 +64,7 @@ export function applyMode(s,key,mode,todayKey=dateKey()){
  s.records[key]={...previous,mode,quantityMenu:structuredClone(menu),quantityExcluded:[...excluded],quantityAppliedAt:new Date().toISOString()};return applied;
 }
 export function clearMode(s,key){for(const [id,log] of Object.entries(s.logs[key]||{}))if(log.source==='mode')delete s.logs[key][id];if(s.logs[key]&&!Object.keys(s.logs[key]).length)delete s.logs[key];delete s.records[key]}
+
+// Missing daily records and explicit `none` share one display/statistics category.
+export function recordMode(s,key){return s.records[key]?.mode||'none'}
+export function modeDistribution(s,start,end,todayKey=dateKey()){const counts={full:0,busy:0,rest:0,none:0};let days=0;const last=end<todayKey?end:todayKey;if(!validDateKey(start)||!validDateKey(last))return {counts,days};for(let key=start;key<=last;key=shiftDate(key,1)){counts[recordMode(s,key)]++;days++}return {counts,days}}
