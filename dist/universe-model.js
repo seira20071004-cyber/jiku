@@ -1,4 +1,4 @@
-import {nodeKind,setting,modesForLevel,validateMeasurement,isEventTask,validateEventDate,eventCompletionDate,validateDuration,unitInfo,rounded} from './model.js';
+import {nodeKind,setting,modesForLevel,validateMeasurement,isEventTask,validateEventDate,eventCompletionDate,validateDuration,unitInfo,rounded,dateKey,recordMode,validDateKey} from './model.js';
 // Navigation and editing rules are independent of the visual scene and historic logs.
 export const UNIVERSE_ORIGIN='@universe-origin';
 export const LEVELS=['宇宙','銀河','恒星系','惑星','衛星'];
@@ -24,6 +24,23 @@ export function completeUniverse(s,name,galaxyName){
  delete s.universe.step;
  delete s.universe.draftName;
  return galaxy?.id??root.id;
+}
+const growthDays=[2,3,5,7,10,14,21,30,45,66];
+const growthNames=[
+ '生まれたて','最初の銀河','ほのかな光','光の輪','星の息吹','星雲の芽吹き',
+ '星雲のゆらぎ','星雲の広がり','深まるオーラ','光の潮流','銀河の輝き','光彩の宇宙'
+];
+export function universeGrowth(s,today=dateKey()){
+ const root=s.nodes.find(node=>node.parentId===null);
+ const hasGalaxy=s.nodes.some(node=>node.parentId===root.id);
+ const dates=new Set([...Object.keys(s.records),...Object.keys(s.logs)]);
+ let days=0;
+ for(const day of dates){
+  if(day<=today&&validDateKey(day)&&(recordMode(s,day)!=='none'||Object.keys(s.logs[day]||{}).length))days++;
+ }
+ const milestone=growthDays.findIndex(threshold=>days<threshold);
+ const level=hasGalaxy?(milestone===-1?growthDays.length+1:milestone+1):0;
+ return {level,days,strength:level/(growthNames.length-1),name:growthNames[level],nextDay:hasGalaxy&&milestone!==-1?growthDays[milestone]:null};
 }
 export function reorderNode(s,id,direction){const node=s.nodes.find(n=>n.id===id);if(!node)return;const siblings=visibleChildren(s,node.parentId),index=siblings.findIndex(n=>n.id===id),next=index+direction;if(next<0||next>=siblings.length)return;[siblings[index],siblings[next]]=[siblings[next],siblings[index]];siblings.forEach((n,i)=>n.order=i)}
 export function sceneLayout(nodes,width=1000,height=700){const portrait=width/height<.85,spacingX=portrait?7.0:8.4,spacingY=portrait?6.4:6.7,columns=portrait?2:3;return nodes.map((n,i)=>{const row=Math.floor(i/columns),col=i%columns,count=Math.min(columns,nodes.length-row*columns);return {id:n.id,x:(col-(count-1)/2)*spacingX+(row%2?.55:-.55),y:((Math.ceil(nodes.length/columns)-1)/2-row)*spacingY,z:Math.sin(i*1.7)*.6}})}

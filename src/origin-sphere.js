@@ -1,8 +1,12 @@
-import {Mesh, ShaderMaterial, SphereGeometry} from 'three';
+import {AdditiveBlending, Mesh, PlaneGeometry, ShaderMaterial, SphereGeometry} from 'three';
+
+export const ORIGIN_FOV=42;
+export const ORIGIN_RADIUS=3.2;
+export const originDistance=aspect=>Math.max(24,19/Math.max(.2,aspect));
 
 // A glass-like shell with interference bands over slowly moving clouds of light.
 export function originSphere(noise) {
- const geometry=new SphereGeometry(3.2,80,56);
+ const geometry=new SphereGeometry(ORIGIN_RADIUS,80,56);
  const material=new ShaderMaterial({
   uniforms:{uTime:{value:0}},
   vertexShader:`
@@ -44,4 +48,46 @@ export function originSphere(noise) {
  const sphere=new Mesh(geometry,material);
  sphere.userData.spin=.045;
  return sphere;
+}
+
+// A thin halo follows the edge of the sphere. Later stages reveal wider,
+// broken bands of light without changing the size of the sphere itself.
+export function originAura(noise,strength,time) {
+ const material=new ShaderMaterial({
+  transparent:true,depthWrite:false,blending:AdditiveBlending,
+  uniforms:{uTime:time,uGrowth:{value:strength}},
+  vertexShader:`
+   varying vec2 vAura;
+   void main(){
+    vAura=(uv-.5)*2.;
+    gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);
+   }`,
+  fragmentShader:`
+   uniform float uTime,uGrowth;
+   varying vec2 vAura;
+   ${noise}
+   void main(){
+    vec2 p=vAura*1.8;
+    float radius=length(p),a=atan(p.y,p.x),t=uTime*.2;
+    vec2 flow=vec2(cos(a),sin(a));
+    float cloud=fbm(vec3(flow*3.,radius*7.+t*.4));
+    float edge=smoothstep(.96,1.025,radius);
+    float width=.045+.27*pow(uGrowth,.75);
+    float reach=radius-1.;
+    float haze=exp(-max(0.,reach)/width);
+    float waves=.55+.45*sin(a*4.+t+cloud*8.);
+    float filaments=pow(.5+.5*sin(reach*(64.-uGrowth*23.)-cloud*9.+sin(a*6.)*1.4-t),4.);
+    float ribbons=haze*(.11+.28*waves+.26*filaments)*edge;
+    float streams=pow(max(0.,cloud-.28)*1.6,1.8)*haze*smoothstep(.23,1.,uGrowth);
+    vec3 violet=vec3(.55,.22,1.0),blue=vec3(.20,.68,1.0),gold=vec3(1.,.56,.23);
+    vec3 light=mix(violet,blue,smoothstep(-.8,.9,sin(a*2.+t*.38)));
+    light=mix(light,gold,smoothstep(.67,1.,uGrowth)*smoothstep(.22,.88,cos(a-.58+cloud*2.)));
+    float alpha=(ribbons+streams*.5)*(.27+.73*uGrowth)*(1.-smoothstep(1.58,1.8,radius));
+    gl_FragColor=vec4(light,alpha);
+   }`
+ });
+ const size=ORIGIN_RADIUS*3.6;
+ const aura=new Mesh(new PlaneGeometry(size,size),material);
+ aura.position.z=-.11;
+ return aura;
 }

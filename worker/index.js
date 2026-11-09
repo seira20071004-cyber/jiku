@@ -1,5 +1,5 @@
 import {googleConfig,authRoute,session,loginPage,googlePicture} from './auth.js';
-const WELCOME_ASSETS=new Set(['/onboarding.css','/onboarding.js','/onboarding-sky.js']);
+const WELCOME_ASSETS=new Set(['/onboarding.css','/onboarding.js','/onboarding-sky.js','/origin-preview.js']);
 // ASSET_MAP is embedded at build time. Authentication runs before serving assets.
 export default {async fetch(request,env){
  const u=new URL(request.url);let c;

@@ -30,7 +30,7 @@ body.birth-page, body.birth-active {
 .birth-screen :is(button, input) { font: inherit; }
 .birth-screen button { cursor: pointer; }
 .birth-screen :is(button, a, input):focus-visible { outline: 2px solid #ccc5ff; outline-offset: 4px; }
-.birth-sky, .birth-sky canvas, .birth-haze {
+.birth-sky, .birth-stars, .birth-haze {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -47,6 +47,45 @@ body.birth-page, body.birth-active {
   transition: opacity 1.8s;
 }
 .birth-screen:is([data-stage="name"], [data-stage="confirm"]) .birth-haze { opacity: 1; }
+.birth-stars { transition: opacity 1.45s ease; }
+.birth-origin {
+  position: absolute;
+  top: var(--birth-point-height);
+  width: 100%;
+  height: calc(100% - 140px);
+  transform: translateY(-50%) scale(.7);
+  opacity: 0;
+  transition: opacity 1.4s ease, transform 1.4s cubic-bezier(.19,1,.22,1);
+}
+.birth-origin canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  mask-image: radial-gradient(circle closest-side, #000 46%, transparent 93%);
+}
+.birth-origin:not(:has(canvas))::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(44vw, 35cqh);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 29% 22%, #f3e6ff87, transparent 27%),
+    radial-gradient(ellipse at center, #090619 20%, #120d2680 53%, transparent 73%),
+    conic-gradient(from 16deg, #7853a2, #6fb5d2, #cc8ad9, #cd987a, #739ca5, #7853a2);
+  box-shadow: inset 0 0 14px #e7d9ff64;
+  content: "";
+}
+.birth-origin { container-type: size; }
+.birth-screen:is([data-forming], [data-stage="name"], [data-stage="confirm"]) .birth-origin {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+.birth-screen:is([data-forming], [data-stage="name"], [data-stage="confirm"]) .birth-stars { opacity: .35; }
+@media (max-width: 560px) {
+  .birth-origin { height: calc(100% - 125px - env(safe-area-inset-bottom)); }
+}
 .birth-light {
   position: absolute;
   top: var(--birth-point-height);

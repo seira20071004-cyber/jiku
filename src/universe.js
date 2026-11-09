@@ -4,17 +4,18 @@ import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {UNIVERSE_ORIGIN,LEVELS} from '../dist/universe-model.js';
-import {originSphere} from './origin-sphere.js';
+import {ORIGIN_FOV, ORIGIN_RADIUS, originAura, originDistance, originSphere} from './origin-sphere.js';
+import {noiseGLSL} from './space-noise.js';
+export {mountOriginPreview} from './origin-preview.js';
 import {createSpaceLayout,spaceObservation,spaceRoute,STAR_RADIUS} from './space-layout.js';
 const palettes=['#a9bfff','#e8bb90','#a4ddd5','#c9a8ef','#e2a9bc','#a6c8ed'];
 function hash(s){let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0}
 function random(seed){let s=seed||1;return()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296)}
-const noiseGLSL=`float hash(vec3 p){p=fract(p*.3183099+vec3(.1,.2,.3));p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}float fbm(vec3 p){float a=.5,v=0.;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec3(2.1);a*=.5;}return v;}`;
 function glowTexture(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.08,'rgba(255,250,237,.95)');g.addColorStop(.22,'rgba(210,220,255,.3)');g.addColorStop(.5,'rgba(160,180,255,.06)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,128,128);return new T.CanvasTexture(c)}
-export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quality='auto'}){
+export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quality='auto',auraStrength=0}){
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,small=innerWidth<600,low=quality==='low'||(navigator.hardwareConcurrency||8)<=4;
  const renderer=new T.WebGLRenderer({antialias:!small,alpha:false,powerPreference:'default'});renderer.setPixelRatio(Math.min(devicePixelRatio,low?1:small?1.35:1.65));renderer.setClearColor('#030611');renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;renderer.domElement.className='universe-webgl';renderer.domElement.setAttribute('aria-label','光と星雲で描く、自分の宇宙');host.append(renderer.domElement);
- const scene=new T.Scene(),camera=new T.PerspectiveCamera(42,1,.01,360);camera.position.set(0,0,30);
+ const scene=new T.Scene(),camera=new T.PerspectiveCamera(ORIGIN_FOV,1,.01,360);camera.position.set(0,0,30);
  const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));const bloom=new UnrealBloomPass(new T.Vector2(800,600),low?.42:.65,.65,.82);composer.addPass(bloom);composer.addPass(new OutputPass());
  const glow=glowTexture(),labels=document.createElement('div');labels.className='universe-labels';host.append(labels);const bg=new T.Group();scene.add(bg);
  const nebula=new T.Mesh(new T.PlaneGeometry(440,300),new T.ShaderMaterial({depthWrite:false,uniforms:{uTime:{value:0}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec2 vUv;uniform float uTime;${noiseGLSL}void main(){vec2 uv=vUv;vec3 p=vec3(uv*5.,.8);float n=fbm(p+fbm(p*1.7));float ridge=pow(max(0.,1.-abs(uv.y-.48+sin(uv.x*4.)*.15)*2.8),3.);float dust=pow(n,2.8)*ridge;vec3 c=vec3(.007,.012,.035)+mix(vec3(.09,.07,.24),vec3(.045,.16,.23),uv.x)*dust*1.3;float cloud=fbm(p*2.+4.);c+=vec3(.2,.09,.15)*pow(cloud,4.)*ridge*.42;gl_FragColor=vec4(c,1.);}`}));nebula.position.z=-65;bg.add(nebula);
@@ -298,12 +299,13 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   if(atOrigin){
    labels.replaceChildren();pickables=[];anchors=[];
    const sphere=originSphere(noiseGLSL);active.add(sphere);animated.add(sphere);
+   if(auraStrength>0)active.add(originAura(noiseGLSL,auraStrength,sphere.material.uniforms.uTime));
    sphere.userData.id=root.id;pickables.push(sphere);
    const button=document.createElement('button');button.className='universe-origin-hit';button.setAttribute('aria-label','宇宙に入る');
    button.addEventListener('click',()=>{if(!transitioning)onSelect(root.id)});
    labels.append(button);anchors.push({button,mesh:sphere,position:sphere.position.clone(),id:root.id,origin:true});
    center.set(0,0,0);
-   baseDistance=Math.max(24,19/Math.max(.2,width/height));
+   baseDistance=originDistance(width/height);
   }else{
    const frame=frames.get(id)||frames.get(root.id);
    const observation=spaceObservation(frames,frame.node.id,camera.aspect,camera.fov);
@@ -395,7 +397,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    warp.material.opacity=0;host.classList.remove('in-transit');host.style.removeProperty('--portal-cover');
   }
  }
- function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix()}
+ function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix();if(currentNode===UNIVERSE_ORIGIN&&!transitioning){baseDistance=originDistance(camera.aspect);camera.position.z=baseDistance}}
  function rebuildLayout(){
   frames=createSpaceLayout(nodes,width,height,small?12:24);
   fill(currentNode);
@@ -424,7 +426,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    const screenX=(projected.x*.5+.5)*width,screenY=(-projected.y*.5+.5)*height;
    const label=anchor.button;
    if(anchor.origin){
-    const diameter=Math.min(width*.85,height*3.2/(slope*camera.position.z));
+    const diameter=Math.min(width*.85,height*ORIGIN_RADIUS/(slope*camera.position.z));
     label.style.width=label.style.height=diameter+'px';
     label.style.transform=`translate(${screenX}px,${screenY}px) translate(-50%,-50%)`;
     continue;

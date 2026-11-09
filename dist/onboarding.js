@@ -51,19 +51,19 @@ export function mountGuestOnboarding(host, error) {
 
 export function mountOnboarding(host, {
   initial, guest = false, preview = false, autoSave = false, error = '',
-  onDraft, onSave, onClose, onSettings
+  onDraft, onSave, onClose, onSettings, renderOrigin
 } = {}) {
   const draft = onboardingDraft(initial);
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const viewport = window.visualViewport;
   const events = new AbortController();
   const {signal} = events;
-  let step, timer, sky, saving = false;
+  let step, timer, formingTimer, sky, disposeOrigin, originRequested = false, saving = false;
 
   host.innerHTML = `
     <main class="birth-screen" aria-label="JIKU はじまりの宇宙">
       <div class="birth-sky" aria-hidden="true">
-        <div class="birth-haze"></div><canvas></canvas><div class="birth-light"></div>
+        <div class="birth-haze"></div><canvas class="birth-stars"></canvas><div class="birth-light"></div><div class="birth-origin"></div>
       </div>
       <header class="birth-header">
         <span class="birth-wordmark">jiku<span>●</span></span>
@@ -82,6 +82,7 @@ export function mountOnboarding(host, {
     </main>`;
 
   const screen = host.firstElementChild;
+  const origin = screen.querySelector('.birth-origin');
   const intro = screen.querySelector('.birth-intro');
   const conversation = screen.querySelector('.birth-conversation');
   const controls = screen.querySelector('.birth-controls');
@@ -101,8 +102,16 @@ export function mountOnboarding(host, {
     return node;
   }
 
+  function prepareOrigin() {
+    if (originRequested) return;
+    originRequested = true;
+    const getRenderer = renderOrigin ? Promise.resolve(renderOrigin) : import('./origin-preview.js').then(module => module.mountOriginPreview);
+    getRenderer.then(render => {if (!signal.aborted) disposeOrigin = render(origin, motion);}).catch(() => {});
+  }
+
   function enter(next, {focus = false} = {}) {
     clearTimeout(timer);
+    clearTimeout(formingTimer);
     step = next;
     screen.dataset.stage = next;
     sky?.stage(next);
@@ -110,6 +119,7 @@ export function mountOnboarding(host, {
     intro.replaceChildren();
     controls.replaceChildren();
     showError('');
+    if (next !== 'gaze') prepareOrigin();
     if (opening[next]) {
       const [text, duration] = opening[next];
       intro.append(message('p', text, 'birth-prompt'));
@@ -117,6 +127,7 @@ export function mountOnboarding(host, {
       return;
     }
     if (next === 'bang') {
+      formingTimer = setTimeout(() => {screen.dataset.forming = '';}, BANG_DURATION - 1450);
       timer = setTimeout(() => enter('name'), BANG_DURATION);
       return;
     }
@@ -194,9 +205,12 @@ export function mountOnboarding(host, {
   viewport?.addEventListener('resize', resizeViewport, {signal});
   viewport?.addEventListener('scroll', resizeViewport, {signal});
   resizeViewport();
-  sky = startBirthSky(screen.querySelector('canvas'), motion);
+  sky = startBirthSky(screen.querySelector('.birth-stars'), motion);
   enter(draft.step);
   if (error) showError(error);
   if (autoSave && step === 'confirm') queueMicrotask(() => {if (!signal.aborted) saveName();});
-  return {dispose() {clearTimeout(timer); events.abort(); sky?.dispose();}};
+  return {dispose() {
+    clearTimeout(timer); clearTimeout(formingTimer); events.abort();
+    sky?.dispose(); disposeOrigin?.();
+  }};
 }
