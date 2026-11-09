@@ -134,7 +134,7 @@ export function mountOnboarding(host, {
   }
 
   function showSave() {
-    addTurn('この目標から、あなたの宇宙を育てていきましょう。', 'birth-reply');
+    addTurn('最初の一歩から記録していきましょう。積み重ねると、目の前の宇宙に色と光が育ちます。', 'birth-reply');
     controls.innerHTML = `<button class="birth-primary" type="button" data-birth="save">
       ${guest ? '<span class="birth-google" aria-hidden="true">G</span> Googleで続けて保存' : '保存して宇宙へ <span aria-hidden="true">→</span>'}
     </button><button class="birth-quiet birth-edit" type="button" data-birth="edit">目標を書き直す</button>`;
@@ -176,7 +176,7 @@ export function mountOnboarding(host, {
     persist();
     screen.dataset.chat = '';
     if (!conversation.children.length) {
-      addTurn('あなたの宇宙が、誕生しました。', 'birth-welcome');
+      addTurn('あなたの宇宙が、誕生しました。ここでは、大きな目標を今日できる一歩まで分けられます。', 'birth-welcome');
     }
     if (next === 'name') {
       conversation.querySelectorAll('.birth-answer, .birth-reply').forEach(turn => turn.remove());
