@@ -84,6 +84,7 @@ body.birth-page, body.birth-active {
   transform: translateY(-50%) scale(1);
 }
 .birth-screen:is([data-forming], [data-stage="name"], [data-stage="confirm"]) .birth-stars { opacity: .35; }
+.birth-screen[data-stage="bang"][data-forming] .birth-stars { opacity: .62; }
 @media (max-width: 560px) {
   .birth-origin { height: calc(100% - 125px - env(safe-area-inset-bottom)); }
 }

@@ -1,4 +1,5 @@
-export const BANG_DURATION = 4600;
+export const BANG_DURATION = 5600;
+export const SPHERE_FORMATION_AT = 4200;
 const clamp = value => Math.max(0, Math.min(1, value));
 const mix = (a, b, t) => a + (b - a) * t;
 const smooth = value => {
@@ -68,7 +69,7 @@ function glow(ctx, x, y, radius, stops) {
   ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
 }
 
-export function startBirthSky(canvas, motion) {
+export function startBirthSky(canvas, origin, motion) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   const stars = Array.from({length: 255}, (_, i) => ({
@@ -77,19 +78,20 @@ export function startBirthSky(canvas, motion) {
     color: ['#e4edff', '#9bc7ff', '#fbe1ff', '#ffdcab'][i % 4],
     size: .32 + grain(i, 87) ** 3 * 1.4
   }));
-  const particles = Array.from({length: 57}, (_, i) => ({
+  const particles = Array.from({length: 76}, (_, i) => ({
     angle: grain(i, 2) * Math.PI * 2,
     radius: .21 + grain(i, 4) * .78,
     depth: grain(i, 5),
     color: ['#bfc5ff', '#f2b4ff', '#aadfff', '#ffd5a7'][i % 4]
   }));
-  let nebula, width, height, center, frame, stage = 'gaze', entered = performance.now();
+  let nebula, width, height, center, sphereRadius, frame, stage = 'gaze', entered = performance.now();
   let drawnStage, lastDraw = 0;
   function resize() {
     const bounds = canvas.getBoundingClientRect();
     width = bounds.width;
     height = bounds.height;
     center = height * (parseFloat(getComputedStyle(canvas).getPropertyValue('--birth-point-height')) || 42) / 100;
+    sphereRadius = Math.min(width * .22, origin.clientHeight * .175);
     const ratio = Math.min(devicePixelRatio || 1, 1.6);
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
@@ -109,6 +111,7 @@ export function startBirthSky(canvas, motion) {
     const scale = Math.min(width, height);
     const cx = width / 2, cy = center;
     const flight = smooth((burst - .13) / .87);
+    const convergence = expanding ? smooth((burst - .51) / .47) : 0;
     ctx.clearRect(0, 0, width, height);
 
     if (!close && burst > .12 && nebula) {
@@ -150,20 +153,50 @@ export function startBirthSky(canvas, motion) {
       }
     }
 
-    if (stage === 'gather' || (expanding && burst < .72)) {
+    if (stage === 'gather' || expanding) {
       const gathering = stage === 'gather' ? smooth(elapsed / 2) : 1;
       const contraction = 1 - smooth(burst / .14);
-      const outgoing = smooth((burst - .12) / .59);
+      const outgoing = smooth((burst - .12) / .43);
+      const tailProgress = smooth((burst - .53) / .47);
       for (const particle of particles) {
-        const distance = scale * particle.radius * (.36 * (1 - gathering * .74) * contraction + outgoing * 1.07);
+        const start = scale * particle.radius * (.36 * (1 - gathering * .74) * contraction + outgoing * 1.07);
+        const finish = sphereRadius * (.86 + particle.depth * .18);
         const angle = particle.angle + gathering * .8 + outgoing * .4;
-        const x = Math.cos(angle) * distance, y = Math.sin(angle) * distance * .77;
-        ctx.globalAlpha = (stage === 'gather' ? gathering : 1 - smooth((burst - .34) / .38)) * (.25 + particle.depth * .65);
-        ctx.fillStyle = particle.color;
+        const curl = .62 + particle.depth * .85;
+        const sweep = angle + curl * convergence;
+        const distance = mix(start, finish, convergence);
+        const stretch = mix(.77, 1, convergence);
+        const x = cx + Math.cos(sweep) * distance;
+        const y = cy + Math.sin(sweep) * distance * stretch;
+        const life = stage === 'gather' ? gathering : 1 - smooth((burst - .82) / .18);
+        const color = convergence > .66 ? '#f1f1fb' : particle.color;
+        if (convergence > .01) {
+          const tailAngle = angle + curl * tailProgress;
+          const tailDistance = mix(start, finish, tailProgress);
+          ctx.globalAlpha = life * (.2 + particle.depth * .32);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = .5 + particle.depth * .8;
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(tailAngle) * tailDistance, cy + Math.sin(tailAngle) * tailDistance * stretch);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = life * (.35 + particle.depth * .65);
+        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(cx + x, cy + y, .48 + particle.depth * 1.55, 0, Math.PI * 2);
+        ctx.arc(x, y, .48 + particle.depth * 1.55, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+
+    if (expanding && convergence > .22 && sphereRadius > 0) {
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = smooth((convergence - .22) / .52) * (1 - smooth((burst - .81) / .19)) * .66;
+      glow(ctx, cx, cy, sphereRadius * 1.25, [
+        [0, '#fff3'], [.58, '#dedbf30d'], [.73, '#c5c2db18'],
+        [.81, '#eceaf980'], [.91, '#c6c5eb24'], [1, '#0000']
+      ]);
+      ctx.globalCompositeOperation = 'source-over';
     }
 
     if (expanding && burst > .11 && burst < .81) {

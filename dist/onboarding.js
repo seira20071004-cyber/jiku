@@ -1,4 +1,4 @@
-import {BANG_DURATION, startBirthSky} from './onboarding-sky.js';
+import {BANG_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
 
 const guestDraftKey = 'jiku:pending-universe';
 const googlePath = '/api/auth/google';
@@ -127,7 +127,7 @@ export function mountOnboarding(host, {
       return;
     }
     if (next === 'bang') {
-      formingTimer = setTimeout(() => {screen.dataset.forming = '';}, BANG_DURATION - 1450);
+      formingTimer = setTimeout(() => {screen.dataset.forming = '';}, SPHERE_FORMATION_AT);
       timer = setTimeout(() => enter('name'), BANG_DURATION);
       return;
     }
@@ -205,7 +205,7 @@ export function mountOnboarding(host, {
   viewport?.addEventListener('resize', resizeViewport, {signal});
   viewport?.addEventListener('scroll', resizeViewport, {signal});
   resizeViewport();
-  sky = startBirthSky(screen.querySelector('.birth-stars'), motion);
+  sky = startBirthSky(screen.querySelector('.birth-stars'), origin, motion);
   enter(draft.step);
   if (error) showError(error);
   if (autoSave && step === 'confirm') queueMicrotask(() => {if (!signal.aborted) saveName();});
