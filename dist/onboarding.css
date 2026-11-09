@@ -105,6 +105,10 @@ body.birth-page, body.birth-active {
   .birth-origin { height: calc(100% - 125px - env(safe-area-inset-bottom)); }
 }
 .birth-light {
+  --birth-beat-duration: 1.8s;
+  --birth-beat-peak: 1.27;
+  --birth-beat-echo: 1.11;
+  --birth-ripple-size: 3.8;
   position: absolute;
   top: var(--birth-point-height);
   left: 50%;
@@ -114,20 +118,55 @@ body.birth-page, body.birth-active {
   transform: translate(-50%, -50%);
   background: #fff7ee;
   box-shadow: 0 0 10px 1px #fbddffbf, 0 0 31px 7px #ad7cff38;
-  animation: birth-pulse 2.8s ease-in-out infinite;
-  transition: width 1.5s, height 1.5s, box-shadow 1.5s, opacity .8s;
+  animation: birth-breathe 3.5s .9s ease-in-out both;
+  transition: width .85s, height .85s, box-shadow .85s;
 }
-.birth-screen[data-stage="gather"] .birth-light {
-  width: 12px;
-  height: 12px;
+.birth-screen:is([data-stage="gather"], [data-stage="ignite"]) .birth-light {
+  width: 10px;
+  height: 10px;
   background: radial-gradient(circle, #fff6e4 31%, #ecc0ff 65%, #8ec8ff);
   box-shadow: 0 0 17px 3px #e6cdffc4, 0 0 45px 14px #8a73ff61, 0 0 85px 25px #6d4bd030;
+  animation: birth-heartbeat var(--birth-beat-duration) ease-in-out infinite;
+}
+.birth-light::after {
+  position: absolute;
+  inset: -2px;
+  border: 1px solid #ddd5ffb3;
+  border-radius: inherit;
+  box-shadow: 0 0 7px #c5adff86;
+  opacity: 0;
+  content: "";
+}
+.birth-screen:is([data-stage="gather"], [data-stage="ignite"]) .birth-light::after {
+  animation: birth-ripple var(--birth-beat-duration) ease-out infinite;
+}
+.birth-screen[data-stage="ignite"] .birth-light {
+  --birth-beat-duration: .8s;
+  --birth-beat-peak: 1.44;
+  --birth-beat-echo: 1.18;
+  --birth-ripple-size: 5.5;
+  width: 15px;
+  height: 15px;
+  box-shadow: 0 0 22px 5px #f4e0ffe0, 0 0 51px 18px #a58aff80, 0 0 95px 29px #7f64e944;
 }
 .birth-screen[data-stage="bang"] .birth-light { animation: birth-collapse .65s ease-in both; }
 .birth-screen:is([data-chat]) .birth-light { display: none; }
-@keyframes birth-pulse {
-  0%, 100% { transform: translate(-50%, -50%) scale(.83); opacity: .76; }
-  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+@keyframes birth-breathe {
+  0% { scale: 1; opacity: .78; }
+  48% { scale: 1.18; opacity: 1; }
+  100% { scale: 1; opacity: .86; }
+}
+@keyframes birth-heartbeat {
+  0%, 100% { scale: 1; opacity: .9; }
+  16% { scale: var(--birth-beat-peak); opacity: 1; }
+  28% { scale: 1; opacity: .91; }
+  42% { scale: var(--birth-beat-echo); opacity: 1; }
+  62% { scale: 1; opacity: .9; }
+}
+@keyframes birth-ripple {
+  0%, 10% { scale: .85; opacity: 0; }
+  19% { opacity: .66; }
+  76%, 100% { scale: var(--birth-ripple-size); opacity: 0; }
 }
 @keyframes birth-collapse {
   0% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
@@ -169,7 +208,7 @@ body.birth-page, body.birth-active {
   letter-spacing: .09em;
   animation: birth-rise .8s ease both;
 }
-.birth-screen[data-stage="gather"] .birth-prompt { animation: birth-rise .7s ease both, birth-fade .28s 1.72s ease-in forwards; }
+.birth-screen[data-stage="gather"] .birth-prompt { animation: birth-rise .7s ease both, birth-fade .48s 3.12s ease-in forwards; }
 @keyframes birth-fade { to { opacity: 0; } }
 .birth-screen .birth-skip {
   position: absolute;

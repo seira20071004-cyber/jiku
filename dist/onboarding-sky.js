@@ -1,6 +1,7 @@
 import {projectedOriginRadius} from './origin-framing.js';
 
 export const BANG_DURATION = 5600;
+export const GATHER_DURATION = 3600;
 export const SPHERE_FORMATION_AT = 4200;
 const clamp = value => Math.max(0, Math.min(1, value));
 const mix = (a, b, t) => a + (b - a) * t;
@@ -108,7 +109,8 @@ export function startBirthSky(canvas, origin, motion) {
     lastDraw = time;
     drawnStage = stage;
     const elapsed = (time - entered) / 1000;
-    const close = stage === 'gaze' || stage === 'gather';
+    const gatheringLight = stage === 'gather' || stage === 'ignite';
+    const close = stage === 'gaze' || gatheringLight;
     const expanding = stage === 'bang';
     const burst = expanding ? clamp(elapsed / (BANG_DURATION / 1000)) : close ? 0 : 1;
     const scale = Math.min(width, height);
@@ -157,8 +159,8 @@ export function startBirthSky(canvas, origin, motion) {
       }
     }
 
-    if (stage === 'gather' || expanding) {
-      const gathering = stage === 'gather' ? smooth(elapsed / 2) : 1;
+    if ((gatheringLight && !motion.matches) || expanding) {
+      const gathering = stage === 'gather' ? smooth((time - entered) / GATHER_DURATION) : 1;
       const contraction = 1 - smooth(burst / .14);
       const outgoing = smooth((burst - .12) / .43);
       const tailProgress = smooth((burst - .55) / .39);
@@ -172,7 +174,7 @@ export function startBirthSky(canvas, origin, motion) {
         const stretch = mix(.77, 1, convergence);
         const x = cx + Math.cos(sweep) * distance;
         const y = cy + Math.sin(sweep) * distance * stretch;
-        const life = stage === 'gather' ? gathering : 1 - smooth((burst - .82) / .18);
+        const life = gatheringLight ? gathering : 1 - smooth((burst - .82) / .18);
         const color = convergence > .66 ? '#f1f1fb' : particle.color;
         if (convergence > .01) {
           const tailAngle = angle + curl * tailProgress;

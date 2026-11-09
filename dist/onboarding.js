@@ -1,10 +1,11 @@
-import {BANG_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
+import {BANG_DURATION, GATHER_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
 
 const guestDraftKey = 'jiku:pending-universe';
 const googlePath = '/api/auth/google';
 const opening = {
-  gaze: ['光を見つめてください。', 2800],
-  gather: ['もう少し、しっかり見つめてみて。', 2000]
+  gaze: {prompt: '光を見つめてください。', duration: 4400, reducedDuration: 2800, next: 'gather'},
+  gather: {prompt: 'もう少し、しっかり見つめてみて。', duration: GATHER_DURATION, reducedDuration: 2000, next: 'ignite'},
+  ignite: {duration: 1600, next: 'bang'}
 };
 
 const welcomeTurns = [
@@ -260,9 +261,11 @@ export function mountOnboarding(host, {
     showError('');
     if (next !== 'gaze') prepareOrigin();
     if (opening[next]) {
-      const [text, duration] = opening[next];
-      intro.append(message('p', text, 'birth-prompt'));
-      timer = setTimeout(() => enter(next === 'gaze' ? 'gather' : motion.matches ? 'interest' : 'bang'), duration);
+      const {prompt, duration, reducedDuration, next: following} = opening[next];
+      if (prompt) intro.append(message('p', prompt, 'birth-prompt'));
+      timer = setTimeout(() => {
+        enter(motion.matches && next !== 'gaze' ? 'interest' : following);
+      }, motion.matches ? reducedDuration ?? 0 : duration);
       return;
     }
     if (next === 'bang') {
