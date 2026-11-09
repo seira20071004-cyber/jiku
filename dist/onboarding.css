@@ -53,9 +53,9 @@ body.birth-page, body.birth-active {
   top: var(--birth-point-height);
   width: 100%;
   height: calc(100% - 140px);
-  transform: translateY(-50%) scale(.7);
+  transform: translateY(-50%);
   opacity: 0;
-  transition: opacity 1.4s ease, transform 1.4s cubic-bezier(.19,1,.22,1);
+  transition: opacity 1.4s ease;
 }
 .birth-origin canvas {
   display: block;
@@ -67,7 +67,7 @@ body.birth-page, body.birth-active {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(44vw, 35cqh);
+  width: var(--birth-orb-diameter, min(44vw, 35cqh));
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
@@ -81,7 +81,23 @@ body.birth-page, body.birth-active {
 .birth-origin { container-type: size; }
 .birth-screen:is([data-forming], [data-chat]) .birth-origin {
   opacity: 1;
-  transform: translateY(-50%) scale(1);
+}
+.birth-origin[data-lit]::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--birth-orb-diameter, min(44vw, 35cqh));
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  box-shadow: 0 0 10px 1px #f6dcf8c0, -8px -3px 27px 2px #b299ff7c, 9px 5px 34px 2px #71bef486;
+  animation: birth-halo 1.2s ease-out both;
+  content: "";
+}
+@keyframes birth-halo {
+  0% { opacity: 0; scale: .96; }
+  43% { opacity: 1; }
+  100% { opacity: .63; scale: 1; }
 }
 .birth-screen:is([data-forming], [data-chat]) .birth-stars { opacity: .35; }
 .birth-screen[data-stage="bang"][data-forming] .birth-stars { opacity: .62; }
@@ -193,6 +209,7 @@ body.birth-page, body.birth-active {
   scrollbar-color: #80719e80 transparent;
   overscroll-behavior: contain;
 }
+.birth-conversation[data-scrolled] { mask-image: linear-gradient(transparent, #000 26px); }
 .birth-conversation:not(:empty) { margin-bottom: 17px; }
 .birth-turn {
   flex: none;
@@ -217,14 +234,19 @@ body.birth-page, body.birth-active {
   font-size: 13px;
 }
 .birth-screen .birth-question .birth-copy {
-  font: 400 clamp(20px, 4.6vw, 26px)/1.53 var(--birth-serif);
+  font: 400 clamp(17px, 4vw, 21px)/1.55 var(--birth-serif);
   letter-spacing: .025em;
   text-wrap: pretty;
 }
-.birth-screen[data-stage="confirm"] .birth-question .birth-copy,
-.birth-screen[data-stage="name"] .birth-interest .birth-copy {
+.birth-screen .birth-emphasis .birth-copy {
+  color: #fbf0ff;
+  font: 400 clamp(22px, 5.4vw, 29px)/1.52 var(--birth-serif);
+  letter-spacing: .018em;
+  text-wrap: pretty;
+}
+.birth-screen .birth-turn:is(.birth-emphasis, .birth-question):not(:nth-last-child(-n+2)) .birth-copy {
   color: #bdb0ce;
-  font-size: 15px;
+  font-size: 14px;
 }
 .birth-screen .birth-answer .birth-copy {
   color: #dcc9fa;

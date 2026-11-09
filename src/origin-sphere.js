@@ -1,8 +1,7 @@
 import {AdditiveBlending, Mesh, PlaneGeometry, ShaderMaterial, SphereGeometry} from 'three';
 
-export const ORIGIN_FOV=42;
-export const ORIGIN_RADIUS=3.2;
-export const originDistance=aspect=>Math.max(24,19/Math.max(.2,aspect));
+import {ORIGIN_RADIUS} from '../dist/origin-framing.js';
+export {ORIGIN_FOV, ORIGIN_RADIUS, originDistance} from '../dist/origin-framing.js';
 
 // A glass-like shell with interference bands over slowly moving clouds of light.
 export function originSphere(noise, colorStrength=0) {

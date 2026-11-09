@@ -25,6 +25,10 @@ test('会話の途中から再開すると、選んだ関心と入力した目�
   assert.deepEqual(onboardingDraft({step:'name',name:'学び直したい',interest:'continue'}),
     {step:'name',name:'学び直したい',interest:'continue'});
   assert.deepEqual(onboardingDraft({step:'interest',interest:'invalid'}), {step:'interest',name:''});
+  assert.deepEqual(onboardingDraft({step:'practice',interest:'continue',friction:'time'}),
+    {step:'practice',name:'',interest:'continue',friction:'time'});
+  assert.deepEqual(onboardingDraft({step:'confirm',name:'学び直したい',interest:'continue',friction:'time'}),
+    {step:'confirm',name:'学び直したい',interest:'continue',friction:'time'});
 });
 
 test('宇宙の誕生は根だけを保存し、再実行で名前や後から作った銀河を変更しない', () => {

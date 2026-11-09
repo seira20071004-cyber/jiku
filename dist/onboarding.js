@@ -30,18 +30,40 @@ const interests = {
   }
 };
 
+const frictionOptions = {
+  start: {
+    label: '何から始めるか迷う',
+    reply: 'まずは、今日できることを一つ決めてみましょう。',
+    example: '気になっていることを5分調べる'
+  },
+  time: {
+    label: '続ける時間が取れない',
+    reply: '忙しい日は、短い時間でできる一歩にしてみましょう。',
+    example: '好きなことに5分だけ触れる'
+  },
+  progress: {
+    label: '進んでいる実感がない',
+    reply: '小さな行動も記録に残すと、積み重ねが見えてきます。',
+    example: '今日できたことを一つ書く'
+  }
+};
+
 export function onboardingDraft(saved, legacy) {
   const source = saved && typeof saved === 'object' ? saved : {};
   const legacyName = typeof legacy?.draftName === 'string' ? legacy.draftName : '';
   const name = (typeof source.name === 'string' ? source.name : legacyName).slice(0, 80);
   const priorAnswer = source.direction || source.custom;
   const interest = Object.hasOwn(interests, source.interest) ? source.interest : null;
+  const friction = Object.hasOwn(frictionOptions, source.friction) ? source.friction : null;
   const hasNamedStage = ['name', 'ready', 'confirm'].includes(source.step) ||
     ['universe-name', 'galaxy', 'bang'].includes(legacy?.step) || Boolean(name || priorAnswer);
   return {
     name: name || (typeof priorAnswer === 'string' ? priorAnswer.slice(0, 80) : ''),
     ...(interest ? {interest} : {}),
-    step: source.step === 'interest' ? 'interest'
+    ...(friction ? {friction} : {}),
+    step: source.step === 'practice' && interest && friction ? 'practice'
+      : source.step === 'friction' && interest ? 'friction'
+      : source.step === 'interest' ? 'interest'
       : ['ready', 'confirm'].includes(source.step) && name.trim() ? 'confirm'
       : hasNamedStage ? 'name' : 'gaze'
   };
@@ -116,7 +138,12 @@ export function mountOnboarding(host, {
   const note = screen.querySelector('.birth-error');
   const skip = screen.querySelector('[data-birth="skip"]');
   const persist = () => onDraft?.({...draft});
-  const scrollToLatest = () => { conversation.scrollTop = conversation.scrollHeight; };
+  const updateConversationEdge = () => conversation.toggleAttribute('data-scrolled', conversation.scrollTop > 1);
+  const scrollToLatest = () => {
+    conversation.scrollTop = conversation.scrollHeight;
+    updateConversationEdge();
+  };
+  conversation.addEventListener('scroll', updateConversationEdge, {signal, passive: true});
 
   function showError(message) {
     note.textContent = message;
@@ -145,20 +172,27 @@ export function mountOnboarding(host, {
     return addTurn('最近、もう少し時間を使えたらいいなと思うことはありますか？', 'birth-question birth-interest', 'JIKU', 'h1');
   }
 
+  function focusTurn(copy, focus) {
+    if (!focus) return;
+    copy.tabIndex = -1;
+    copy.focus({preventScroll: true});
+  }
+
+  function choiceControls(options, stage, label) {
+    controls.innerHTML = `<div class="birth-choices" role="group" aria-label="${label}">${Object.entries(options).map(([id, option]) =>
+      `<button class="birth-choice" type="button" data-choice="${id}">${option.label}<span aria-hidden="true">→</span></button>`
+    ).join('')}</div>${stage === 'friction' ? '<button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>' : ''}`;
+    scrollToLatest();
+  }
+
   function showInterests(focus) {
     const question = conversation.querySelector('.birth-interest .birth-copy') || askInterest();
-    controls.innerHTML = `<div class="birth-choices" role="group" aria-label="今の気持ち">${Object.entries(interests).map(([id, option]) =>
-      `<button class="birth-choice" type="button" data-interest="${id}">${option.label}<span aria-hidden="true">→</span></button>`
-    ).join('')}</div>`;
-    scrollToLatest();
-    if (focus) {
-      question.tabIndex = -1;
-      question.focus({preventScroll: true});
-    }
+    choiceControls(interests, 'interest', '今の気持ち');
+    focusTurn(question, focus);
   }
 
   function revealFirstQuestion(focus) {
-    addTurn(welcomeLines[0], 'birth-welcome');
+    addTurn(welcomeLines[0], 'birth-emphasis');
     timer = setTimeout(() => {
       addTurn(welcomeLines[1], 'birth-welcome');
       timer = setTimeout(() => {
@@ -168,16 +202,44 @@ export function mountOnboarding(host, {
     }, 1700);
   }
 
+  function restoreChoice() {
+    if (!draft.interest || conversation.querySelector('.birth-choice-answer')) return;
+    if (!conversation.querySelector('.birth-interest')) askInterest();
+    addTurn(interests[draft.interest].label, 'birth-answer birth-choice-answer', 'あなた');
+  }
+
+  function askFriction() {
+    restoreChoice();
+    return conversation.querySelector('.birth-friction .birth-copy') ||
+      addTurn('何かを始めたり続けたりするとき、何がいちばん難しいですか？', 'birth-question birth-friction', 'JIKU', 'h2');
+  }
+
+  function explainPractice(focus, showAction) {
+    askFriction();
+    const option = frictionOptions[draft.friction];
+    addTurn(option.label, 'birth-answer birth-practice-turn', 'あなた');
+    addTurn(option.reply, 'birth-practice-turn');
+    const animated = showAction && !motion.matches;
+    const showExample = () => {
+      addTurn('「' + option.example + '」を試しに記録してみましょう。', 'birth-practice-turn');
+      showAction?.();
+    };
+    const showHighlight = () => {
+      const highlight = addTurn('小さな一歩が、宇宙の光になる。', 'birth-emphasis birth-practice-turn');
+      focusTurn(highlight, focus);
+      if (animated) timer = setTimeout(showExample, 1050);
+      else showExample();
+    };
+    if (animated) timer = setTimeout(showHighlight, 900);
+    else showHighlight();
+  }
+
   function askGoal(focus) {
+    restoreChoice();
     const option = interests[draft.interest];
-    if (option && !conversation.querySelector('.birth-choice-answer')) {
-      if (!conversation.querySelector('.birth-interest')) askInterest();
-      addTurn(option.label, 'birth-answer birth-choice-answer', 'あなた');
-    }
     const tag = option ? 'h2' : 'h1';
     const question = addTurn(option?.question || 'これから、どんなことを少しずつ育てたいですか？', 'birth-question birth-goal-question', 'JIKU', tag);
-    question.tabIndex = -1;
-    if (focus) question.focus({preventScroll: true});
+    focusTurn(question, focus);
   }
 
   function showComposer() {
@@ -215,7 +277,8 @@ export function mountOnboarding(host, {
     step = next;
     screen.dataset.stage = next;
     sky?.stage(next);
-    skip.hidden = ['interest', 'name', 'confirm'].includes(next);
+    skip.hidden = !Object.hasOwn(opening, next) && next !== 'bang';
+    origin.toggleAttribute('data-lit', Boolean(draft.friction && ['name', 'confirm'].includes(next)));
     intro.replaceChildren();
     controls.replaceChildren();
     showError('');
@@ -240,11 +303,23 @@ export function mountOnboarding(host, {
         revealFirstQuestion(focus);
         return;
       }
-      for (const line of welcomeLines) addTurn(line, 'birth-welcome');
+      addTurn(welcomeLines[0], 'birth-emphasis');
+      addTurn(welcomeLines[1], 'birth-welcome');
     }
     if (next === 'interest') {
-      conversation.querySelectorAll('.birth-answer, .birth-goal-question, .birth-reply').forEach(turn => turn.remove());
+      conversation.querySelectorAll('.birth-answer, .birth-friction, .birth-practice-turn, .birth-peak, .birth-goal-question, .birth-reply').forEach(turn => turn.remove());
       showInterests(focus);
+    } else if (next === 'friction') {
+      conversation.querySelectorAll('.birth-practice-turn, .birth-peak, .birth-goal-question, .birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
+      focusTurn(askFriction(), focus);
+      choiceControls(frictionOptions, 'friction', '続けるうえで難しいこと');
+    } else if (next === 'practice') {
+      conversation.querySelectorAll('.birth-practice-turn, .birth-peak, .birth-goal-question, .birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
+      explainPractice(focus, () => {
+        controls.innerHTML = `<button class="birth-primary" type="button" data-birth="practice">一歩を記録してみる <span aria-hidden="true">✧</span></button>
+          <button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
+        scrollToLatest();
+      });
     } else if (next === 'name') {
       conversation.querySelectorAll('.birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
       const openComposer = () => {
@@ -252,11 +327,17 @@ export function mountOnboarding(host, {
         showComposer();
         if (previous === 'confirm') controls.querySelector('input').focus();
       };
-      if (previous === 'interest' && !motion.matches) {
-        addTurn(interests[draft.interest].label, 'birth-answer birth-choice-answer', 'あなた');
-        timer = setTimeout(openComposer, 240);
-      } else openComposer();
+      if (draft.friction && !conversation.querySelector('.birth-peak')) {
+        if (!conversation.querySelector('.birth-practice-turn')) explainPractice(false);
+        addTurn('いまの一歩が、宇宙に光を灯しました。', 'birth-emphasis birth-peak');
+      }
+      if (previous === 'practice' && !motion.matches) timer = setTimeout(openComposer, 1050);
+      else openComposer();
     } else {
+      if (draft.friction && !conversation.querySelector('.birth-practice-turn')) {
+        explainPractice(false);
+        addTurn('いまの一歩が、宇宙に光を灯しました。', 'birth-emphasis birth-peak');
+      }
       if (!conversation.querySelector('.birth-goal-question')) askGoal(false);
       const answer = addTurn(draft.name, 'birth-answer birth-goal-answer', 'あなた');
       if (focus) {
@@ -286,13 +367,22 @@ export function mountOnboarding(host, {
   screen.addEventListener('click', event => {
     const button = event.target.closest('button');
     const action = button?.dataset.birth;
-    const choice = button?.dataset.interest;
-    if (choice && step === 'interest' && Object.hasOwn(interests, choice)) {
+    const choice = button?.dataset.choice;
+    if (step === 'interest' && Object.hasOwn(interests, choice)) {
       draft.interest = choice;
-      enter('name', {focus: true});
+      delete draft.friction;
+      enter('friction', {focus: true});
+    }
+    if (step === 'friction' && Object.hasOwn(frictionOptions, choice)) {
+      draft.friction = choice;
+      enter('practice', {focus: true});
     }
     if (action === 'skip') enter('interest', {focus: true});
-    if (action === 'back') enter('interest', {focus: true});
+    if (action === 'practice') enter('name', {focus: true});
+    if (action === 'back') {
+      const previous = {friction: 'interest', practice: 'friction', name: draft.friction ? 'practice' : 'interest'}[step];
+      if (previous) enter(previous, {focus: true});
+    }
     if (action === 'close') onClose?.();
     if (action === 'settings') onSettings?.();
     if (action === 'edit') enter('name', {focus: true});

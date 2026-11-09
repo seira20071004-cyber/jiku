@@ -17,7 +17,7 @@ test('公開Workerは認証設定なし・セッションなしでアプリを�
  assert.equal((await worker.fetch(req('/app.js'),env)).status,401);
  assert.equal((await worker.fetch(req('/model.js'),env)).status,401);assert.equal((await worker.fetch(req('/tree3d.js'),env)).status,401);
  assert.equal((await worker.fetch(req('/api/session'),env)).status,401);
- for(const name of ['onboarding.css','onboarding.js','onboarding-sky.js','origin-preview.js']){
+ for(const name of ['onboarding.css','onboarding.js','onboarding-sky.js','origin-framing.js','origin-preview.js']){
   const asset=await worker.fetch(req('/'+name),env);assert.equal(asset.status,200);
  }
  assert.equal((await worker.fetch(req('/universe-model.js'),env)).status,401);

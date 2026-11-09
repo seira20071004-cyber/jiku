@@ -1,3 +1,5 @@
+import {projectedOriginRadius} from './origin-framing.js';
+
 export const BANG_DURATION = 5600;
 export const SPHERE_FORMATION_AT = 4200;
 const clamp = value => Math.max(0, Math.min(1, value));
@@ -91,7 +93,8 @@ export function startBirthSky(canvas, origin, motion) {
     width = bounds.width;
     height = bounds.height;
     center = height * (parseFloat(getComputedStyle(canvas).getPropertyValue('--birth-point-height')) || 42) / 100;
-    sphereRadius = Math.min(width * .22, origin.clientHeight * .175);
+    sphereRadius = projectedOriginRadius(origin.clientWidth, origin.clientHeight);
+    if (sphereRadius) origin.style.setProperty('--birth-orb-diameter', sphereRadius * 2 + 'px');
     const ratio = Math.min(devicePixelRatio || 1, 1.6);
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
@@ -111,7 +114,8 @@ export function startBirthSky(canvas, origin, motion) {
     const scale = Math.min(width, height);
     const cx = width / 2, cy = center;
     const flight = smooth((burst - .13) / .87);
-    const convergence = expanding ? smooth((burst - .51) / .47) : 0;
+    const convergence = expanding ? smooth((burst - .52) / .39) : 0;
+    const launch = smooth((burst - .12) / .32);
     ctx.clearRect(0, 0, width, height);
 
     if (!close && burst > .12 && nebula) {
@@ -133,11 +137,11 @@ export function startBirthSky(canvas, origin, motion) {
     if (!close && burst > .16) {
       const skyAlpha = smooth((burst - .16) / .53);
       for (const star of stars) {
-        const perspective = .12 + flight * (.4 + star.depth * .9);
+        const perspective = .12 + (.72 * flight + .28 * launch) * (.4 + star.depth * .9);
         const x = star.x * width * perspective, y = star.y * height * perspective;
         if (cx + x < -5 || cx + x > width + 5 || cy + y < -5 || cy + y > height + 5) continue;
         const shimmer = motion.matches ? .85 : .82 + Math.sin(time / 1250 + star.phase) * .18;
-        const streak = expanding ? Math.sin(flight * Math.PI) * star.depth * .075 : 0;
+        const streak = expanding ? Math.sin(launch * Math.PI) * star.depth * .16 + Math.sin(flight * Math.PI) * star.depth * .065 : 0;
         ctx.globalAlpha = skyAlpha * (.28 + star.depth * .6) * shimmer;
         ctx.strokeStyle = ctx.fillStyle = star.color;
         ctx.beginPath();
@@ -157,10 +161,10 @@ export function startBirthSky(canvas, origin, motion) {
       const gathering = stage === 'gather' ? smooth(elapsed / 2) : 1;
       const contraction = 1 - smooth(burst / .14);
       const outgoing = smooth((burst - .12) / .43);
-      const tailProgress = smooth((burst - .53) / .47);
+      const tailProgress = smooth((burst - .55) / .39);
       for (const particle of particles) {
         const start = scale * particle.radius * (.36 * (1 - gathering * .74) * contraction + outgoing * 1.07);
-        const finish = sphereRadius * (.86 + particle.depth * .18);
+        const finish = sphereRadius * (.984 + particle.depth * .031);
         const angle = particle.angle + gathering * .8 + outgoing * .4;
         const curl = .62 + particle.depth * .85;
         const sweep = angle + curl * convergence;
@@ -200,16 +204,24 @@ export function startBirthSky(canvas, origin, motion) {
     }
 
     if (expanding && burst > .11 && burst < .81) {
-      const wave = clamp((burst - .11) / .7);
-      const radius = scale * (.008 + wave ** .87 * .95);
+      const reach = Math.hypot(Math.max(cx, width - cx), Math.max(cy, height - cy));
+      const wave = clamp((burst - .11) / .43);
+      const radius = reach * (.008 + wave ** .79 * 1.12);
       ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = (1 - smooth(wave)) * .79;
+      ctx.globalAlpha = (1 - wave ** 1.55) * .86;
       glow(ctx, cx, cy, radius + 1, [
         [0, '#0000'], [.59, '#0000'], [.79, '#664fd633'], [.9, '#a976ff96'],
         [.96, '#e3cfffbd'], [.985, '#82daff74'], [1, '#0000']
       ]);
+      const echo = smooth((burst - .19) / .43);
+      if (echo > 0 && echo < 1) {
+        ctx.globalAlpha = .42 * (1 - echo);
+        glow(ctx, cx, cy, reach * (.01 + echo * 1.03), [
+          [0, '#0000'], [.75, '#0000'], [.91, '#9261d98c'], [.96, '#f6d4ffbd'], [1, '#0000']
+        ]);
+      }
       const flash = smooth((burst - .11) / .055) * (1 - smooth((burst - .18) / .28));
-      ctx.globalAlpha = flash * .88;
+      ctx.globalAlpha = flash * .96;
       glow(ctx, cx, cy, scale * (.11 + flight * .24), [
         [0, '#fff6e7'], [.05, '#fff7e6'], [.14, '#eab5ffdf'], [.34, '#9a72f786'],
         [.64, '#679dff25'], [1, '#0000']
