@@ -298,7 +298,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   bg.visible=!atOrigin;renderer.setClearColor(atOrigin?'#000000':'#030611');
   if(atOrigin){
    labels.replaceChildren();pickables=[];anchors=[];
-   const sphere=originSphere(noiseGLSL);active.add(sphere);animated.add(sphere);
+   const sphere=originSphere(noiseGLSL,auraStrength);active.add(sphere);animated.add(sphere);
    if(auraStrength>0)active.add(originAura(noiseGLSL,auraStrength,sphere.material.uniforms.uTime));
    sphere.userData.id=root.id;pickables.push(sphere);
    const button=document.createElement('button');button.className='universe-origin-hit';button.setAttribute('aria-label','宇宙に入る');

@@ -75,6 +75,7 @@ body.birth-page, body.birth-active {
     radial-gradient(ellipse at center, #090619 20%, #120d2680 53%, transparent 73%),
     conic-gradient(from 16deg, #7853a2, #6fb5d2, #cc8ad9, #cd987a, #739ca5, #7853a2);
   box-shadow: inset 0 0 14px #e7d9ff64;
+  filter: grayscale(1);
   content: "";
 }
 .birth-origin { container-type: size; }

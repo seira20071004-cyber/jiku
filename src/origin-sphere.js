@@ -5,10 +5,10 @@ export const ORIGIN_RADIUS=3.2;
 export const originDistance=aspect=>Math.max(24,19/Math.max(.2,aspect));
 
 // A glass-like shell with interference bands over slowly moving clouds of light.
-export function originSphere(noise) {
+export function originSphere(noise, colorStrength=0) {
  const geometry=new SphereGeometry(ORIGIN_RADIUS,80,56);
  const material=new ShaderMaterial({
-  uniforms:{uTime:{value:0}},
+  uniforms:{uTime:{value:0},uColorStrength:{value:colorStrength}},
   vertexShader:`
    varying vec3 vSurface,vNormal,vView;
    void main(){
@@ -18,7 +18,7 @@ export function originSphere(noise) {
    }`,
   fragmentShader:`
    varying vec3 vSurface,vNormal,vView;
-   uniform float uTime;
+   uniform float uTime,uColorStrength;
    ${noise}
    vec3 spectrum(float x){return .52+.48*cos(6.28318*(x+vec3(.04,.71,.43)));}
    void main(){
@@ -42,7 +42,8 @@ export function originSphere(noise) {
     light+=vec3(.54,.72,1.)*glint*.48;
     float speck=noise(s*290.);
     light+=spectrum(tint+.37)*pow(speck,35.)*.6*(.45+ribbons);
-    gl_FragColor=vec4(light,1.);
+    float silver=dot(light,vec3(.2126,.7152,.0722));
+    gl_FragColor=vec4(mix(vec3(silver),light,uColorStrength),1.);
    }`
  });
  const sphere=new Mesh(geometry,material);
