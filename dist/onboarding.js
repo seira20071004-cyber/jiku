@@ -7,6 +7,11 @@ const opening = {
   gather: ['もう少し、しっかり見つめてみて。', 2000]
 };
 
+const welcomeLines = [
+  'あなたの宇宙が、誕生しました。',
+  'ここでは、大きな目標を今日できる一歩まで分けられます。'
+];
+
 const interests = {
   try: {
     label: 'やってみたいことがある',
@@ -152,6 +157,17 @@ export function mountOnboarding(host, {
     }
   }
 
+  function revealFirstQuestion(focus) {
+    addTurn(welcomeLines[0], 'birth-welcome');
+    timer = setTimeout(() => {
+      addTurn(welcomeLines[1], 'birth-welcome');
+      timer = setTimeout(() => {
+        askInterest();
+        timer = setTimeout(() => showInterests(focus), 700);
+      }, 2700);
+    }, 1700);
+  }
+
   function askGoal(focus) {
     const option = interests[draft.interest];
     if (option && !conversation.querySelector('.birth-choice-answer')) {
@@ -220,12 +236,15 @@ export function mountOnboarding(host, {
     persist();
     screen.dataset.chat = '';
     if (!conversation.children.length) {
-      addTurn('あなたの宇宙が、誕生しました。ここでは、大きな目標を今日できる一歩まで分けられます。', 'birth-welcome');
+      if (next === 'interest') {
+        revealFirstQuestion(focus);
+        return;
+      }
+      for (const line of welcomeLines) addTurn(line, 'birth-welcome');
     }
     if (next === 'interest') {
       conversation.querySelectorAll('.birth-answer, .birth-goal-question, .birth-reply').forEach(turn => turn.remove());
-      if (previous === 'bang' && !motion.matches) timer = setTimeout(() => showInterests(focus), 460);
-      else showInterests(focus);
+      showInterests(focus);
     } else if (next === 'name') {
       conversation.querySelectorAll('.birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
       const openComposer = () => {
