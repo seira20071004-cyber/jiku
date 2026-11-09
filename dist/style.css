@@ -62,3 +62,16 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 
 /* The only object outside the universe is its entrance. */
 .universe-scene.at-origin,.at-origin .universe-stage{background:#000}.at-origin .universe-stage{cursor:default}.universe-origin-hit{position:absolute;left:0;top:0;pointer-events:auto;border-radius:50%;padding:0;cursor:pointer}.universe-origin-hit:focus-visible,.universe-origin-fallback:focus-visible{outline:1px solid #d8caff;outline-offset:9px}.universe-origin-caption{position:absolute;bottom:11%;left:0;right:0;margin:0;text-align:center;color:#a6a0b7;font-size:10px;letter-spacing:.15em;transition:opacity .2s}.universe-stage.in-transit~.universe-hud .universe-origin-caption{opacity:0}.universe-origin-fallback{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);border-radius:50%;width:min(58vw,32vh,260px);aspect-ratio:1;box-shadow:inset 0 0 20px #e7d9ff88,0 0 16px #9d64f52b;background:radial-gradient(ellipse at 29% 19%,#ffffffb5,transparent 24%),radial-gradient(ellipse at 55% 56%,#030213 15%,#120e2b80 58%,transparent 71%),conic-gradient(from 16deg,#b088f0,#7ae4fa,#f1b0f2,#ffc493,#85e7c7,#ad91f3,#b088f0)}.space-heading .space-edit{font-size:10px;letter-spacing:0;padding:8px 11px;min-height:32px;margin-top:3px;flex-shrink:0;border:1px solid #aab9e323;border-radius:20px;color:#9da9c8;background:#11162a60}.space-heading>div{min-width:0}.space-heading h1{overflow-wrap:anywhere}
+
+.space-heading .space-edit-title{padding:0;display:block;text-align:left;font:inherit;letter-spacing:inherit;overflow-wrap:anywhere;touch-action:manipulation;user-select:none}
+.task-target-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.task-target-grid .task-week-target-entry{gap:7px;margin-top:6px}
+.task-target-grid input{width:100%;min-width:0}
+.task-target-grid [data-target-unit]{flex-shrink:0;font-size:10px}
+#dialog [data-routine-fields],#dialog [data-event-fields]{border:0;padding:0;margin:0;min-width:0}
+#dialog fieldset[hidden]{display:none}
+.event-state,.day-events p{font-size:12px;color:#b9a8db}
+.day-events{margin:0 0 18px}
+.day-events .text-button{display:block;text-align:left}
+.event-calendar-dot{position:absolute;right:9px;top:9px;width:6px;height:6px;border-radius:50%;background:#e8a679}
+@media(max-width:400px){.weekly-workspace .statistics-tabs{gap:16px}}
