@@ -3,7 +3,7 @@ import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
-import {sceneLayout,UNIVERSE_ORIGIN} from '../dist/universe-model.js';
+import {sceneLayout,UNIVERSE_ORIGIN,LEVELS} from '../dist/universe-model.js';
 import {originSphere} from './origin-sphere.js';
 const palettes=['#a9bfff','#e8bb90','#a4ddd5','#c9a8ef','#e2a9bc','#a6c8ed'];
 function hash(s){let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0}
@@ -23,14 +23,78 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  const stars=points(sp,sc,ss);bg.add(stars);
  function halo(parent,color,size,opacity=.4){const sprite=new T.Sprite(new T.SpriteMaterial({map:glow,color,transparent:true,opacity,blending:T.AdditiveBlending,depthWrite:false}));sprite.scale.set(size,size,1);parent.add(sprite);return sprite}
  const animated=new Set();
- function galaxy(seed,size=1,distant=false){const group=new T.Group(),r=random(seed),p=[],c=[],sz=[],base=new T.Color(palettes[seed%palettes.length]),warm=new T.Color('#ffe3b2'),blue=new T.Color('#899bff'),count=distant?(low?260:420):low?1000:small?1800:3300;
- for(let i=0;i<count;i++){const radius=Math.pow(r(),.8)*3.2,arms=2+seed%3,arm=i%arms,angle=arm*Math.PI*2/arms+radius*(1.1+(seed%5)*.13)+(r()-.5)*(distant?.18+radius*.13:.4+radius*.3),spread=(r()-.5)*(.15+radius*.15);p.push(Math.cos(angle)*radius+spread,(r()-.5)*(.08+radius*.12),Math.sin(angle)*radius+(r()-.5)*radius*.14);const col=radius<.65?warm.clone():base.clone().lerp(blue,r()*.5);col.multiplyScalar(.55+r()*.85);c.push(col.r,col.g,col.b);sz.push(.65+r()*1.65)}
- const cloud=points(p,c,sz);if(distant)cloud.material.uniforms.uFade.value=.82;group.add(cloud);group.rotation.set(.98+(seed%3)*.13,0,(seed%7)*.18);group.scale.setScalar(size);const core=new T.Mesh(new T.SphereGeometry(distant?.07:.13,18,12),new T.MeshBasicMaterial({color:distant?'#c9bdab':'#fff5da'}));group.add(core);halo(group,'#ffe5bf',2,distant?.23:.7);if(!distant)halo(group,base,7,.16);group.userData.spin=.025;animated.add(group);return group}
+ function galaxyParticles(seed,count,distant){
+  const rng=random(seed),positions=[],colors=[],sizes=[];
+  const base=new T.Color(palettes[seed%palettes.length]);
+  const warm=new T.Color('#ffe3b2'),blue=new T.Color('#899bff'),arms=2+seed%3;
+  for(let i=0;i<count;i++){
+   const radius=Math.pow(rng(),.8)*3.2;
+   const twist=radius*(1.1+(seed%5)*.13);
+   const angle=i%arms*Math.PI*2/arms+twist+(rng()-.5)*(distant?.18+radius*.13:.4+radius*.3);
+   const spread=(rng()-.5)*(.15+radius*.15);
+   positions.push(Math.cos(angle)*radius+spread,(rng()-.5)*(.08+radius*.12),Math.sin(angle)*radius+(rng()-.5)*radius*.14);
+   const color=radius<.65?warm.clone():base.clone().lerp(blue,rng()*.5);
+   color.multiplyScalar(.55+rng()*.85);
+   colors.push(color.r,color.g,color.b);sizes.push(.65+rng()*1.65);
+  }
+  return {positions,colors,sizes,base};
+ }
+ function galaxy(seed,size=1,distant=false){
+  const group=new T.Group();
+  const count=distant?(low?260:420):low?1000:small?1800:3300;
+  const {positions,colors,sizes,base}=galaxyParticles(seed,count,distant);
+  const cloud=points(positions,colors,sizes);
+  if(distant)cloud.material.uniforms.uFade.value=.82;
+  group.add(cloud);group.rotation.set(.98+(seed%3)*.13,0,(seed%7)*.18);group.scale.setScalar(size);
+  const core=new T.Mesh(new T.SphereGeometry(distant?.07:.13,18,12),new T.MeshBasicMaterial({color:distant?'#c9bdab':'#fff5da'}));
+  group.add(core);halo(group,'#ffe5bf',2,distant?.23:.7);
+  if(!distant)halo(group,base,7,.16);
+  group.userData.spin=.025;animated.add(group);return group;
+ }
+ let galaxyField=null,galaxyFieldKey='';
+ function fillGalaxyField(){
+  const aspect=width/height,key=[baseDistance,aspect.toFixed(2)].join(':');
+  if(galaxyFieldKey===key&&galaxyField)return;
+  if(galaxyField){bg.remove(galaxyField);cleanup(galaxyField)}
+  const positions=[],colors=[],sizes=[],rng=random(61722);
+  const layers=[
+   {z:-16,count:7,scale:1.14,light:.43},
+   {z:-34,count:10,scale:1.18,light:.52},
+   {z:-63,count:15,scale:1.24,light:.58},
+   {z:-104,count:20,scale:1.3,light:.54}
+  ];
+  const vertex=new T.Vector3(),transform=new T.Object3D();
+  for(const [layerIndex,layer] of layers.entries()){
+   const count=low?Math.ceil(layer.count*.75):layer.count;
+   const columns=Math.max(2,Math.round(Math.sqrt(count*aspect))),rows=Math.ceil(count/columns);
+   for(let i=0;i<count;i++){
+    const seed=770+layerIndex*641+i*19,z=layer.z+(rng()-.5)*10;
+    const halfHeight=(baseDistance-z)*Math.tan(T.MathUtils.degToRad(camera.fov/2));
+    const x=((i%columns+.15+rng()*.7)/columns*2-1)*halfHeight*aspect*1.12;
+    const y=((Math.floor(i/columns)+.15+rng()*.7)/rows*2-1)*halfHeight*1.16;
+    transform.position.set(x,y,z);
+    transform.rotation.set(.72+rng()*.6,rng()*.3,rng()*Math.PI*2);
+    transform.scale.setScalar(layer.scale*(.61+rng()*.68));
+    transform.updateMatrix();
+    const dust=galaxyParticles(seed,low?180:290,true);
+    for(let j=0;j<dust.sizes.length;j++){
+     const k=j*3;vertex.fromArray(dust.positions,k).applyMatrix4(transform.matrix);
+     positions.push(vertex.x,vertex.y,vertex.z);
+     colors.push(dust.colors[k]*layer.light,dust.colors[k+1]*layer.light,dust.colors[k+2]*layer.light);
+     sizes.push(dust.sizes[j]);
+    }
+    positions.push(x,y,z);colors.push(.46,.35,.25);sizes.push(3.2);
+   }
+  }
+  galaxyField=points(positions,colors,sizes);galaxyFieldKey=key;bg.add(galaxyField);
+ }
  const distantGalaxies=new T.Group();
  distantGalaxies.visible=false;bg.add(distantGalaxies);
- function setGalaxyBackdrop(enabled){
-  stars.visible=!enabled;distantGalaxies.visible=enabled;
-  if(!enabled)return;
+ function setGalaxyBackdrop(depth){
+  stars.visible=depth>1;distantGalaxies.visible=depth===1;
+  if(depth===0)fillGalaxyField();
+  if(galaxyField)galaxyField.visible=depth===0;
+  if(depth!==1)return;
   const randomPosition=random(27114);
   const columns=width/height<.85?3:5, rows=4;
   for(let i=0;i<columns*rows;i++){
@@ -64,11 +128,13 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   baseDistance=Math.max(24,19/Math.max(.2,width/height));camera.position.set(0,0,baseDistance);camera.lookAt(0,0,0);return;
  }
  const root=nodes.find(n=>n.parentId===null),node=nodes.find(n=>n.id===nodeId)||root;let depth=0,p=node;while(p?.parentId){depth++;p=nodes.find(n=>n.id===p.parentId)}const children=depth>=4?[]:nodes.filter(n=>n.parentId===node.id).sort((a,b)=>(a.order||0)-(b.order||0)).slice(0,small?12:24);const map=sceneLayout(children,width,height);if(depth){const central=depth===1?blackHole(hash(node.id)):depth===2?star(hash(node.id),1.45):planet(hash(node.id),depth===3?3.1:2.1);central.position.set(0,0,-2);active.add(central);if(depth===1){const disk=galaxy(hash(node.id),2.7);disk.position.z=-9;disk.children.forEach(o=>{if(o.material)o.material.opacity=.4});active.add(disk)}}
- const portrait=width/height<.85;
+ const portrait=width/height<.85,rows=Math.ceil(children.length/(portrait?2:3));
+ baseDistance=Math.max(portrait?32:25,depth?((Math.ceil(children.length/(portrait?4:7))-1)*3.3+7)*2.1:((portrait?9:12)/Math.max(.35,width/height))*1.5,rows*10);
  for(let i=0;i<children.length;i++){const n=children[i],h=hash(n.id);let mesh=depth===0?galaxy(h,.84):depth===1?star(h,.64):planet(h,depth===2?.75:.46);let x=map[i].x,y=map[i].y,z=map[i].z;
+ if(depth===0){z=(i%3-1)*3.8;const perspective=(baseDistance-z)/baseDistance;x*=perspective;y*=perspective}
  if(depth>0){const ring=Math.floor(i/(portrait?4:7)),count=Math.min(portrait?4:7,children.length-ring*(portrait?4:7)),a=(i%(portrait?4:7))/count*Math.PI*2+.32;const r=5.0+ring*3.3;x=Math.cos(a)*r;y=Math.sin(a)*r*.72;active.add(orbit(r));}
- mesh.position.set(x,y,z);active.add(mesh);const hit=new T.Mesh(new T.SphereGeometry(1.2,12,8),new T.MeshBasicMaterial({visible:false}));hit.position.copy(mesh.position);hit.userData.id=n.id;active.add(hit);pickables.push(hit);const button=document.createElement('button');button.className='celestial-label';button.textContent=n.name;button.title=n.name;button.setAttribute('aria-label',n.name+'へ入る');button.addEventListener('click',()=>{if(!transitioning)onSelect(n.id)});labels.append(button);anchors.push({button,position:mesh.position.clone().add(new T.Vector3(0,depth===0?-2.05:-1.15,0)),mesh,hit,id:n.id,orbit:depth>=2?{radius:Math.hypot(x,y/.72),angle:Math.atan2(y/.72,x)}:null});if(born===n.id&&!reduced){mesh.scale.multiplyScalar(.01);mesh.userData.birth=performance.now();mesh.userData.finalScale=depth===0?.84:1}}
- const rows=Math.ceil(children.length/(portrait?2:3));baseDistance=Math.max(portrait?32:25,depth?((Math.ceil(children.length/(portrait?4:7))-1)*3.3+7)*2.1:((portrait?9:12)/Math.max(.35,width/height))*1.5,rows*10);camera.position.set(0,0,baseDistance);camera.lookAt(0,0,0);setGalaxyBackdrop(depth===1);onZoom?.(100);born=null;
+ mesh.position.set(x,y,z);active.add(mesh);const hit=new T.Mesh(new T.SphereGeometry(1.2,12,8),new T.MeshBasicMaterial({visible:false}));hit.position.copy(mesh.position);hit.userData.id=n.id;active.add(hit);pickables.push(hit);const button=document.createElement('button');button.className='celestial-label';button.dataset.level=LEVELS[depth+1];button.textContent=n.name;button.title=LEVELS[depth+1]+' · '+n.name;button.setAttribute('aria-label',n.name+'へ入る');button.addEventListener('click',()=>{if(!transitioning)onSelect(n.id)});labels.append(button);anchors.push({button,position:mesh.position.clone().add(new T.Vector3(0,depth===0?-2.05:-1.15,0)),mesh,hit,id:n.id,orbit:depth>=2?{radius:Math.hypot(x,y/.72),angle:Math.atan2(y/.72,x)}:null});if(born===n.id&&!reduced){mesh.scale.multiplyScalar(.01);mesh.userData.birth=performance.now();mesh.userData.finalScale=depth===0?.84:1}}
+ camera.position.set(0,0,baseDistance);camera.lookAt(0,0,0);setGalaxyBackdrop(depth);onZoom?.(100);born=null;
  }
  function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix()}
  const ro=new ResizeObserver(()=>{const old=width/height;resize();if(Math.abs(old-width/height)>.15&&!transitioning)fill(currentNode)});resize();fill(current);ro.observe(host);
@@ -80,7 +146,11 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  renderer.domElement.addEventListener('pointerdown',downEvent);renderer.domElement.addEventListener('pointermove',moveEvent);renderer.domElement.addEventListener('pointerup',upEvent);renderer.domElement.addEventListener('pointercancel',upEvent);renderer.domElement.addEventListener('wheel',wheel,{passive:false});
  function animate(time){if(disposed)return;raf=requestAnimationFrame(animate);if(document.hidden||time-last<(low?42:32))return;const dt=Math.min(.05,(time-last)/1000);last=time;if(!reduced){stars.rotation.z=Math.sin(time*.000008)*.012;for(const o of animated){o.rotation.y+=(o.userData.spin||.02)*dt;const u=o.material?.uniforms;if(u?.uTime)u.uTime.value=time*.001;if(o.userData.birth){const f=Math.min(1,(time-o.userData.birth)/1400);o.scale.setScalar((o.userData.finalScale||1)*(.01+.99*(1-Math.pow(1-f,3))));if(f===1)delete o.userData.birth}}}
  if(burstCloud){const age=(time-burstStart)/1000,arr=burstCloud.geometry.attributes.position;for(let i=0;i<arr.count;i++)arr.setXYZ(i,burstVelocities[i*3]*age,burstVelocities[i*3+1]*age,burstVelocities[i*3+2]*age);arr.needsUpdate=true;burstCloud.material.uniforms.uFade.value=Math.max(0,1-age/4.5);if(age>4.5){cleanup(burstCloud);burstCloud=null}}
- if(tween)tween(time);bg.position.x=-camera.position.x*.08;bg.position.y=-camera.position.y*.08;camera.updateMatrixWorld();const used=[];for(const a of anchors){if(a.orbit&&!reduced&&!transitioning&&!pointers.size&&!host.matches(':hover')&&document.activeElement!==a.button){a.orbit.angle+=dt*.004;const x=Math.cos(a.orbit.angle)*a.orbit.radius,y=Math.sin(a.orbit.angle)*a.orbit.radius*.72;a.mesh.position.x=x;a.mesh.position.y=y;a.hit.position.copy(a.mesh.position);a.position.set(x,y-1.15,a.mesh.position.z)}const p=a.position.clone().project(camera);let x=(p.x*.5+.5)*width,y=(-p.y*.5+.5)*height;if(a.origin){const diameter=Math.min(width*.85,height*3.2/(Math.tan(T.MathUtils.degToRad(camera.fov/2))*camera.position.z));a.button.style.width=a.button.style.height=diameter+'px';a.button.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`;continue}const w=Math.min(small?200:220,a.button.offsetWidth||130);x=Math.max(w/2+8,Math.min(width-w/2-8,x));for(let tries=0;tries<4&&used.some(r=>Math.abs(x-r.x)<(w+r.w)/2+5&&Math.abs(y-r.y)<46);tries++)y+=47;const visible=p.z<1&&y>10&&y<height-45;if(visible)used.push({x,y,w});a.button.style.transform=`translate(${x}px,${y}px) translate(-50%,0)`;a.button.style.visibility=visible?'visible':'hidden';}onZoom?.(Math.round(baseDistance/camera.position.z*100));composer.render()}
+ if(tween)tween(time);bg.position.x=-camera.position.x*.08;bg.position.y=-camera.position.y*.08;camera.updateMatrixWorld();const used=[];for(const a of anchors){if(a.orbit&&!reduced&&!transitioning&&!pointers.size&&!host.matches(':hover')&&document.activeElement!==a.button){a.orbit.angle+=dt*.004;const x=Math.cos(a.orbit.angle)*a.orbit.radius,y=Math.sin(a.orbit.angle)*a.orbit.radius*.72;a.mesh.position.x=x;a.mesh.position.y=y;a.hit.position.copy(a.mesh.position);a.position.set(x,y-1.15,a.mesh.position.z)}const p=a.position.clone().project(camera);let x=(p.x*.5+.5)*width,y=(-p.y*.5+.5)*height;if(a.origin){const diameter=Math.min(width*.85,height*3.2/(Math.tan(T.MathUtils.degToRad(camera.fov/2))*camera.position.z));a.button.style.width=a.button.style.height=diameter+'px';a.button.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`;continue}const w=a.button.offsetWidth||130,h=a.button.offsetHeight||44;
+ x=Math.max(w/2+8,Math.min(width-w/2-8,x));
+ for(let tries=0;tries<4&&used.some(r=>Math.abs(x-r.x)<(w+r.w)/2+5&&y<r.y+r.h+4&&y+h>r.y-4);tries++)y+=h+5;
+ const visible=p.z<1&&y>10&&y<height-h-2;
+ if(visible)used.push({x,y,w,h});a.button.style.transform=`translate(${x}px,${y}px) translate(-50%,0)`;a.button.style.visibility=visible?'visible':'hidden';}onZoom?.(Math.round(baseDistance/camera.position.z*100));composer.render()}
  raf=requestAnimationFrame(animate);
- return {async navigate(id,direction=1){if(transitioning||disposed)return false;transitioning=true;labels.inert=true;host.classList.add('in-transit');const anchor=anchors.find(a=>a.id===id),start=camera.position.clone(),destination=anchor?.mesh.position.clone()||new T.Vector3(0,0,0),startTime=performance.now(),duration=reduced?0:direction>0?1450:1100;return new Promise(resolve=>{pendingResolve=resolve;tween=time=>{const raw=duration?Math.min(1,(time-startTime)/duration):1,t=raw*raw*(3-2*raw);if(raw<.63){camera.position.lerpVectors(start,new T.Vector3(destination.x,destination.y,direction>0?3:baseDistance*1.65),Math.min(1,t/.7));labels.style.opacity=String(Math.max(0,1-raw*3))}else{if(currentNode!==id){fill(id);camera.position.z=direction>0?baseDistance*1.45:baseDistance*.6}const f=(raw-.63)/.37;camera.position.z=T.MathUtils.lerp(direction>0?baseDistance*1.45:baseDistance*.6,baseDistance,1-Math.pow(1-f,3));labels.style.opacity=String(f)}warp.material.opacity=Math.sin(raw*Math.PI)*.25;warp.position.set(camera.position.x,camera.position.y,camera.position.z-18);host.style.setProperty('--travel',String(Math.sin(raw*Math.PI)*.6));if(raw===1){tween=null;transitioning=false;labels.inert=false;labels.style.opacity='1';host.classList.remove('in-transit');host.style.setProperty('--travel','0');pendingResolve=null;resolve(true)}}})},zoom(factor){if(!transitioning)camera.position.z=T.MathUtils.clamp(camera.position.z/factor,baseDistance*.45,baseDistance*2)},reset(){camera.position.set(0,0,baseDistance)},birth(id){born=id;fill(currentNode)},burst(){if(reduced)return;const p=[],c=[],sizes=[],r=random(824);burstVelocities=[];for(let i=0;i<(low?350:750);i++){p.push(0,0,0);const a=r()*Math.PI*2,v=2+r()*13;burstVelocities.push(Math.cos(a)*v,Math.sin(a)*v,(r()-.5)*v);const col=new T.Color(palettes[i%palettes.length]);c.push(col.r,col.g,col.b);sizes.push(1+r()*2)}burstCloud=points(p,c,sizes);scene.add(burstCloud);burstStart=performance.now()},getView(){return null},dispose(){pendingResolve?.(false);pendingResolve=null;disposed=true;cancelAnimationFrame(raf);ro.disconnect();for(const [k,fn] of [['pointerdown',downEvent],['pointermove',moveEvent],['pointerup',upEvent],['pointercancel',upEvent],['wheel',wheel]])renderer.domElement.removeEventListener(k,fn);cleanup(active);cleanup(bg);cleanup(warp);if(burstCloud)cleanup(burstCloud);glow.dispose();composer.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();labels.remove()}};
+ return {async navigate(id,direction=1){if(transitioning||disposed)return false;transitioning=true;labels.inert=true;host.classList.add('in-transit');const anchor=anchors.find(a=>a.id===id),start=camera.position.clone(),destination=anchor?.mesh.position.clone()||new T.Vector3(0,0,0),startTime=performance.now(),duration=reduced?0:direction>0?1450:1100;return new Promise(resolve=>{pendingResolve=resolve;tween=time=>{const raw=duration?Math.min(1,(time-startTime)/duration):1,t=raw*raw*(3-2*raw);if(raw<.63){camera.position.lerpVectors(start,new T.Vector3(destination.x,destination.y,direction>0?destination.z+3:baseDistance*1.65),Math.min(1,t/.7));labels.style.opacity=String(Math.max(0,1-raw*3))}else{if(currentNode!==id){fill(id);camera.position.z=direction>0?baseDistance*1.45:baseDistance*.6}const f=(raw-.63)/.37;camera.position.z=T.MathUtils.lerp(direction>0?baseDistance*1.45:baseDistance*.6,baseDistance,1-Math.pow(1-f,3));labels.style.opacity=String(f)}warp.material.opacity=Math.sin(raw*Math.PI)*.25;warp.position.set(camera.position.x,camera.position.y,camera.position.z-18);host.style.setProperty('--travel',String(Math.sin(raw*Math.PI)*.6));if(raw===1){tween=null;transitioning=false;labels.inert=false;labels.style.opacity='1';host.classList.remove('in-transit');host.style.setProperty('--travel','0');pendingResolve=null;resolve(true)}}})},zoom(factor){if(!transitioning)camera.position.z=T.MathUtils.clamp(camera.position.z/factor,baseDistance*.45,baseDistance*2)},reset(){camera.position.set(0,0,baseDistance)},birth(id){born=id;fill(currentNode)},burst(){if(reduced)return;const p=[],c=[],sizes=[],r=random(824);burstVelocities=[];for(let i=0;i<(low?350:750);i++){p.push(0,0,0);const a=r()*Math.PI*2,v=2+r()*13;burstVelocities.push(Math.cos(a)*v,Math.sin(a)*v,(r()-.5)*v);const col=new T.Color(palettes[i%palettes.length]);c.push(col.r,col.g,col.b);sizes.push(1+r()*2)}burstCloud=points(p,c,sizes);scene.add(burstCloud);burstStart=performance.now()},getView(){return null},dispose(){pendingResolve?.(false);pendingResolve=null;disposed=true;cancelAnimationFrame(raf);ro.disconnect();for(const [k,fn] of [['pointerdown',downEvent],['pointermove',moveEvent],['pointerup',upEvent],['pointercancel',upEvent],['wheel',wheel]])renderer.domElement.removeEventListener(k,fn);cleanup(active);cleanup(bg);cleanup(warp);if(burstCloud)cleanup(burstCloud);glow.dispose();composer.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();labels.remove()}};
 }

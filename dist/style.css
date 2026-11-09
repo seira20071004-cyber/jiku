@@ -75,3 +75,51 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .day-events .text-button{display:block;text-align:left}
 .event-calendar-dot{position:absolute;right:9px;top:9px;width:6px;height:6px;border-radius:50%;background:#e8a679}
 @media(max-width:400px){.weekly-workspace .statistics-tabs{gap:16px}}
+
+/* The same branching map supports filtering and traveling through the universe. */
+.hierarchy-hint{margin:0 0 14px;color:#a2aaca;font-size:11px}
+.hierarchy-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:9px 0 16px;font-size:10px;color:#b6bdd6}
+.hierarchy-legend span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.hierarchy-legend i{font-style:normal;color:var(--level-ink,#b6bdd6)}
+.hierarchy-legend b{color:#525876;font-weight:400}
+.hierarchy-tree,.hierarchy-children{list-style:none;margin:0;padding:0}
+.hierarchy-tree{--branch-line:#777aa45e}
+.hierarchy-children{padding-left:18px}
+.hierarchy-children[hidden]{display:none}
+.hierarchy-children>.hierarchy-branch{position:relative;padding:7px 0 0 14px}
+.hierarchy-children>.hierarchy-branch::before,.hierarchy-children>.hierarchy-branch::after{content:'';position:absolute;left:0;pointer-events:none}
+.hierarchy-children>.hierarchy-branch::before{top:0;bottom:0;border-left:1px solid var(--branch-line)}
+.hierarchy-children>.hierarchy-branch:last-child::before{bottom:auto;height:30px}
+.hierarchy-children>.hierarchy-branch::after{width:14px;top:30px;border-top:1px solid var(--branch-line)}
+.hierarchy-row{display:flex;min-height:46px;border:1px solid #8797be29;border-radius:10px;background:#121a2c}
+.hierarchy-row.is-current{border-color:#a88cf2;background:#292143}
+.hierarchy-pick{display:flex;align-items:center;gap:8px;min-width:0;flex:1;text-align:left;padding:8px 10px;color:#e1e7f8;border-radius:9px}
+.hierarchy-pick:hover,.hierarchy-expand:hover{background:#ffffff09}
+.hierarchy-mark{width:19px;flex:0 0 19px;font-size:16px;text-align:center;color:var(--level-ink,#ced2f0)}
+.hierarchy-level{font-size:9px;color:var(--level-ink,#ced2f0);white-space:nowrap}
+.hierarchy-name{font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+.hierarchy-name small{display:block;margin-top:2px;color:#a7afca;font-size:9px}
+.hierarchy-current{margin-left:auto;color:#cfb9ff;font-size:11px}
+.hierarchy-expand{flex:0 0 43px;min-height:44px;display:flex;align-items:center;justify-content:center;gap:4px;border-left:1px solid #8797be29;color:#c5cbe5;font-size:16px;border-radius:0 9px 9px 0}
+.hierarchy-expand small{font-size:9px;color:#a2aaca}
+.hierarchy-row[data-level="0"],.hierarchy-legend [data-level="0"]{--level-ink:#d0b3ff}
+.hierarchy-row[data-level="1"],.hierarchy-legend [data-level="1"]{--level-ink:#9db4ff}
+.hierarchy-row[data-level="2"],.hierarchy-legend [data-level="2"]{--level-ink:#f3ce8d}
+.hierarchy-row[data-level="3"],.hierarchy-legend [data-level="3"]{--level-ink:#9cdbce}
+.hierarchy-row[data-level="4"],.hierarchy-legend [data-level="4"]{--level-ink:#c8c9df}
+.universe-topline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.space-breadcrumb{min-width:0}
+.space-breadcrumb button[aria-current]{color:#e0d8ff;background:#8684c22b;border-radius:16px;padding-inline:8px}
+.space-map-trigger{pointer-events:auto;flex-shrink:0;padding:8px 12px;min-height:34px;border:1px solid #c2bcf137;border-radius:18px;background:#11172bcc;color:#d7d4ec;font-size:11px}
+.space-map-trigger>svg{vertical-align:middle;margin-right:3px;color:#b7a4ed}
+.celestial-label[data-level]{white-space:normal;text-wrap:balance;overflow-wrap:anywhere}
+.celestial-label[data-level]::before{content:attr(data-level);display:inline-block;margin-right:6px;color:#bcc2eb;font-size:8px;line-height:1}
+@media(max-width:560px){
+ .hierarchy-children{padding-left:11px}
+ .hierarchy-children>.hierarchy-branch{padding-left:9px}
+ .hierarchy-children>.hierarchy-branch::after{width:9px}
+ .hierarchy-pick{gap:5px;padding-inline:6px}
+ .hierarchy-expand{flex-basis:36px}
+ .hierarchy-name{font-size:11px}
+ .space-map-trigger{font-size:10px}
+}
