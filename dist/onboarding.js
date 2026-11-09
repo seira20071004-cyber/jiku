@@ -5,33 +5,30 @@ const googlePath = '/api/auth/google';
 const opening = {
   gaze: {prompt: '光を見つめてください。', duration: 4400, reducedDuration: 2800, next: 'gather'},
   gather: {prompt: 'もう少し、しっかり見つめてみて。', duration: GATHER_DURATION, reducedDuration: 2000, next: 'ignite'},
-  ignite: {duration: 1600, next: 'bang'}
+  ignite: {duration: 3200, next: 'still'},
+  still: {duration: 1050, next: 'bang'}
 };
 
-const welcomeTurns = [
-  ['あなたの宇宙が、誕生しました。', 'birth-emphasis', 1700],
-  ['ここでは、大きな目標を今日できる一歩まで分けられます。', 'birth-welcome', 2700],
-  ['最近、もう少し時間を使えたらいいなと思うことはありますか？', 'birth-question', 700, 'JIKU', 'h1']
+const witnessedBirthTurns = [
+  ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis', 2800],
+  ['さっき光に向けた集中を、日々の大切なことにも向けられます。', 'birth-welcome', 3100]
 ];
-const saveTurns = [
-  ['最初の一歩から記録していきましょう。', 'birth-reply', 1750],
-  ['積み重ねると、目の前の宇宙に色と光が育ちます。', 'birth-reply', 0]
+const welcomeTurns = [
+  ['JIKUでは、大きな目標を、今日できる一歩まで分けられます。', 'birth-welcome', 2900],
+  ['最近、もう少し時間を使えたらいいなと思うことはありますか？', 'birth-question', 700, 'JIKU', 'h1']
 ];
 
 const interests = {
   try: {
     label: 'やってみたいことがある',
-    question: '何をやってみたいですか？',
     example: '自分のサービスを作りたい'
   },
   continue: {
     label: '続けたいことがある',
-    question: 'それを続けて、どうなれたらうれしいですか？',
     example: '英語で気軽に話せるようになりたい'
   },
   unsure: {
     label: 'まだ思いつかない',
-    question: 'どんな時間が少し増えたら、うれしいですか？',
     example: '好きなことをする時間を増やしたい'
   }
 };
@@ -190,7 +187,7 @@ export function mountOnboarding(host, {
     ).join('')}</div>${canGoBack ? '<button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>' : ''}`;
   }
 
-  function showInterests(previous, focus) {
+  function showInterests(previous, focus, witnessedBirth) {
     const showChoices = question => {
       choiceControls(interests, '今の気持ち');
       focusTurn(question, focus);
@@ -199,7 +196,7 @@ export function mountOnboarding(host, {
       const [text, className, , from, tag] = welcomeTurns.at(-1);
       showChoices(showTurn(text, className, from, tag));
     } else {
-      showSequence(welcomeTurns, showChoices);
+      showSequence(witnessedBirth ? [...witnessedBirthTurns, ...welcomeTurns] : welcomeTurns, showChoices);
     }
   }
 
@@ -216,15 +213,9 @@ export function mountOnboarding(host, {
     });
   }
 
-  function askGoal(focus) {
-    const option = interests[draft.interest];
-    const question = showTurn(option?.question || 'これから、どんなことを少しずつ育てたいですか？', 'birth-question', 'JIKU', 'h1');
-    focusTurn(question, focus);
-  }
-
   function showComposer() {
     controls.innerHTML = `<form class="birth-form">
-      <label class="birth-visually-hidden" for="birth-input">宇宙の目標</label>
+      <label class="birth-visually-hidden" for="birth-input">いちばん大きな目標</label>
       <input id="birth-input" maxlength="80" required enterkeyhint="send" autocomplete="off">
       <button class="birth-primary" type="submit">送る <span aria-hidden="true">↑</span></button>
     </form><button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
@@ -247,7 +238,7 @@ export function mountOnboarding(host, {
     getRenderer.then(render => {if (!signal.aborted) disposeOrigin = render(origin, motion);}).catch(() => {});
   }
 
-  function enter(next, {focus = false} = {}) {
+  function enter(next, {focus = false, witnessedBirth = false} = {}) {
     clearTimeout(timer);
     clearTimeout(formingTimer);
     const previous = step;
@@ -270,7 +261,7 @@ export function mountOnboarding(host, {
     }
     if (next === 'bang') {
       formingTimer = setTimeout(() => {screen.dataset.forming = '';}, SPHERE_FORMATION_AT);
-      timer = setTimeout(() => enter('interest'), BANG_DURATION);
+      timer = setTimeout(() => enter('interest', {witnessedBirth: true}), BANG_DURATION);
       return;
     }
 
@@ -278,7 +269,7 @@ export function mountOnboarding(host, {
     persist();
     screen.dataset.chat = '';
     if (next === 'interest') {
-      showInterests(previous, focus);
+      showInterests(previous, focus, witnessedBirth);
     } else if (next === 'friction') {
       const question = showTurn('何かを始めたり続けたりするとき、何がいちばん難しいですか？', 'birth-question', 'JIKU', 'h1');
       choiceControls(frictionOptions, '続けるうえで難しいこと', true);
@@ -286,23 +277,22 @@ export function mountOnboarding(host, {
     } else if (next === 'practice') {
       showPractice(focus);
     } else if (next === 'name') {
-      const openComposer = () => {
-        askGoal(focus);
+      const goalQuestion = ['この宇宙で叶えたい、いちばん大きな目標は何ですか？', 'birth-question', 0, 'JIKU', 'h1'];
+      const openComposer = question => {
         showComposer();
         if (previous === 'confirm') controls.querySelector('input').focus();
+        else focusTurn(question, focus);
       };
-      if (previous === 'practice') {
-        showTurn('いまの一歩が、宇宙に光を灯しました。', 'birth-emphasis');
-        timer = setTimeout(openComposer, 2000);
-      } else openComposer();
+      const turns = previous === 'practice' ? [
+        ['いまの小さな一歩が、宇宙に光を灯しました。', 'birth-emphasis', 2200],
+        ['今度は、その一歩を重ねた先の未来を思い浮かべてみてください。', 'birth-welcome', 2900],
+        goalQuestion
+      ] : [goalQuestion];
+      showSequence(turns, openComposer);
     } else {
-      const turns = previous === 'name'
-        ? [[draft.name, 'birth-answer', 1200, 'あなた'], ...saveTurns]
-        : [saveTurns.at(-1)];
-      showSequence(turns, reply => {
-        showSave();
-        focusTurn(reply, focus);
-      });
+      const answer = showTurn(draft.name, 'birth-answer', 'あなた');
+      showSave();
+      focusTurn(answer, focus);
     }
   }
 

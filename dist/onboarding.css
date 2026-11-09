@@ -149,7 +149,8 @@ body.birth-page, body.birth-active {
   height: 15px;
   box-shadow: 0 0 22px 5px #f4e0ffe0, 0 0 51px 18px #a58aff80, 0 0 95px 29px #7f64e944;
 }
-.birth-screen[data-stage="bang"] .birth-light { animation: birth-collapse .65s ease-in both; }
+.birth-screen[data-stage="still"] .birth-light { animation: birth-collapse .38s ease-in both; }
+.birth-screen[data-stage="bang"] .birth-light { opacity: 0; animation: none; }
 .birth-screen:is([data-chat]) .birth-light { display: none; }
 @keyframes birth-breathe {
   0% { scale: 1; opacity: .78; }
@@ -169,9 +170,8 @@ body.birth-page, body.birth-active {
   76%, 100% { scale: var(--birth-ripple-size); opacity: 0; }
 }
 @keyframes birth-collapse {
-  0% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
-  79% { transform: translate(-50%, -50%) scale(.25); opacity: .52; }
-  100% { transform: translate(-50%, -50%) scale(.12); opacity: 0; }
+  from { scale: 1; opacity: .9; }
+  to { scale: .35; opacity: .7; }
 }
 .birth-header {
   display: flex;
