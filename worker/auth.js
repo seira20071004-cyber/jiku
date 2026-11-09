@@ -56,6 +56,10 @@ export function loginPage(error=''){
 <head>
  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
  <meta name="theme-color" content="#050612"><title>jiku | ログイン</title>
+ <link rel="manifest" href="/manifest.webmanifest">
+ <link rel="apple-touch-icon" sizes="180x180" href="/icons/jiku-180.png">
+ <meta name="apple-mobile-web-app-title" content="jiku">
+ <link rel="icon" type="image/svg+xml" href="/icons/jiku.svg">
  <link rel="stylesheet" href="/onboarding.css">
 </head>
 <body class="birth-page">
