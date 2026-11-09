@@ -7,16 +7,38 @@ const opening = {
   gather: ['もう少し、しっかり見つめてみて。', 2000]
 };
 
+const interests = {
+  try: {
+    label: 'やってみたいことがある',
+    question: '何をやってみたいですか？',
+    example: '自分のサービスを作りたい'
+  },
+  continue: {
+    label: '続けたいことがある',
+    question: 'それを続けて、どうなれたらうれしいですか？',
+    example: '英語で気軽に話せるようになりたい'
+  },
+  unsure: {
+    label: 'まだ思いつかない',
+    question: 'どんな時間が少し増えたら、うれしいですか？',
+    example: '好きなことをする時間を増やしたい'
+  }
+};
+
 export function onboardingDraft(saved, legacy) {
   const source = saved && typeof saved === 'object' ? saved : {};
   const legacyName = typeof legacy?.draftName === 'string' ? legacy.draftName : '';
   const name = (typeof source.name === 'string' ? source.name : legacyName).slice(0, 80);
   const priorAnswer = source.direction || source.custom;
+  const interest = Object.hasOwn(interests, source.interest) ? source.interest : null;
   const hasNamedStage = ['name', 'ready', 'confirm'].includes(source.step) ||
     ['universe-name', 'galaxy', 'bang'].includes(legacy?.step) || Boolean(name || priorAnswer);
   return {
     name: name || (typeof priorAnswer === 'string' ? priorAnswer.slice(0, 80) : ''),
-    step: ['ready', 'confirm'].includes(source.step) && name.trim() ? 'confirm' : hasNamedStage ? 'name' : 'gaze'
+    ...(interest ? {interest} : {}),
+    step: source.step === 'interest' ? 'interest'
+      : ['ready', 'confirm'].includes(source.step) && name.trim() ? 'confirm'
+      : hasNamedStage ? 'name' : 'gaze'
   };
 }
 
@@ -42,8 +64,8 @@ export function mountGuestOnboarding(host, error) {
     onDraft(draft) {
       try { sessionStorage.setItem(guestDraftKey, JSON.stringify(draft)); } catch {}
     },
-    onSave(name) {
-      sessionStorage.setItem(guestDraftKey, JSON.stringify({step: 'confirm', name}));
+    onSave(name, draft) {
+      sessionStorage.setItem(guestDraftKey, JSON.stringify({...draft, name}));
       window.open(googlePath + '?onboarding=1', '_top');
     }
   });
@@ -114,20 +136,42 @@ export function mountOnboarding(host, {
     return copy;
   }
 
+  function askInterest() {
+    return addTurn('最近、もう少し時間を使えたらいいなと思うことはありますか？', 'birth-question birth-interest', 'JIKU', 'h1');
+  }
+
+  function showInterests(focus) {
+    const question = conversation.querySelector('.birth-interest .birth-copy') || askInterest();
+    controls.innerHTML = `<div class="birth-choices" role="group" aria-label="今の気持ち">${Object.entries(interests).map(([id, option]) =>
+      `<button class="birth-choice" type="button" data-interest="${id}">${option.label}<span aria-hidden="true">→</span></button>`
+    ).join('')}</div>`;
+    scrollToLatest();
+    if (focus) {
+      question.tabIndex = -1;
+      question.focus({preventScroll: true});
+    }
+  }
+
   function askGoal(focus) {
-    const question = addTurn('この宇宙で、いちばん叶えたいことは何ですか？', 'birth-question', 'JIKU', 'h1');
+    const option = interests[draft.interest];
+    if (option && !conversation.querySelector('.birth-choice-answer')) {
+      if (!conversation.querySelector('.birth-interest')) askInterest();
+      addTurn(option.label, 'birth-answer birth-choice-answer', 'あなた');
+    }
+    const tag = option ? 'h2' : 'h1';
+    const question = addTurn(option?.question || 'これから、どんなことを少しずつ育てたいですか？', 'birth-question birth-goal-question', 'JIKU', tag);
     question.tabIndex = -1;
     if (focus) question.focus({preventScroll: true});
-    return question;
   }
 
   function showComposer() {
     controls.innerHTML = `<form class="birth-form">
-      <label class="birth-visually-hidden" for="birth-input">いちばん大きな目標</label>
-      <input id="birth-input" maxlength="80" required placeholder="例：自分のサービスを作りたい" enterkeyhint="send" autocomplete="off">
+      <label class="birth-visually-hidden" for="birth-input">宇宙の目標</label>
+      <input id="birth-input" maxlength="80" required enterkeyhint="send" autocomplete="off">
       <button class="birth-primary" type="submit">送る <span aria-hidden="true">↑</span></button>
-    </form>`;
+    </form><button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
     const input = controls.querySelector('input');
+    input.placeholder = '例：' + (interests[draft.interest]?.example || interests.try.example);
     input.value = draft.name;
     controls.querySelector('button').disabled = !draft.name.trim();
     scrollToLatest();
@@ -155,7 +199,7 @@ export function mountOnboarding(host, {
     step = next;
     screen.dataset.stage = next;
     sky?.stage(next);
-    skip.hidden = next === 'name' || next === 'confirm';
+    skip.hidden = ['interest', 'name', 'confirm'].includes(next);
     intro.replaceChildren();
     controls.replaceChildren();
     showError('');
@@ -163,12 +207,12 @@ export function mountOnboarding(host, {
     if (opening[next]) {
       const [text, duration] = opening[next];
       intro.append(message('p', text, 'birth-prompt'));
-      timer = setTimeout(() => enter(next === 'gaze' ? 'gather' : motion.matches ? 'name' : 'bang'), duration);
+      timer = setTimeout(() => enter(next === 'gaze' ? 'gather' : motion.matches ? 'interest' : 'bang'), duration);
       return;
     }
     if (next === 'bang') {
       formingTimer = setTimeout(() => {screen.dataset.forming = '';}, SPHERE_FORMATION_AT);
-      timer = setTimeout(() => enter('name'), BANG_DURATION);
+      timer = setTimeout(() => enter('interest'), BANG_DURATION);
       return;
     }
 
@@ -178,18 +222,24 @@ export function mountOnboarding(host, {
     if (!conversation.children.length) {
       addTurn('あなたの宇宙が、誕生しました。ここでは、大きな目標を今日できる一歩まで分けられます。', 'birth-welcome');
     }
-    if (next === 'name') {
-      conversation.querySelectorAll('.birth-answer, .birth-reply').forEach(turn => turn.remove());
+    if (next === 'interest') {
+      conversation.querySelectorAll('.birth-answer, .birth-goal-question, .birth-reply').forEach(turn => turn.remove());
+      if (previous === 'bang' && !motion.matches) timer = setTimeout(() => showInterests(focus), 460);
+      else showInterests(focus);
+    } else if (next === 'name') {
+      conversation.querySelectorAll('.birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
       const openComposer = () => {
-        if (!conversation.querySelector('.birth-question')) askGoal(focus);
+        if (!conversation.querySelector('.birth-goal-question')) askGoal(focus);
         showComposer();
         if (previous === 'confirm') controls.querySelector('input').focus();
       };
-      if (previous === 'bang' && !motion.matches) timer = setTimeout(openComposer, 460);
-      else openComposer();
+      if (previous === 'interest' && !motion.matches) {
+        addTurn(interests[draft.interest].label, 'birth-answer birth-choice-answer', 'あなた');
+        timer = setTimeout(openComposer, 240);
+      } else openComposer();
     } else {
-      if (!conversation.querySelector('.birth-question')) askGoal(false);
-      const answer = addTurn(draft.name, 'birth-answer', 'あなた');
+      if (!conversation.querySelector('.birth-goal-question')) askGoal(false);
+      const answer = addTurn(draft.name, 'birth-answer birth-goal-answer', 'あなた');
       if (focus) {
         answer.tabIndex = -1;
         answer.focus({preventScroll: true});
@@ -205,7 +255,7 @@ export function mountOnboarding(host, {
     controls.querySelectorAll('button').forEach(button => {button.disabled = true;});
     showError('');
     try {
-      await onSave(draft.name);
+      await onSave(draft.name, {...draft});
     } catch {
       showError('目標を保存できませんでした。もう一度お試しください。');
     } finally {
@@ -215,8 +265,15 @@ export function mountOnboarding(host, {
   }
 
   screen.addEventListener('click', event => {
-    const action = event.target.closest('button')?.dataset.birth;
-    if (action === 'skip') enter('name', {focus: true});
+    const button = event.target.closest('button');
+    const action = button?.dataset.birth;
+    const choice = button?.dataset.interest;
+    if (choice && step === 'interest' && Object.hasOwn(interests, choice)) {
+      draft.interest = choice;
+      enter('name', {focus: true});
+    }
+    if (action === 'skip') enter('interest', {focus: true});
+    if (action === 'back') enter('interest', {focus: true});
     if (action === 'close') onClose?.();
     if (action === 'settings') onSettings?.();
     if (action === 'edit') enter('name', {focus: true});

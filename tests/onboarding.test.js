@@ -11,12 +11,20 @@ test('旧版で銀河の入力まで進んだユーザーは宇宙名を引き�
   assert.equal(draft.name, 'ものづくりを続ける');
 });
 
-test('以前の回答を引き継いで一問にまとめ、空の名前では確認画面へ進まない', () => {
+test('以前の回答を引き継ぎ、空の名前では確認画面へ進まない', () => {
   const saved = {step:'ready',name:'自分の時間を持つ'};
   assert.deepEqual(onboardingDraft(saved), {step:'confirm',name:saved.name});
   assert.deepEqual(onboardingDraft({step:'custom',direction:'自分の時間を持ちたい'}), {step:'name',name:'自分の時間を持ちたい'});
   assert.deepEqual(onboardingDraft({step:'confirm',name:' '}), {step:'name',name:' '});
   assert.deepEqual(onboardingDraft(null), {step:'gaze',name:''});
+});
+
+test('会話の途中から再開すると、選んだ関心と入力した目標が引き継がれる', () => {
+  assert.deepEqual(onboardingDraft({step:'interest',name:'仮の目標',interest:'try'}),
+    {step:'interest',name:'仮の目標',interest:'try'});
+  assert.deepEqual(onboardingDraft({step:'name',name:'学び直したい',interest:'continue'}),
+    {step:'name',name:'学び直したい',interest:'continue'});
+  assert.deepEqual(onboardingDraft({step:'interest',interest:'invalid'}), {step:'interest',name:''});
 });
 
 test('宇宙の誕生は根だけを保存し、再実行で名前や後から作った銀河を変更しない', () => {

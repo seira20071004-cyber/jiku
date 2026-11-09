@@ -44,7 +44,7 @@ export function mountOriginPreview(host, motion) {
  }
  function animate(time){
   frame=requestAnimationFrame(animate);
-  if(!document.hidden&&!motion.matches&&host.parentElement?.closest('.birth-screen')?.matches('[data-forming], [data-stage=name], [data-stage=confirm]')&&time-last>=40){last=time;draw(time)}
+  if(!document.hidden&&!motion.matches&&host.parentElement?.closest('.birth-screen')?.matches('[data-forming], [data-chat]')&&time-last>=40){last=time;draw(time)}
  }
  const observer=new ResizeObserver(resize);
  observer.observe(host);
