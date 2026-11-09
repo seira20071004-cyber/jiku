@@ -8,7 +8,23 @@ export function visibleChildren(s,id){return s.nodes.filter(n=>n.parentId===id).
 export function canPlace(s,id,parentId){const parent=s.nodes.find(n=>n.id===parentId);if(!parent||nodeKind(s,parentId)==='action')return false;const branch=s.nodes.find(n=>n.id===id);if(!branch)return nodeDepth(s,parentId)<4;const seen=new Set();function height(n){if(seen.has(n.id))return Infinity;seen.add(n.id);const children=s.nodes.filter(c=>c.parentId===n.id);return children.length?1+Math.max(...children.map(height)):0}if(nodePath(s,parentId).some(n=>n.id===id))return false;return nodeDepth(s,parentId)+1+height(branch)<=4}
 export function freshUniverse(){return {version:1,nodes:[{id:'root',parentId:null,name:'自分が望む人生を実現する'}],settings:{},records:{},logs:{},reviews:{},pending:[],universe:{version:1,onboarded:false,step:'welcome'}}}
 export function migrateUniverse(s){if(s.universe?.version===1)return s;return {...s,universe:{version:1,onboarded:true,migratedAt:new Date().toISOString(),legacyDeep:s.nodes.some(n=>nodeDepth(s,n.id)>4)}}}
-export function completeUniverse(s,name,galaxyName){const root=s.nodes.find(n=>n.parentId===null);if(!name.trim()||!galaxyName.trim())throw Error('名前を入力してください');root.name=name.trim().slice(0,80);let galaxy=s.nodes.find(n=>n.parentId===root.id);if(!galaxy){galaxy={id:crypto.randomUUID(),parentId:root.id,name:galaxyName.trim().slice(0,80),symbolName:galaxyName.trim().slice(0,80)};s.nodes.push(galaxy)}s.universe={version:1,onboarded:true};return galaxy.id}
+export function completeUniverse(s,name,galaxyName){
+ const root=s.nodes.find(n=>n.parentId===null);
+ let galaxy=s.nodes.find(n=>n.parentId===root.id);
+ if(s.universe?.onboarded)return galaxy?.id??root.id;
+ const title=name.trim(),firstGalaxy=galaxyName?.trim();
+ if(!title||galaxyName!==undefined&&!firstGalaxy)throw Error('名前を入力してください');
+ root.name=title.slice(0,80);
+ if(firstGalaxy&&!galaxy){
+  const label=firstGalaxy.slice(0,80);
+  galaxy={id:crypto.randomUUID(),parentId:root.id,name:label,symbolName:label};
+  s.nodes.push(galaxy);
+ }
+ s.universe={...s.universe,version:1,onboarded:true};
+ delete s.universe.step;
+ delete s.universe.draftName;
+ return galaxy?.id??root.id;
+}
 export function reorderNode(s,id,direction){const node=s.nodes.find(n=>n.id===id);if(!node)return;const siblings=visibleChildren(s,node.parentId),index=siblings.findIndex(n=>n.id===id),next=index+direction;if(next<0||next>=siblings.length)return;[siblings[index],siblings[next]]=[siblings[next],siblings[index]];siblings.forEach((n,i)=>n.order=i)}
 export function sceneLayout(nodes,width=1000,height=700){const portrait=width/height<.85,spacingX=portrait?7.0:8.4,spacingY=portrait?6.4:6.7,columns=portrait?2:3;return nodes.map((n,i)=>{const row=Math.floor(i/columns),col=i%columns,count=Math.min(columns,nodes.length-row*columns);return {id:n.id,x:(col-(count-1)/2)*spacingX+(row%2?.55:-.55),y:((Math.ceil(nodes.length/columns)-1)/2-row)*spacingY,z:Math.sin(i*1.7)*.6}})}
 

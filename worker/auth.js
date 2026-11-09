@@ -49,5 +49,38 @@ export async function authRoute(request,c,fetcher=fetch){const u=new URL(request
 }
 export function loginPage(error=''){
  const message=error==='denied'?'このGoogleアカウントには利用が許可されていません。':error==='retry'?'ログインを完了できませんでした。もう一度お試しください。':'';
- return `<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>jiku | ログイン</title><style>body{margin:0;background:#f7f8f2;color:#293d31;font-family:system-ui,sans-serif;min-height:100dvh;display:grid;place-items:center}main{width:min(360px,calc(100vw - 80px));text-align:center;padding:38px 24px;border:1px solid #e7e9df;border-radius:18px;background:#fffefa}.brand{font:54px Georgia;margin:0 0 30px}.brand span{color:#91a678}h1{font:23px Georgia;line-height:1.7}p{font-size:12px;color:#8b957e;line-height:2}a{margin:30px 0;display:flex;align-items:center;justify-content:center;gap:14px;padding:14px;background:white;color:#293d31;text-decoration:none;border:1px solid #d7ddce;border-radius:8px;font-size:14px}a span{font:bold 22px Arial;color:#4285f4}.error{color:#a16c50}small{font-size:10px;color:#98a18e}</style><main><div class="brand">jiku<span>●</span></div><h1>自分の軸を、<br>日々の行動へ。</h1><p>あなたの木と、小さな一歩を育てよう。</p>${message?`<p class="error" role="alert">${message}</p>`:''}<a href="/api/auth/google" target="_top"><span>G</span>Googleでログイン</a><small>データはこのブラウザでアカウント別に保存されます。</small></main></html>`;
+ return `<!doctype html>
+<html lang="ja">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="theme-color" content="#050612"><title>jiku | ログイン</title>
+ <link rel="stylesheet" href="/onboarding.css">
+</head>
+<body class="birth-page">
+ <div id="welcome">
+  <main class="birth-screen" data-stage="welcome" aria-label="JIKU はじまりの宇宙">
+   <div class="birth-sky" aria-hidden="true"><div class="birth-haze"></div><div class="birth-light"></div></div>
+   <header class="birth-header"><span class="birth-wordmark">jiku<span>●</span></span><span class="birth-edition">THE FIRST LIGHT</span></header>
+   <div class="birth-content">
+    <div class="birth-transcript"><div class="birth-messages">
+     <h1 class="birth-message birth-lead">JIKUへようこそ。</h1>
+     <p class="birth-message">ここは、あなたが目指す未来を、自分だけの宇宙として育てていく場所です。</p>
+     <p class="birth-message">まずは、ログインして始めましょう。</p>
+    </div></div>
+    <div class="birth-controls">
+     ${message?`<p class="birth-error" role="alert">${message}</p>`:''}
+     <a class="birth-primary" href="/api/auth/google" target="_top" aria-label="ログインして始める（Googleでログイン）"><span class="birth-google" aria-hidden="true">G</span>ログインして始める</a>
+    </div>
+    <footer class="birth-tools"></footer>
+   </div>
+  </main>
+ </div>
+ <script type="module">
+  import {mountOnboarding} from '/onboarding.js';
+  const host=document.getElementById('welcome');
+  const error=host.querySelector('[role="alert"]')?.textContent;
+  mountOnboarding(host,{welcome:true,error});
+ </script>
+</body>
+</html>`;
 }

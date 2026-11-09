@@ -1,4 +1,5 @@
 import {googleConfig,authRoute,session,loginPage,googlePicture} from './auth.js';
+const WELCOME_ASSETS=new Set(['/onboarding.css','/onboarding.js']);
 // ASSET_MAP is embedded at build time. Authentication runs before serving assets.
 export default {async fetch(request,env){
  const u=new URL(request.url);let c;
@@ -8,7 +9,7 @@ export default {async fetch(request,env){
   const auth=await authRoute(request,c);if(auth)return auth;
   const user=await session(request,c);
   if(u.pathname==='/api/session')return Response.json(user?{mode:'google',user:{id:user.sub,email:user.email,name:user.name,picture:googlePicture(user.picture)}}:{mode:'google',user:null},{status:user?200:401,headers:{'Cache-Control':'no-store'}});
-  if(!user){if(u.pathname==='/'||u.pathname==='/index.html')return new Response(loginPage(u.searchParams.get('login')),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}});return new Response(null,{status:401,headers:{'Cache-Control':'no-store'}})}
+  if(!user&&!WELCOME_ASSETS.has(u.pathname)){if(u.pathname==='/'||u.pathname==='/index.html')return new Response(loginPage(u.searchParams.get('login')),{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}});return new Response(null,{status:401,headers:{'Cache-Control':'no-store'}})}
  }else if(u.pathname==='/api/session')return Response.json({mode:'local'},{headers:{'Cache-Control':'no-store'}});
  if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405});
  const path=u.pathname==='/'?'/index.html':u.pathname;const asset=Object.hasOwn(ASSET_MAP,path)?ASSET_MAP[path]:null;if(!asset)return new Response('Not found',{status:404});
