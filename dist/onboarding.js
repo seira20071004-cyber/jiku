@@ -1,28 +1,28 @@
-import {BANG_DURATION, GATHER_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
+import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
 
 const guestDraftKey = 'jiku:pending-universe';
 const googlePath = '/api/auth/google';
 const opening = {
   gaze: {prompt: '光を見つめてください。', duration: 4400, reducedDuration: 2800, next: 'gather'},
   gather: {prompt: 'もう少し、しっかり見つめてみて。', duration: GATHER_DURATION, reducedDuration: 2000, next: 'ignite'},
-  ignite: {duration: 3200, next: 'still'},
+  ignite: {duration: IGNITION_DURATION, next: 'still'},
   still: {duration: 1050, next: 'bang'}
 };
 
 const witnessedBirthTurns = [
   ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis'],
-  ['さっき光に向けた集中を、日々の大切なことにも向けられます。', 'birth-welcome']
+  ['あの光を見つめたときのように、大切なことに意識を向けられる時間を想像してみてください。', 'birth-welcome']
 ];
 const welcomeTurns = [
-  ['JIKUでは、大きな目標を、今日できる一歩まで分けられます。', 'birth-welcome']
+  ['やりたい気持ちはあるのに、一日が終わると何も進んでいないと感じることはありませんか？', 'birth-welcome']
 ];
-const interestQuestion = '今、あなたが少し時間を使いたいのはどんなことですか？';
+const interestQuestion = '大切なことを前に進めたいとき、どこでつまずきますか？';
 
 const interests = {
   try: {
-    label: '新しく始めたいことがある',
-    question: '新しいことを始めるとき、いちばん引っかかるのは何ですか？',
-    reflection: 'その挑戦を少しずつ続けたら、何を実現できたらうれしいですか？',
+    label: 'やりたいことがあるのに、始められない',
+    question: '最初の一歩を踏み出すとき、何がいちばん気になりますか？',
+    reflection: 'その挑戦が形になったら、どんな自分になっていたいですか？',
     steps: {
       start: ['何から始めたらいいか分からない', '気になることを一つだけ調べる'],
       time: ['始める時間がなかなか取れない', '試しに5分だけ触れてみる'],
@@ -31,20 +31,20 @@ const interests = {
     example: '自分のサービスを作りたい'
   },
   continue: {
-    label: '今やっていることを続けたい',
-    question: '続けたいことに取り組むとき、いちばん難しいのは何ですか？',
-    reflection: 'それを続けた先で、今よりどんなことができるようになりたいですか？',
+    label: '始めても、なかなか続かない',
+    question: '続けたいと思っていても、どんなときに止まってしまいますか？',
+    reflection: '続けた先で、何ができるようになったらうれしいですか？',
     steps: {
       start: ['毎回、何をするか迷う', '次にやることを一つ決めておく'],
       time: ['忙しい日に後回しになる', 'いつもの取り組みを5分だけやる'],
-      progress: ['上達している実感がない', '前よりできるようになったことを一つ書く']
+      progress: ['上達している実感がない', '今日取り組んだ時間を記録する']
     },
     example: '英語で気軽に話せるようになりたい'
   },
   unsure: {
-    label: 'まだ決まっていない',
-    question: '何に時間を使いたいか考えるとき、今の気持ちに近いのはどれですか？',
-    reflection: 'そんな時間が増えたら、どんな毎日を過ごしたいですか？',
+    label: '何に時間を使いたいか、まだ見えていない',
+    question: 'やりたいことを見つけるうえで、何がいちばん難しいですか？',
+    reflection: '夢中になれることが見つかったら、どんな毎日を過ごしたいですか？',
     steps: {
       start: ['自分が何を好きなのか思い浮かばない', '最近楽しかったことを一つ思い出す'],
       time: ['考える余裕がなかなかない', '今週、自分のために5分空けてみる'],
@@ -56,19 +56,19 @@ const interests = {
 
 const replies = {
   start: {
-    try: '始め方が見えないときは、まず小さく調べるだけでも一歩です。',
-    continue: '取り組む内容を先に一つ決めておくと、次に始めやすくなります。',
-    unsure: '最近楽しかったことを思い出すと、自分が大切にしたい時間のヒントになります。'
+    try: 'Jikuでは、大きな目標を分けて、今日すぐにできる一歩を決められます。',
+    continue: 'Jikuに次の一歩を置いておけば、次に開いたときに何をするか迷わずに済みます。',
+    unsure: '最近楽しかったことを手がかりに、もう一度試したいことをJikuに置いておけます。'
   },
   time: {
-    try: '最初は5分だけでも、試してみる時間をつくれます。',
-    continue: '忙しい日は、いつもの取り組みを短くすると続けやすくなります。',
-    unsure: '自分のための5分があると、何をしたいか少し考える余裕が生まれます。'
+    try: 'まとまった時間が取れない日も、Jikuで5分から試せる一歩を決められます。',
+    continue: 'Jikuなら、忙しい日でも取り組める小さな行動を、余裕のある日と分けて用意できます。',
+    unsure: 'Jikuでは、やりたいことを探すための5分も、ひとつの行動として決められます。'
   },
   progress: {
-    try: 'うまくできるか不安なときは、試せそうなことを一つ見つけるところから始められます。',
-    continue: '前よりできることを書いておくと、積み重ねが見えてきます。',
-    unsure: '一つを短い期間だけ試すと、自分に合っているか確かめられます。'
+    try: 'うまくできるか不安なときは、Jikuで挑戦を分けて、まずは試せそうなことから始められます。',
+    continue: 'Jikuに取り組んだ時間を残せば、結果が出る前でも積み重ねを振り返れます。',
+    unsure: '気になることを一つ選んでJikuに置き、短い期間だけ試して自分に合うか確かめられます。'
   }
 };
 
@@ -134,12 +134,12 @@ export function mountOnboarding(host, {
   let step, timer, formingTimer, sky, disposeOrigin, originRequested = false, saving = false;
 
   host.innerHTML = `
-    <main class="birth-screen" aria-label="JIKU はじまりの宇宙">
+    <main class="birth-screen" aria-label="Jiku はじまりの宇宙">
       <div class="birth-sky" aria-hidden="true">
         <div class="birth-haze"></div><canvas class="birth-stars"></canvas><div class="birth-light"></div><div class="birth-origin"></div>
       </div>
       <header class="birth-header">
-        <span class="birth-wordmark">jiku<span>●</span></span>
+        <span class="birth-wordmark">Jiku<span>●</span></span>
         ${preview ? '<span class="birth-edition">初回体験プレビュー</span>' : ''}
         ${onClose ? '<button type="button" class="birth-quiet" data-birth="close">閉じる</button>' : ''}
         ${guest ? '<a class="birth-quiet" href="/api/auth/google" target="_top" aria-label="Googleでログイン">ログイン</a>' : ''}
@@ -147,7 +147,7 @@ export function mountOnboarding(host, {
       </header>
       <div class="birth-intro" aria-live="polite"></div>
       <div class="birth-content">
-        <div class="birth-conversation" role="log" aria-label="JIKUとの会話" aria-relevant="additions"></div>
+        <div class="birth-conversation" role="log" aria-label="Jikuとの会話" aria-relevant="additions"></div>
         <div class="birth-controls"></div>
         <p class="birth-error" role="alert" hidden></p>
       </div>
@@ -175,7 +175,7 @@ export function mountOnboarding(host, {
     return node;
   }
 
-  function showTurn(text, className, from = 'JIKU', tag = 'p') {
+  function showTurn(text, className, from = 'Jiku', tag = 'p') {
     const turn = document.createElement('div');
     turn.className = `birth-turn ${className}`;
     turn.append(message('span', from, 'birth-speaker'));
@@ -215,8 +215,8 @@ export function mountOnboarding(host, {
 
   function showInterests(previous, focus, witnessedBirth) {
     const showChoices = shouldFocus => {
-      const question = showTurn(interestQuestion, 'birth-question', 'JIKU', 'h1');
-      choiceControls(Object.entries(interests).map(([id, option]) => [id, option.label]), '今、時間を使いたいこと');
+      const question = showTurn(interestQuestion, 'birth-question', 'Jiku', 'h1');
+      choiceControls(Object.entries(interests).map(([id, option]) => [id, option.label]), '当てはまる困りごと');
       focusTurn(question, shouldFocus);
     };
     if (previous && !Object.hasOwn(opening, previous) && previous !== 'bang') {
@@ -297,14 +297,14 @@ export function mountOnboarding(host, {
       showInterests(previous, focus, witnessedBirth);
     } else if (next === 'friction') {
       const interest = interests[draft.interest];
-      const question = showTurn(interest.question, 'birth-question', 'JIKU', 'h1');
+      const question = showTurn(interest.question, 'birth-question', 'Jiku', 'h1');
       choiceControls(Object.entries(interest.steps).map(([id, [label]]) => [id, label]), '今の気持ちに近い答え', true);
       focusTurn(question, focus);
     } else if (next === 'practice') {
       showPractice(focus);
     } else if (next === 'name') {
       const openComposer = shouldFocus => {
-        const question = showTurn('この宇宙で叶えたい、いちばん大きな目標は何ですか？', 'birth-question', 'JIKU', 'h1');
+        const question = showTurn('この宇宙で叶えたい、いちばん大きな目標は何ですか？', 'birth-question', 'Jiku', 'h1');
         showComposer();
         if (previous === 'confirm') controls.querySelector('input').focus();
         else focusTurn(question, shouldFocus);

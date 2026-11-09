@@ -55,19 +55,19 @@ export function loginPage(error=''){
 <html lang="ja">
 <head>
  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
- <meta name="theme-color" content="#050612"><title>jiku | ログイン</title>
+ <meta name="theme-color" content="#050612"><title>Jiku | ログイン</title>
  <link rel="manifest" href="/manifest.webmanifest">
  <link rel="apple-touch-icon" sizes="180x180" href="/icons/jiku-180.png">
- <meta name="apple-mobile-web-app-title" content="jiku">
+ <meta name="apple-mobile-web-app-title" content="Jiku">
  <link rel="icon" type="image/svg+xml" href="/icons/jiku.svg">
  <link rel="stylesheet" href="/onboarding.css">
 </head>
 <body class="birth-page">
  <div id="welcome">
-  <main class="birth-screen" data-stage="gaze" aria-label="JIKU はじまりの宇宙">
+  <main class="birth-screen" data-stage="gaze" aria-label="Jiku はじまりの宇宙">
    <div class="birth-sky" aria-hidden="true"><div class="birth-light"></div></div>
    <header class="birth-header">
-    <span class="birth-wordmark">jiku<span>●</span></span>
+    <span class="birth-wordmark">Jiku<span>●</span></span>
     <a class="birth-quiet" href="/api/auth/google" target="_top" aria-label="Googleでログイン">ログイン</a>
    </header>
    <div class="birth-intro"><p class="birth-prompt">光を見つめてください。</p></div>
