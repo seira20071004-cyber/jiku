@@ -45,7 +45,7 @@ async function enterSpace(id){
  if(!target)return;
  const depth=nodeDepth(state,target.id),old=currentSpace();
  if(depth>4){legacyDetail(id);return}
- if(!fromOrigin&&!toOrigin&&old.id===id)return;
+ if(!fromOrigin&&!toOrigin&&old.id===id){treeScene?.reset();return}
  const direction=toOrigin?-1:fromOrigin||depth>nodeDepth(state,old.id)?1:-1;
  navigating=true;
  try{
