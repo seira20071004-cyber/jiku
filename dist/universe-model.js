@@ -1,5 +1,6 @@
 import {nodeKind,setting,modesForLevel,validateMeasurement} from './model.js';
 // Navigation and editing rules are independent of the visual scene and historic logs.
+export const UNIVERSE_ORIGIN='@universe-origin';
 export const LEVELS=['宇宙','銀河','恒星系','惑星','衛星'];
 export function nodePath(s,id){const path=[],seen=new Set();let n=s.nodes.find(n=>n.id===id);while(n&&!seen.has(n.id)){seen.add(n.id);path.unshift(n);n=s.nodes.find(p=>p.id===n.parentId)}return path}
 export const nodeDepth=(s,id)=>nodePath(s,id).length-1;
