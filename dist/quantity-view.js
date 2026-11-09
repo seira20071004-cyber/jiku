@@ -1,39 +1,158 @@
-import {weeklyTaskSections,weeklyAchievement} from './universe-model.js';
-import {UNITS,MODES,taskLevel,modeTotals,measurement,unitInfo,quantitySummary,setting,leaves,ancestry,descendants,shiftDate,weekStart,isEventTask,eventCompletionDate,goalIds} from './model.js';
+import {weeklyTaskSections,weeklyAchievement,timeGoalProgress} from './universe-model.js';
+import {UNITS,MODES,taskLevel,modeTotals,unitInfo,quantitySummary,setting,leaves,ancestry,descendants,shiftDate,weekStart,isEventTask,eventCompletionDate,goalIds,timeMeasurement,taskRecordFields} from './model.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const numberText=n=>new Intl.NumberFormat('ja-JP',{maximumFractionDigits:3}).format(n);
-export function quantitySettingsFields(s,id,required=true){const m=measurement(s,id),u=unitInfo(m);return `<section class="task-amount-config"><h3>1日に取り組む量</h3><p class="task-setting-caption">例：本を10ページ読む、30分勉強する</p><div class="task-amount-entry"><label><span class="sr-only">タスク量</span><input type="number" inputmode="decimal" name="daily-amount" data-task-amount min="0.001" max="1000000" step="any" ${required?'required':''} value="${m.dailyAmount??''}" placeholder="10" aria-label="タスク量"></label><label><span class="sr-only">単位</span><select name="quantity-unit" data-quantity-unit required aria-label="単位">${Object.entries(UNITS).map(([k,u])=>`<option value="${k}" ${m.unit===k?'selected':''}>${u.label}</option>`).join('')}<option value="custom" ${m.unit==='custom'?'selected':''}>その他</option></select></label></div><label class="task-custom-unit" data-custom-unit ${m.unit==='custom'?'':'hidden'}>単位の名前<input name="custom-unit" maxlength="12" ${m.unit==='custom'?'required':''} value="${esc(m.customUnit||'')}" placeholder="例：km、曲、セット"></label><div class="task-weekly-target"><h3>目標にする量</h3><p>週と月のどちらか、または両方を設定できます。</p><div class="task-target-grid">${[['weekly','1週間の目標',m.weeklyTarget],['monthly','1ヶ月の目標',m.monthlyTarget]].map(([period,label,target])=>`<label>${label}<span class="task-week-target-entry"><input name="${period}-target" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" value="${target??''}" aria-label="${label}"><span data-target-unit>${esc(u.label)}</span></span></label>`).join('')}</div></div><p class="task-amount-preview" data-task-preview>${m.dailyAmount?`取り組む日には、${numberText(m.dailyAmount)}${esc(u.label)}を記録します。`:'量と単位を決めてください。'}</p></section>`}
+function minuteInput(label,name,value='',required=true){
+ return `<label>${label}<span class="task-week-target-entry"><input type="number" inputmode="decimal" name="${name}" min="0.001" max="1000000" step="any" ${required?'required':''} value="${esc(value??'')}" aria-label="${label}"><span>分</span></span></label>`;
+}
+function quantitySettingsFields(m){
+ return `<section class="task-amount-config">
+  <h3>時間の設定</h3>
+  ${minuteInput('1日に取り組む時間','daily-minutes',m.dailyAmount)}
+  <div class="task-weekly-target"><h3>目標時間</h3><p>週と月のどちらか、または両方を設定できます。</p>
+   <div class="task-target-grid">
+    ${minuteInput('1週間の目標時間','weekly-minutes',m.weeklyTarget,false)}
+    ${minuteInput('1ヶ月の目標時間','monthly-minutes',m.monthlyTarget,false)}
+   </div>
+  </div>
+ </section>`;
+}
+export function extraMetricFields(metric={},event=false){
+ const unit=metric.unit||'';
+ const amountInput=(label,field,value,required=false)=>`<label>${label}<input type="number" inputmode="decimal" name="${field}" min="0.001" max="1000000" step="any" ${required?'required':''} value="${esc(value??'')}"></label>`;
+ return `<div class="extra-metric" data-extra-metric>
+  <div class="extra-metric-top"><label>追加の単位<select name="extra-unit" required><option value="">選択してください</option>${Object.entries(UNITS).filter(([,u])=>u.dimension!=='time').map(([key,u])=>`<option value="${key}" ${unit===key?'selected':''}>${u.label}</option>`).join('')}<option value="custom" ${unit==='custom'?'selected':''}>自由入力</option></select></label><button type="button" class="text-button" data-remove-extra aria-label="追加の単位を削除">×</button></div>
+  <label data-extra-custom ${unit==='custom'?'':'hidden'}>単位の名前<input name="extra-custom-unit" maxlength="12" value="${esc(metric.customUnit||'')}" ${unit==='custom'?'required':'disabled'}></label>
+  ${amountInput('取り組む日の量','extra-daily',metric.dailyAmount,true)}
+  <fieldset data-extra-targets ${event?'hidden disabled':''}><details ${metric.weeklyTarget||metric.monthlyTarget?'open':''}>
+   <summary>この単位の目標（任意）</summary><div class="task-target-grid">
+    ${amountInput('週間目標','extra-weekly',metric.weeklyTarget)}
+    ${amountInput('月間目標','extra-monthly',metric.monthlyTarget)}
+   </div>
+  </details></fieldset>
+ </div>`;
+}
+function extraRecordFields(metrics=[],amounts=[]){
+ if(!metrics.length)return '';
+ return `<section class="extra-record-fields"><h3>追加の記録（任意）</h3><div class="task-target-grid">
+  ${metrics.map((metric,index)=>{const {label}=unitInfo(metric);return `<label>${esc(label)}<input name="record-extra" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" value="${esc(amounts[index]??'')}"></label>`}).join('')}
+ </div></section>`;
+}
 export function taskLevelFields(a,name='task-level'){const selected=taskLevel(a),options=[{value:'rest',title:'毎日取り組む',days:['rest','busy','full']},{value:'busy',title:'忙しい日も取り組む',days:['busy','full']},{value:'full',title:'余裕がある日だけ',days:['full']}];return `<fieldset class="task-schedule-config"><legend>どんな日に取り組みますか？</legend><p class="task-setting-caption">1つ選ぶと、対象の日が自動で決まります。</p><div class="task-schedule-options">${options.map(o=>`<label class="task-schedule-option"><input type="radio" required name="${esc(name)}" value="${o.value}" ${selected===o.value?'checked':''}><span class="task-schedule-copy"><strong>${o.title}</strong><span class="task-day-tags">${o.days.map(d=>`<span>${MODES[d].icon} ${MODES[d].label}</span>`).join('')}</span></span><span class="task-schedule-check" aria-hidden="true">✓</span></label>`).join('')}</div><p class="task-fixed-note">どの日も、設定した量は同じです。</p></fieldset>`}
 export function taskSettingsFields(s,id){
- const action=setting(s,id),event=isEventTask(action);
+ const action=setting(s,id),event=isEventTask(action),m=timeMeasurement(action.measurement||{unit:'minutes'});
  return `<label>タスクの形式<select name="task-format"><option value="routine" ${event?'':'selected'}>繰り返すタスク</option><option value="event" ${event?'selected':''}>一度きりのイベント</option></select></label>
- <fieldset data-routine-fields ${event?'hidden disabled':''}>${quantitySettingsFields(s,id)}${taskLevelFields(action)}</fieldset>
- <fieldset data-event-fields ${event?'':'hidden disabled'}><label>イベントの日付（任意）<input type="date" name="event-date" value="${esc(action.eventDate||'')}"></label><p class="footnote">例：ハッカソンに参加する。終わった日に「完了を記録」で残せます。</p></fieldset>`;
+ <fieldset data-routine-fields ${event?'hidden disabled':''}>${quantitySettingsFields(m)}${taskLevelFields(action)}</fieldset>
+ <fieldset data-event-fields ${event?'':'hidden disabled'}>
+  <label>イベントの日付（任意）<input type="date" name="event-date" value="${esc(action.eventDate||'')}"></label>
+  ${minuteInput('イベントに取り組む時間','event-minutes',m.dailyAmount)}
+ </fieldset>
+ <section class="task-extra-config">
+  <h3>追加の記録（任意）</h3><p>ページ数、単語数、回数など、必要な単位を追加できます。</p>
+  <div data-extra-list>${(m.extras||[]).filter(metric=>metric.dailyAmount!=null||metric.weeklyTarget!=null||metric.monthlyTarget!=null).map(metric=>extraMetricFields(metric,event)).join('')}</div>
+  <button type="button" class="text-button add-extra-unit" data-add-extra>＋ 単位を追加</button>
+ </section>`;
 }
 export function eventPanel(s,id,date,today){
  const node=s.nodes.find(n=>n.id===id),action=setting(s,id),done=eventCompletionDate(s,id);
+ const m=timeMeasurement(action.measurement||{unit:'minutes'});
  const displayDate=done||(action.eventDate&&action.eventDate<=today?action.eventDate:date);
+ const log=done?s.logs[done][id]:null;
  return `<div class="dialog-title"><div><div class="eyebrow">イベント</div><h2>${esc(node.name)}</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>
  ${node.description?`<p class="space-description">${esc(node.description)}</p>`:''}
- <p class="event-state">${done?'完了 · '+esc(done):action.eventDate?'予定 · '+esc(action.eventDate):'日付未定'}</p>
- ${done?`<button class="text-button" data-undo-event="${esc(id)}">完了を取り消す</button>`:`<form id="event-form" data-id="${esc(id)}"><label>完了した日<input name="event-completed-date" type="date" required max="${today}" value="${displayDate}"></label><div class="dialog-actions"><button class="primary" type="submit">完了を記録</button></div></form>`}
+ <p class="event-state">${done?'完了 · '+esc(done):action.eventDate?'予定 · '+esc(action.eventDate):'日付未定'}${log?.eventMinutes?' · '+hoursText(log.eventMinutes/60):''}${(log?.eventQuantities||[]).map(q=>' · '+numberText(q.amount)+esc(unitInfo(q.measurement).label)).join('')}</p>
+ ${done?`<button class="text-button" data-undo-event="${esc(id)}">完了を取り消す</button>`:`<form id="event-form" data-id="${esc(id)}">
+  <label>完了した日<input name="event-completed-date" type="date" required max="${today}" value="${displayDate}"></label>
+  ${minuteInput('取り組んだ時間','record-minutes',m.dailyAmount)}
+  ${extraRecordFields(m.extras,m.extras?.map(metric=>metric.dailyAmount))}
+  <div class="dialog-actions"><button class="primary" type="submit">完了を記録</button></div></form>`}
  <button class="text-button" data-edit="${esc(id)}">イベントの設定を編集 →</button>`;
 }
 export function presetPanel(s,id){const n=s.nodes.find(n=>n.id===id),a=setting(s,id);if(!n)return '';return `<form id="preset-form" data-id="${esc(id)}"><div class="dialog-title"><div><div class="eyebrow">${esc(ancestry(s,id).slice(1,-1).join(' / ')||'自分の宇宙')}</div><h2>${esc(n.name)}</h2></div><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>${taskSettingsFields(s,id)}<div class="dialog-actions"><button type="button" class="text-button" data-edit="${esc(id)}">名前・親目標などを編集</button><button class="primary" type="submit">タスクを保存</button></div><button type="button" class="text-button record-adjust-button" data-record-leaf="${esc(id)}">${isEventTask(a)?'イベントの完了を記録':'今日の記録を調整'}</button></form>`}
-export function modePickerContent(s,key){const current=s.records[key]?.mode;return `<div class="dialog-title"><div><div class="eyebrow">${Number(key.slice(5,7))}月${Number(key.slice(8))}日</div><h2>今日は、どのペース？</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><p class="mode-picker-note">タスクに保存した固定量を、そのまま反映します。</p><div class="quick-mode-options">${['full','busy','rest'].map(k=>{const m=MODES[k],summary=modeTotals(s,k);return `<button data-mode="${k}" data-date="${key}" class="quick-mode ${k} ${current===k?'chosen':''}"><span class="quick-mode-icon">${m.icon}</span><div><strong>${m.label}</strong><small>${summary.count?summary.groups.map(g=>{const q=readableQuantity(g.total,g.dimension,g.unit);return `${numberText(q.amount)}${esc(q.unit)}`}).join(' ・ '):'固定量を設定したタスクはありません'}</small></div><i>${current===k?'✓':'→'}</i></button>`}).join('')}</div>${Object.values(s.logs[key]||{}).some(l=>l.quantity&&l.source!=='mode')?'<p class="footnote">この日だけ修正した量は、そのまま残ります。</p>':''}<div class="mode-picker-footer"><button class="text-button" data-configure-leaves>タスクの量を設定する</button><button class="text-button quiet" data-do="close">あとで</button></div>`}
-export function recordPanel(s,id,date,today){const n=s.nodes.find(n=>n.id===id);if(!n)return '';const old=s.logs[date]?.[id],m=old?.quantity?.measurement||measurement(s,id),u=unitInfo(m),week=weekStart(date),summary=quantitySummary(s,week,shiftDate(week,6),id,week===weekStart(today)),group=summary.groups.find(g=>g.dimension===u.dimension),amount=old?.quantity?.amount??m.dailyAmount??'',active=setting(s,id);const increments=u.dimension==='time'?(u.label==='分'?[10,30,60]:[.25,.5,1]):[1,5,10];return `<form id="quantity-form" data-id="${esc(id)}"><div class="dialog-title"><div><div class="eyebrow">${esc(ancestry(s,id).slice(1,-1).join(' / ')||'自分の宇宙')}</div><h2>${esc(n.name)}</h2></div><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div><label>記録する日<input type="date" name="record-date" value="${date}" max="${today}" required></label><label class="quantity-input-label">この日の合計<div class="quantity-input"><input name="amount" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" value="${amount}" placeholder="0" required autofocus><span>${esc(u.label)}</span></div></label><div class="quantity-increments">${increments.map(v=>`<button type="button" data-add-quantity="${v}">＋${numberText(v)}${esc(u.label)}</button>`).join('')}</div><div class="record-week-summary"><span>この週の合計</span><strong>${numberText(group?.total||0)}<small>${esc(group?.unit||(u.dimension==='time'?'時間':u.label))}</small></strong></div>${old&&!old.quantity?'<p class="footnote">この日には以前のチェック記録があります。量はまだ記録されていません。</p>':''}${old?.source==='mode'?'<p class="footnote">モードから反映した量です。この日だけ修正できます。</p>':''}${old?.quantity?'<p class="footnote">保存すると、この日の合計を更新します。過去の記録の単位を使用しています。</p>':'<p class="footnote">1日に何回か取り組んだ場合は、合計量を入力してください。</p>'}${active.type==='once'?'<p class="footnote">記録すると、このタスクは完了になります。</p>':''}<div class="dialog-actions"><button type="button" class="text-button" data-open-preset="${esc(id)}">タスクの量を設定</button><button type="submit" class="primary">量を記録する</button></div>${old?`<button type="button" class="text-button danger remove-quantity" data-remove-quantity="${esc(id)}" data-log-date="${date}">この日の記録を削除</button>`:''}</form>`}
-function readableQuantity(amount,dimension,unit){return dimension==='time'&&amount>0&&Math.abs(amount-Math.round(amount))>.00001?{amount:Math.round(amount*60000)/1000,unit:'分'}:{amount,unit}}
+export function modePickerContent(s,key){const current=s.records[key]?.mode;return `<div class="dialog-title"><div><div class="eyebrow">${Number(key.slice(5,7))}月${Number(key.slice(8))}日</div><h2>今日は、どのペース？</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><p class="mode-picker-note">タスクに保存した固定量を、そのまま反映します。</p><div class="quick-mode-options">${['full','busy','rest'].map(k=>{const m=MODES[k],summary=modeTotals(s,k);return `<button data-mode="${k}" data-date="${key}" class="quick-mode ${k} ${current===k?'chosen':''}"><span class="quick-mode-icon">${m.icon}</span><div><strong>${m.label}</strong><small>${summary.count?[...summary.groups].sort((a,b)=>Number(b.dimension==='time')-Number(a.dimension==='time')).map(g=>g.dimension==='time'?hoursText(g.total):numberText(g.total)+esc(g.unit)).join(' ・ '):'固定量を設定したタスクはありません'}</small></div><i>${current===k?'✓':'→'}</i></button>`}).join('')}</div>${Object.values(s.logs[key]||{}).some(l=>l.quantity&&l.source!=='mode')?'<p class="footnote">この日だけ修正した量は、そのまま残ります。</p>':''}<div class="mode-picker-footer"><button class="text-button" data-configure-leaves>タスクの量を設定する</button><button class="text-button quiet" data-do="close">あとで</button></div>`}
+export function recordPanel(s,id,date,today){
+ const node=s.nodes.find(n=>n.id===id);
+ if(!node)return '';
+ const old=s.logs[date]?.[id],m=taskRecordFields(s,date,id),week=weekStart(date);
+ const summary=quantitySummary(s,week,shiftDate(week,6),id,false);
+ const hours=summary.groups.find(group=>group.dimension==='time')?.total||0;
+ return `<form id="quantity-form" data-id="${esc(id)}">
+  <div class="dialog-title"><div><div class="eyebrow">${esc(ancestry(s,id).slice(1,-1).join(' / ')||'自分の宇宙')}</div><h2>${esc(node.name)}</h2></div><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <label>記録する日<input type="date" name="record-date" value="${date}" max="${today}" required></label>
+  ${minuteInput('この日に取り組んだ時間','record-minutes',m.dailyAmount)}
+  <div class="quantity-increments">${[10,30,60].map(minutes=>`<button type="button" data-add-quantity="${minutes}">＋${minutes}分</button>`).join('')}</div>
+  ${extraRecordFields(m.extras,m.extraAmounts)}
+  <div class="record-week-summary"><span>この週の合計</span><strong>${hoursText(hours)}</strong></div>
+  ${old?.source==='mode'?'<p class="footnote">モードから反映した記録です。この日だけ調整できます。</p>':''}
+  <div class="dialog-actions"><button type="button" class="text-button" data-open-preset="${esc(id)}">タスクの設定</button><button type="submit" class="primary">記録する</button></div>
+  ${old?.quantity?`<button type="button" class="text-button danger remove-quantity" data-remove-quantity="${esc(id)}" data-log-date="${date}">この日の記録を削除</button>`:''}
+ </form>`;
+}
+const formatHours=new Intl.NumberFormat('ja-JP',{maximumFractionDigits:2});
+const hoursNumber=hours=>hours>0&&hours<.01?numberText(hours):formatHours.format(hours);
+export const hoursText=hours=>hoursNumber(hours)+'時間';
+function taskDetails(s,section,targetLabel,editableIds,end,today){
+ const tasks=new Map();
+ for(const row of section.rows){
+  if(!tasks.has(row.id))tasks.set(row.id,[]);
+  tasks.get(row.id).push(row);
+ }
+ return `<section class="weekly-goal-section"><h2><span>✧</span>${esc(section.name)}</h2>${[...tasks.values()].map(metrics=>{
+  const sorted=[...metrics].sort((a,b)=>Number(b.dimension==='time')-Number(a.dimension==='time'));
+  const task=sorted[0],editable=!task.deleted&&editableIds.has(task.id);
+  const date=metrics.flatMap(row=>Object.keys(row.byDate)).sort().at(-1)||(end<today?end:today);
+  return `<article class="period-task">
+   <header><strong>${esc(task.name)}</strong>${task.deleted?'<small>過去のタスク</small>':''}
+   ${editable?`<button type="button" data-record-leaf="${esc(task.id)}" data-log-date="${date}" aria-label="${esc(task.name)}の記録を修正">›</button>`:''}</header>
+   ${sorted.map(row=>{
+    const progress=weeklyAchievement(row.amount,row.target);
+    return `<div class="period-task-metric"><div><strong>${row.dimension==='time'?hoursText(row.amount):numberText(row.amount)+esc(row.unit)}</strong>
+      ${progress?`<span>${targetLabel} ${row.dimension==='time'?hoursText(row.target):numberText(row.target)+esc(row.unit)} · ${progress.percent}%</span>`:''}</div>
+      ${progress?`<div class="weekly-task-progress-track" role="progressbar" aria-label="${esc(task.name)}の${targetLabel}達成度（${esc(row.unit)}）" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.bar}" aria-valuetext="${progress.percent}%"><i style="width:${progress.bar}%"></i></div>`:''}
+     </div>`;
+   }).join('')}
+   ${editable&&!isEventTask(setting(s,task.id))&&!sorted.some(row=>row.dimension==='time'&&row.hasTarget)?`<button type="button" class="text-button" data-open-preset="${esc(task.id)}">目標時間を設定 →</button>`:''}
+  </article>`;
+ }).join('')}</section>`;
+}
 export function weeklyPanel(s,{week,scope,today,month}){
  const monthly=Boolean(month),period=monthly?'月':'週',targetLabel=monthly?'月間目標':'週間目標';
  const start=monthly?month+'-01':week;
  const end=monthly?month+'-'+new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).getUTCDate():shiftDate(week,6);
  const isCurrent=monthly?month===today.slice(0,7):week===weekStart(today);
  const summary=quantitySummary(s,start,end,scope,isCurrent,monthly?'month':'week');
- const groups=summary.groups.filter(g=>g.total>0),sections=weeklyTaskSections(s,summary,scope).filter(section=>section.rows.length);
- const editableIds=new Set(leaves(s).map(n=>n.id)),goal=s.nodes.find(n=>n.id===scope),short=d=>`${Number(d.slice(5,7))}/${Number(d.slice(8))}`;
+ const time=summary.groups.find(group=>group.dimension==='time')?.total||0;
+ const additional=summary.groups.filter(group=>group.dimension!=='time'&&group.total>0);
+ const sections=weeklyTaskSections(s,summary,scope).filter(section=>section.rows.length);
+ const progress=timeGoalProgress(summary.rows);
+ const editableIds=new Set(leaves(s).map(n=>n.id));
+ const goal=s.nodes.find(n=>n.id===scope)||s.nodes.find(n=>n.parentId===null);
+ const short=date=>`${Number(date.slice(5,7))}/${Number(date.slice(8))}`;
  const events=Object.entries(s.logs).filter(([date])=>date>=start&&date<=end).sort(([a],[b])=>b.localeCompare(a)).flatMap(([date,logs])=>Object.entries(logs)
   .filter(([id,log])=>log.eventCompleted&&(scope==='all'||(log.goalIds||goalIds(s,id)).includes(scope)))
-  .map(([id,log])=>({date,id,name:log.name})));
- return `<section class="weekly-record" aria-label="${period}の記録"><header class="weekly-period"><button class="week-arrow" data-quantity-period="-1" aria-label="前の${period}">‹</button><div><span>${start.slice(0,4)}年${isCurrent?' · 今'+period:''}</span><h1>${monthly?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div><button class="week-arrow" data-quantity-period="1" aria-label="次の${period}" ${isCurrent?'disabled':''}>›</button></header><div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する目標</span><strong>${esc(goal?.name||'すべての目標')}</strong><i>⌄</i></button>${!isCurrent?`<button class="text-button" data-reset-period>今${period}へ戻る</button>`:''}</div>${groups.length?`<section class="weekly-total-block" aria-label="この${period}の合計"><h2>この${period}の合計</h2><div class="weekly-total-values">${groups.map(g=>{const shown=readableQuantity(g.total,g.dimension,g.unit);return `<div><strong>${numberText(shown.amount)}</strong><span>${esc(shown.unit)}</span></div>`}).join('')}</div></section>`:events.length?'':`<p class="weekly-empty-note">この${period}の記録は、まだありません。</p>`}<div class="weekly-task-sections">${sections.map(section=>`<section class="weekly-goal-section"><h2><span>✧</span>${esc(section.name)}</h2>${section.rows.map(row=>{const shown=readableQuantity(row.amount,row.dimension,row.unit),target=readableQuantity(row.target,row.dimension,row.unit),progress=weeklyAchievement(row.amount,row.target);return `<div class="weekly-task-row"><div><strong>${esc(row.name)}</strong>${row.deleted?'<small>過去のタスク</small>':''}</div><div class="weekly-task-value"><b>${numberText(shown.amount)}</b><span>${esc(shown.unit)}</span>${!row.deleted&&editableIds.has(row.id)?`<button data-record-leaf="${esc(row.id)}" data-log-date="${Object.keys(row.byDate||{}).sort().at(-1)||(end<today?end:today)}" aria-label="${esc(row.name)}の記録を修正">›</button>`:''}</div>${progress?`<div class="weekly-task-progress"><div class="weekly-task-progress-track" role="progressbar" aria-label="${esc(row.name)}の${targetLabel}達成度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.bar}" aria-valuetext="${progress.percent}%"><i style="width:${progress.bar}%"></i></div><p><span>${targetLabel} ${numberText(target.amount)}${esc(target.unit)}</span><strong>${progress.percent}%${progress.complete?' 達成':''}</strong></p></div>`:!row.hasTarget&&!row.deleted&&editableIds.has(row.id)&&!isEventTask(setting(s,row.id))?`<button class="weekly-target-missing" data-open-preset="${esc(row.id)}">目標を設定 →</button>`:''}</div>`}).join('')}</section>`).join('')||(events.length?'':`<div class="weekly-empty-tasks"><p>タスクを設定すると、ここで${period}ごとの量を見られます。</p><button class="text-button" data-view="tree">自分の宇宙へ →</button></div>`)}</div>${events.length?`<section class="weekly-goal-section"><h2><span>✧</span>完了したイベント</h2>${events.map(e=>`<div class="weekly-task-row"><strong>${esc(e.name)}</strong><span class="event-state">${short(e.date)} · 完了</span></div>`).join('')}</section>`:''}${summary.entries.some(e=>e.source==='mode')?'<p class="weekly-source-note">モードから反映した固定量を含みます。記録はカレンダーから修正できます。</p>':''}${summary.unknown?`<p class="weekly-source-note">量が未記録のチェック ${summary.unknown}件は合計に含めていません。</p>`:''}</section>`
+  .map(([id,log])=>({date,name:log.name,minutes:log.eventMinutes,quantities:log.eventQuantities||[]})));
+ return `<section class="weekly-record" aria-label="${period}の記録">
+  <header class="weekly-period"><button class="week-arrow" data-quantity-period="-1" aria-label="前の${period}">‹</button><div><span>${start.slice(0,4)}年${isCurrent?' · 今'+period:''}</span><h1>${monthly?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div><button class="week-arrow" data-quantity-period="1" aria-label="次の${period}" ${isCurrent?'disabled':''}>›</button></header>
+  <div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する目標</span><strong>${esc(goal?.name||'宇宙')}</strong><i>⌄</i></button>${!isCurrent?`<button class="text-button" data-reset-period>今${period}へ戻る</button>`:''}</div>
+  <section class="weekly-total-block period-overview" aria-label="目標の達成率">
+   <h2>この${period}に取り組んだ時間</h2>
+   <div class="weekly-total-values"><div><strong>${hoursNumber(time)}</strong><span>時間</span></div></div>
+   ${additional.length?`<div class="period-extra-totals">${additional.map(group=>`<span>${numberText(group.total)}${esc(group.unit)}</span>`).join('')}</div>`:''}
+   <div class="period-achievement">
+    <div><strong>時間目標の達成率</strong>${progress.achievement?`<b>${progress.achievement.percent}%</b>`:''}</div>
+    ${progress.achievement?`<div class="weekly-task-progress-track" role="progressbar" aria-label="目標全体の達成率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.achievement.bar}" aria-valuetext="${progress.achievement.percent}%"><i style="width:${progress.achievement.bar}%"></i></div>
+    <p>${hoursText(progress.actual)} / ${hoursText(progress.target)} · ${progress.count}件の時間目標</p>`:`<p>この${period}の時間目標があるタスクを設定すると、達成率が表示されます。</p>`}
+   </div>
+  </section>
+  <details class="period-details" ${sections.length||events.length?'':'open'}>
+   <summary>タスク別の内訳</summary>
+   ${sections.map(section=>taskDetails(s,section,targetLabel,editableIds,end,today)).join('')}
+   ${events.length?`<section class="weekly-goal-section"><h2><span>✧</span>完了したイベント</h2>${events.map(event=>`<div class="weekly-task-row"><strong>${esc(event.name)}</strong><span class="event-state">${short(event.date)} · 完了${event.minutes?' · '+hoursText(event.minutes/60):''}${event.quantities.map(q=>' · '+numberText(q.amount)+esc(unitInfo(q.measurement).label)).join('')}</span></div>`).join('')}</section>`:''}
+   ${sections.length||events.length?'':'<p class="weekly-empty-note">この期間のタスクの記録は、まだありません。</p>'}
+  </details>
+  ${summary.entries.some(entry=>entry.source==='mode')?'<p class="weekly-source-note">モードから反映した固定量を含みます。</p>':''}
+  ${summary.rows.some(row=>row.dimension!=='time'&&row.amount>0&&!summary.rows.some(other=>other.id===row.id&&other.dimension==='time'&&other.amount>0))?'<p class="weekly-source-note">時間の記録がない実績は、記録されている単位で表示しています。</p>':''}
+  ${summary.unknown?`<p class="weekly-source-note">量が未記録のチェック ${summary.unknown}件は合計に含めていません。</p>`:''}
+ </section>`;
 }
 export function scopeOptions(s,selected){const root=s.nodes.find(n=>n.parentId===null),out=[];function walk(n,depth){out.push(`<option value="${esc(n.id)}" ${selected===n.id?'selected':''}>${'　'.repeat(depth)}${esc(n.name)}</option>`);s.nodes.filter(c=>c.parentId===n.id).forEach(c=>walk(c,depth+1))}if(root)walk(root,0);return `<option value="all" ${selected==='all'?'selected':''}>宇宙全体</option>`+out.join('')}

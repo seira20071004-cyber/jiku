@@ -123,3 +123,31 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
  .hierarchy-name{font-size:11px}
  .space-map-trigger{font-size:10px}
 }
+
+.task-extra-config{margin:20px 0 12px}
+.task-extra-config>p{font-size:11px;color:#9f9ab6;margin:0 0 12px}
+.extra-metric{padding:12px 14px;margin:9px 0;border:1px solid #8b7eaa40;border-radius:10px;background:#1a1b2e}
+.extra-metric-top{display:flex;align-items:flex-start;gap:10px}
+.extra-metric-top>label{flex:1;min-width:0}
+.extra-metric-top button{padding:7px 9px;min-height:34px;font-size:18px}
+.extra-metric label[data-extra-custom][hidden]{display:none}
+#dialog [data-extra-targets]{padding:0;border:0;margin:0;min-width:0}
+.extra-metric summary{cursor:pointer;font-size:11px;color:#b5a8ce}
+.add-extra-unit{min-height:38px;padding:7px 12px;border:1px solid #9b80c450;border-radius:8px}
+.extra-record-fields{margin:14px 0}
+.period-extra-totals{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.period-extra-totals>span{font-size:11px;padding:4px 8px;border:1px solid #8778a843;border-radius:14px;color:#bcafd9}
+.period-achievement{border-top:1px solid #9483bb36;margin-top:16px;padding-top:12px}
+.period-achievement>div:first-child{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:9px}
+.period-achievement strong{font-size:12px;color:#ddd4f1}
+.period-achievement b{font:500 26px 'Outfit',sans-serif;color:#d7bcff}
+.period-achievement p{font-size:11px;color:#b1a5cd;margin:8px 0 0}
+.period-details>summary{cursor:pointer;padding:13px 15px;border:1px solid #a99ac32b;border-radius:10px;margin-bottom:16px;font-size:12px;color:#d8c7f3;background:#141529}
+.period-task{padding:12px 0;border-bottom:1px solid #9483bb30}
+.period-task header,.period-task-metric>div:first-child{display:flex;justify-content:space-between;align-items:center;gap:9px}
+.period-task header{min-height:32px;font-size:12px;color:#d6d4e8}
+.period-task header button{min-width:32px;min-height:34px;font-size:18px;color:#bba7da}
+.period-task-metric{margin:8px 0}
+.period-task-metric strong{font-size:12px;color:#dac9f7}
+.period-task-metric span{font-size:10px;color:#aa9cbe}
+.period-task-metric .weekly-task-progress-track{margin-top:5px}

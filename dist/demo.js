@@ -4,7 +4,14 @@ import {freshUniverse} from './universe-model.js';
 export function createDemoUniverse(today=dateKey()){
  const s=freshUniverse();s.nodes[0].name='自分が望む人生を、少しずつ形にする';s.nodes[0].kind='goal';
  const goal=(id,parentId,name,description)=>s.nodes.push({id,parentId,name,description,kind:'goal',symbolName:name});
- const task=(id,parentId,name,amount,unit,target,mode,customUnit)=>{s.nodes.push({id,parentId,name,description:'毎日の小さな積み重ねを、この目標につなげる。',kind:'action'});s.settings[id]={priority:1,type:'continuous',status:'active',modes:modesForLevel(mode),measurement:{unit,dailyAmount:amount,weeklyTarget:target,...(customUnit?{customUnit}:{})}}};
+ const task=(id,parentId,name,amount,unit,target,mode,customUnit)=>{
+  s.nodes.push({id,parentId,name,description:'毎日の小さな積み重ねを、この目標につなげる。',kind:'action'});
+  const minutes=unit==='minutes'?amount:unit==='hours'?amount*60:{rest:5,busy:15,full:25}[mode];
+  const weeklyMinutes=Math.round(minutes*target/amount);
+  const extras=unit==='minutes'||unit==='hours'?[]:[{unit,dailyAmount:amount,weeklyTarget:target,monthlyTarget:target*4,...(customUnit?{customUnit}:{})}];
+  s.settings[id]={priority:1,type:'continuous',status:'active',modes:modesForLevel(mode),
+   measurement:{unit:'minutes',dailyAmount:minutes,weeklyTarget:weeklyMinutes,monthlyTarget:weeklyMinutes*4,extras}};
+ };
  const galaxies=[
  ['dev','自分のプロダクトを育てる',[
   ['craft','つくる力を磨く',[

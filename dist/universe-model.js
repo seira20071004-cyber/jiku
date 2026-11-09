@@ -1,4 +1,4 @@
-import {nodeKind,setting,modesForLevel,validateMeasurement,isEventTask,validateEventDate,eventCompletionDate} from './model.js';
+import {nodeKind,setting,modesForLevel,validateMeasurement,isEventTask,validateEventDate,eventCompletionDate,validateDuration,unitInfo,rounded} from './model.js';
 // Navigation and editing rules are independent of the visual scene and historic logs.
 export const UNIVERSE_ORIGIN='@universe-origin';
 export const LEVELS=['宇宙','銀河','恒星系','惑星','衛星'];
@@ -20,11 +20,13 @@ export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurem
  if(!isRoot){if(!parentId||!s.nodes.some(p=>p.id===parentId))throw Error('つながっている上位目標を選んでください');if((isNew||parentId!==n.parentId)&&!canPlace(s,id,parentId))throw Error('上位目標を確認してください。宇宙から衛星までの5階層以内で、目標につなげられます。')}
  if(kind==='action'){
   if(isRoot||(!isNew&&s.nodes.some(c=>c.parentId===id)))throw Error('下位目標のあるものは目標として保存してください');
+  validateMeasurement(measurement);
+  if(unitInfo(measurement).dimension!=='time')throw Error('取り組む時間を入力してください');
+  validateDuration(measurement.dailyAmount);
+  if(measurement.extras?.some(metric=>metric.dailyAmount==null))throw Error('追加で記録する量を入力してください');
   if(eventDate!==undefined)validateEventDate(eventDate);
   else{
-   validateMeasurement(measurement);
-   if(measurement.dailyAmount==null)throw Error('タスク量を入力してください');
-   if(measurement.weeklyTarget==null&&measurement.monthlyTarget==null)throw Error('週間目標か月間目標を入力してください');
+   if(measurement.weeklyTarget==null&&measurement.monthlyTarget==null)throw Error('週間か月間の目標時間を入力してください');
    if(!['rest','busy','full'].includes(mode))throw Error('タスクのモードを選んでください');
   }
  }
@@ -35,7 +37,7 @@ export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurem
   const changedFormat=isEventTask(previous)!==(eventDate!==undefined);
   if(changedFormat)s.pending=s.pending.filter(item=>item.id!==target.id);
   s.settings[target.id]=eventDate!==undefined
-   ?{...base,type:'once',eventDate,modes:[],status:eventCompletionDate(s,target.id)?'completed':'active'}
+   ?{...base,type:'once',eventDate,measurement:structuredClone(measurement),modes:[],status:eventCompletionDate(s,target.id)?'completed':'active'}
    :{...base,...(changedFormat?{type:'continuous',status:'active'}:{}),measurement:structuredClone(measurement),modes:modesForLevel(mode)};
  }
  return target.id;
@@ -54,3 +56,10 @@ export function weeklyTaskSections(s,summary,scope='all'){
 }
 
 export function weeklyAchievement(amount,target){if(!Number.isFinite(target)||target<=0||!Number.isFinite(amount)||amount<0)return null;const percent=Math.round(amount/target*100);return {percent,bar:Math.min(100,percent),complete:amount>=target}}
+
+export function timeGoalProgress(rows){
+ const targets=rows.filter(row=>row.dimension==='time'&&Number.isFinite(row.target)&&row.target>0);
+ const actual=rounded(targets.reduce((sum,row)=>sum+row.amount,0));
+ const target=rounded(targets.reduce((sum,row)=>sum+row.target,0));
+ return {actual,target,count:targets.length,achievement:weeklyAchievement(actual,target)};
+}
