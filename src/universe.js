@@ -5,7 +5,7 @@ import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {UNIVERSE_ORIGIN,LEVELS} from '../dist/universe-model.js';
 import {originSphere} from './origin-sphere.js';
-import {createSpaceLayout,spaceRoute} from './space-layout.js';
+import {createSpaceLayout,spaceObservation,spaceRoute,STAR_RADIUS} from './space-layout.js';
 const palettes=['#a9bfff','#e8bb90','#a4ddd5','#c9a8ef','#e2a9bc','#a6c8ed'];
 function hash(s){let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0}
 function random(seed){let s=seed||1;return()=>((s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296)}
@@ -31,22 +31,51 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    const twist=radius*(1.1+(seed%5)*.13);
    const angle=i%arms*Math.PI*2/arms+twist+(rng()-.5)*(distant?.18+radius*.13:.4+radius*.3);
    const spread=(rng()-.5)*(.15+radius*.15);
-   positions.push(Math.cos(angle)*radius+spread,(rng()-.5)*(.08+radius*.12),Math.sin(angle)*radius+(rng()-.5)*radius*.14);
+   const y=(rng()-.5)*(.08+radius*.12),z=Math.sin(angle)*radius+(rng()-.5)*radius*.14;
    const color=radius<.65?warm.clone():base.clone().lerp(blue,rng()*.5);
    color.multiplyScalar(.55+rng()*.85);
-   colors.push(color.r,color.g,color.b);sizes.push(.65+rng()*1.65);
+   const size=.65+rng()*1.65;
+   if(!distant&&radius<.53)continue;
+   positions.push(Math.cos(angle)*radius+spread,y,z);
+   colors.push(color.r,color.g,color.b);sizes.push(size);
   }
   return {positions,colors,sizes,base};
+ }
+ function blackHole(){
+  const group=new T.Group();
+  const core=new T.Mesh(new T.SphereGeometry(.25,36,24),new T.MeshBasicMaterial({color:'#02030a'}));
+  group.add(core);
+  const rim=new T.Mesh(new T.RingGeometry(.249,.269,72),new T.MeshBasicMaterial({
+   color:'#ffda9a',transparent:true,opacity:.85,side:T.DoubleSide,depthWrite:false,blending:T.AdditiveBlending
+  }));
+  rim.position.z=.12;group.add(rim);
+  const disk=new T.Mesh(new T.RingGeometry(.255,.87,100,4),new T.ShaderMaterial({
+   transparent:true,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending,
+   vertexShader:`varying vec2 vDisk;void main(){vDisk=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+   fragmentShader:`varying vec2 vDisk;
+    void main(){
+     float r=length(vDisk),a=atan(vDisk.y,vDisk.x);
+     float edge=smoothstep(.255,.32,r)*(1.-smoothstep(.38,.87,r));
+     float bands=.62+.38*sin(r*42.+sin(a*2.+r*8.)*1.4);
+     float bright=.68+.32*cos(a-.45);
+     vec3 light=mix(vec3(.57,.24,.11),vec3(1.9,1.28,.71),1.-smoothstep(.28,.64,r));
+     gl_FragColor=vec4(light,edge*bands*bright*.86);
+    }`
+  }));
+  disk.rotation.set(1.08,0,-.26);group.add(disk);
+  halo(group,'#ffd193',1.6,.24);
+  return group;
  }
  function galaxy(seed,size=1){
   const group=new T.Group(),count=low?1000:small?1800:3300;
   const {positions,colors,sizes,base}=galaxyParticles(seed,count,false);
-  group.add(points(positions,colors,sizes));
-  group.rotation.set(.98+(seed%3)*.13,0,(seed%7)*.18);
+  const spiral=points(positions,colors,sizes);
+  spiral.rotation.set(.98+(seed%3)*.13,0,(seed%7)*.18);
+  spiral.userData.spin=.025;animated.add(spiral);
+  group.add(spiral,blackHole());
   group.scale.setScalar(size);
-  const core=new T.Mesh(new T.SphereGeometry(.13,18,12),new T.MeshBasicMaterial({color:'#fff5da'}));
-  group.add(core);halo(group,'#ffe5bf',2,.7);halo(group,base,7,.16);
-  group.userData.spin=.025;animated.add(group);return group;
+  halo(group,base,7,.13);
+  return group;
  }
  let galaxyField=null;
  function createGalaxyField(){
@@ -80,23 +109,37 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    }
    const cloud=points(positions,colors,sizes);
    group.add(cloud);
-   return {z:layer.z,w:columns*layer.spacing,h:rows*layer.spacing,clouds:[cloud],key:''};
+   return {kind:'galaxies',z:layer.z,w:columns*layer.spacing,h:rows*layer.spacing,clouds:[cloud],key:''};
   });
-  const starWidth=76,starHeight=62,starPositions=[],starColors=[],starSizes=[];
-  const tint=new T.Color();
-  for(let i=0;i<(low?155:260);i++){
-   starPositions.push(rng()*starWidth,rng()*starHeight,(rng()-.5)*10);
-   const bright=rng();
-   tint.setHSL(.54+rng()*.24,.15+rng()*.3,.48+bright*.38).multiplyScalar(.38+bright*.52);
-   starColors.push(tint.r,tint.g,tint.b);starSizes.push(bright>.94?2.05:.65+rng()*.7);
+  function starLayer(z,w,h,count,kind){
+   const positions=[],colors=[],sizes=[],tint=new T.Color();
+   for(let i=0;i<count;i++){
+    positions.push(rng()*w,rng()*h,(rng()-.5)*10);
+    const bright=rng();
+    tint.setHSL(.54+rng()*.24,.15+rng()*.3,.48+bright*.38).multiplyScalar(.38+bright*.52);
+    colors.push(tint.r,tint.g,tint.b);
+    sizes.push(bright>.94?2.05:.65+rng()*.7);
+   }
+   const cloud=points(positions,colors,sizes);
+   group.add(cloud);
+   return {kind,z,w,h,clouds:[cloud],key:''};
   }
-  const starCloud=points(starPositions,starColors,starSizes);
-  group.add(starCloud);layers.push({z:-12,w:starWidth,h:starHeight,clouds:[starCloud],key:''});
+  layers.push(starLayer(-12,76,62,low?155:260,'near-stars'));
+  layers.push(starLayer(-43,100,86,low?360:600,'deep-stars'));
+  layers.push(starLayer(-94,150,132,low?530:900,'deep-stars'));
   bg.add(group);
   return {group,layers};
  }
- function setGalaxyBackdrop(){
+ function setGalaxyBackdrop(starAmount){
   if(!galaxyField)galaxyField=createGalaxyField();
+  for(const layer of galaxyField.layers){
+   const amount=layer.kind==='galaxies'?1-starAmount:layer.kind==='deep-stars'?starAmount:1;
+   layer.clouds[0].material.uniforms.uFade.value=amount;
+   if(amount===0){
+    for(const cloud of layer.clouds)cloud.visible=false;
+    layer.key='';
+   }
+  }
  }
  function updateGalaxyBackdrop(){
   if(!bg.visible||!galaxyField?.group.visible)return;
@@ -106,6 +149,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   nebula.position.x=x;nebula.position.y=y;
   nebula.scale.set(Math.max(1,skyHeight*camera.aspect/210),Math.max(1,skyHeight/140),1);
   for(const layer of galaxyField.layers){
+   if(!layer.clouds[0].material.uniforms.uFade.value)continue;
    // A margin keeps a galaxy visible even when its center sits just outside the view.
    const halfHeight=(camera.position.z-layer.z+10)*fovScale,halfWidth=halfHeight*camera.aspect;
    const left=Math.floor((x-halfWidth-6)/layer.w),right=Math.floor((x+halfWidth+6)/layer.w);
@@ -178,7 +222,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  function body(id){
   if(bodies.has(id))return bodies.get(id);
   const frame=frames.get(id),seed=hash(id),scale=frames.get(frame.node.parentId).scale;
-  const object=frame.depth===1?galaxy(seed,.84):frame.depth===2?star(seed,.64):planet(seed,frame.depth===3?.75:.46);
+  const object=frame.depth===1?galaxy(seed,.84):frame.depth===2?star(seed,STAR_RADIUS):planet(seed,frame.depth===3?.75:.46);
   object.scale.multiplyScalar(scale);
   object.position.set(frame.x,frame.y,frame.z);active.add(object);
   const hit=new T.Mesh(new T.SphereGeometry((frame.depth===1?2.3:1.4)*scale,12,8),new T.MeshBasicMaterial({visible:false}));
@@ -193,14 +237,15 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   const object=new T.Group();
   object.position.set(frame.x,frame.y,frame.z);
   object.scale.setScalar(frame.scale);
-  for(let i=0;i<frame.rings;i++)object.add(orbit(5+i*3.3));
+  for(let i=0;i<frame.rings;i++)object.add(orbit(frame.orbitRadius+i*3.3));
   active.add(object);
   const entity={object,materials:prepareFade(object),alpha:1};
   orbitGroups.set(id,entity);return entity;
  }
  function visibleIds(id){
   const frame=frames.get(id);
-  return new Set([...(frame.depth?[id]:[]),...frame.visible.map(node=>node.id)]);
+  const context=frame.depth===3?[frame.node.parentId]:[];
+  return new Set([...(frame.depth?[id]:[]),...context,...frame.visible.map(node=>node.id)]);
  }
  function clearObjects(){
   for(const object of [...active.children])cleanup(object);
@@ -248,9 +293,10 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    baseDistance=Math.max(24,19/Math.max(.2,width/height));
   }else{
    const frame=frames.get(id)||frames.get(root.id);
+   const observation=spaceObservation(frames,frame.node.id,camera.aspect,camera.fov);
    settle(frame.node.id);
-   center.set(frame.x,frame.y,frame.z);baseDistance=frame.distance;
-   setGalaxyBackdrop();
+   center.set(observation.x,observation.y,observation.z);baseDistance=observation.distance;
+   setGalaxyBackdrop(Number(frame.depth>=2));
   }
   camera.position.copy(center).add(new T.Vector3(0,0,baseDistance));camera.lookAt(center);
  }
@@ -287,10 +333,11 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  }
  async function approach(id,routeLength){
   const before=visibleIds(currentNode),after=visibleIds(id);
-  const frame=frames.get(id),movingIn=frame.depth>frames.get(currentNode).depth;
+  const frame=frames.get(id),from=frames.get(currentNode),movingIn=frame.depth>from.depth;
+  const observation=spaceObservation(frames,id,camera.aspect,camera.fov);
   const start=camera.position.clone();
-  const destination=new T.Vector3(frame.x,frame.y,frame.z+frame.distance);
-  if(movingIn)destination.z=Math.min(destination.z,frame.z+Math.max(frame.distance*.48,(start.z-frame.z)*.86));
+  const destination=new T.Vector3(observation.x,observation.y,observation.z+observation.distance);
+  if(movingIn&&frame.depth!==3)destination.z=Math.min(destination.z,frame.z+Math.max(frame.distance*.48,(start.z-frame.z)*.86));
   const incoming=[...after].filter(bodyId=>!before.has(bodyId)).map(body);
   const outgoing=[...before].filter(bodyId=>!after.has(bodyId)).map(body);
   const fromRings=rings(currentNode),toRings=rings(id);
@@ -303,13 +350,16 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    const lateral=movingIn?smooth(raw/.86):smooth((raw-.1)/.9);
    camera.position.set(T.MathUtils.lerp(start.x,destination.x,lateral),T.MathUtils.lerp(start.y,destination.y,lateral),T.MathUtils.lerp(start.z,destination.z,smooth(raw)));
    const reveal=smooth((raw-.28)/.66),recede=1-smooth((raw-.16)/.7);
+   if((from.depth>=2)!==(frame.depth>=2)){
+    setGalaxyBackdrop(T.MathUtils.lerp(Number(from.depth>=2),Number(frame.depth>=2),smooth(raw)));
+   }
    incoming.forEach(entity=>fade(entity,reveal));
    outgoing.forEach(entity=>fade(entity,recede));
    if(raw>=.4&&!labelsReady){setLabels(id);labelsReady=true}
    labels.style.opacity=String(labelsReady?smooth((raw-.48)/.52):1-smooth(raw/.33));
   });
   if(!arrived)return false;
-  center.set(frame.x,frame.y,frame.z);baseDistance=frame.distance;
+  center.set(observation.x,observation.y,observation.z);baseDistance=observation.distance;
   settle(id,labelsReady);
   return true;
  }

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createSpaceLayout,spaceRoute} from '../src/space-layout.js';
+import {createSpaceLayout,spaceObservation,spaceRoute,STAR_RADIUS} from '../src/space-layout.js';
 
 const nodes=[
  {id:'root',parentId:null},
@@ -26,4 +26,18 @@ test('横長でも縦長でも、下位の天体へ進むほど観察距離が�
    assert.ok(Math.hypot(target.x-parent.x,target.y-parent.y)>0);
   }
  }
+});
+
+test('縦長の惑星画面では惑星と親の恒星を一緒に収める',()=>{
+ const width=390,height=780,aspect=width/height;
+ const frames=createSpaceLayout(nodes,width,height,12);
+ const planet=frames.get('planet-a'),star=frames.get('star-a');
+ const view=spaceObservation(frames,planet.node.id,aspect);
+ const slope=Math.tan(21*Math.PI/180);
+ for(const [body,radius] of [[planet,1.5*star.scale],[star,STAR_RADIUS*frames.get(star.node.parentId).scale]]){
+  const depth=view.z+view.distance-body.z-radius;
+  assert.ok(Math.abs(body.x-view.x)+radius<depth*slope*aspect);
+  assert.ok(Math.abs(body.y-view.y)+radius<depth*slope);
+ }
+ assert.ok(view.distance<star.distance);
 });
