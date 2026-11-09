@@ -1,7 +1,7 @@
 import {sceneLayout} from '../dist/universe-model.js';
 
 const CHILD_SCALE=.43;
-export const STAR_RADIUS=.36;
+export const STAR_RADIUS=.24;
 
 // A body has one position and size whether seen from its parent or up close.
 export function createSpaceLayout(nodes,width,height,limit){
@@ -42,15 +42,15 @@ export function createSpaceLayout(nodes,width,height,limit){
  return frames;
 }
 
-// Keep the planet and the star it orbits in the same view, including tall screens.
+// Frame the selected body and the body it orbits, including on tall screens.
 export function spaceObservation(frames,id,aspect,verticalFov=42){
  const frame=frames.get(id);
- if(frame.depth!==3)return frame;
- const star=frames.get(frame.node.parentId);
- const starScale=frames.get(star.node.parentId).scale;
+ if(frame.depth<3)return frame;
+ const parent=frames.get(frame.node.parentId);
+ const parentScale=frames.get(parent.node.parentId).scale;
  const subjects=[
-  {...frame,radius:1.5*star.scale},
-  {...star,radius:STAR_RADIUS*starScale},
+  {...frame,radius:(frame.depth===3?1.5:.92)*parent.scale},
+  {...parent,radius:(parent.depth===2?STAR_RADIUS:1.5)*parentScale},
   ...frame.visible.map(node=>({...frames.get(node.id),radius:.92*frame.scale}))
  ];
  const slope=Math.tan(verticalFov*Math.PI/360)*.91;

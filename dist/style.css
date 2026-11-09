@@ -151,3 +151,23 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .period-task-metric strong{font-size:12px;color:#dac9f7}
 .period-task-metric span{font-size:10px;color:#aa9cbe}
 .period-task-metric .weekly-task-progress-track{margin-top:5px}
+
+.celestial-label[data-role="current"],.celestial-label[data-role="parent"]{
+ color:#f0edff;
+ background:#0a1028e0;
+ border-color:#bac3f350;
+}
+.celestial-label[data-role="current"]{
+ pointer-events:none;
+ border-color:#cbb2ff6b;
+}
+.celestial-label[data-role="current"]::after{display:none}
+.celestial-label[data-role="parent"]::after{content:'↩'}
+.universe-stage::after{
+ content:'';
+ position:absolute;
+ inset:0;
+ pointer-events:none;
+ background:radial-gradient(ellipse at center,#25263f,#0a1025 72%,#070b18);
+ opacity:var(--portal-cover,0);
+}

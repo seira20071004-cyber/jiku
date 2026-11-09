@@ -244,7 +244,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  }
  function visibleIds(id){
   const frame=frames.get(id);
-  const context=frame.depth===3?[frame.node.parentId]:[];
+  const context=frame.depth>=3?[frame.node.parentId]:[];
   return new Set([...(frame.depth?[id]:[]),...context,...frame.visible.map(node=>node.id)]);
  }
  function clearObjects(){
@@ -254,14 +254,27 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  function setLabels(id){
   labels.replaceChildren();anchors=[];pickables=[];
   const frame=frames.get(id);
-  for(const node of frame.visible){
-   const entity=body(node.id),mesh=entity.object;
-   const button=document.createElement('button'),level=LEVELS[frame.depth+1];
-   button.className='celestial-label';button.dataset.level=level;button.textContent=node.name;
-   button.title=level+' · '+node.name;button.setAttribute('aria-label',node.name+'に近づく');
-   button.addEventListener('click',()=>{if(!transitioning)onSelect(node.id)});
-   labels.append(button);pickables.push(entity.hit);
-   anchors.push({button,mesh,id:node.id,position:mesh.position.clone().add(new T.Vector3(0,(frame.depth===0?-2.05:-1.15)*frame.scale,0))});
+  const roles=[
+   ...(frame.depth?[{node:frame.node,role:'current'}]:[]),
+   ...(frame.depth>=3?[{node:frames.get(frame.node.parentId).node,role:'parent'}]:[]),
+   ...frame.visible.map(node=>({node,role:'child'}))
+  ];
+  for(const {node,role} of roles){
+   const target=frames.get(node.id),entity=body(node.id);
+   const current=role==='current',level=LEVELS[target.depth];
+   const label=document.createElement(current?'span':'button');
+   label.className='celestial-label';label.dataset.level=level;label.dataset.role=role;
+   label.textContent=node.name;label.title=level+' · '+node.name;
+   if(current)label.setAttribute('aria-hidden','true'); // The same name is in the heading.
+   else{
+    label.setAttribute('aria-label',node.name+(role==='parent'?'へ戻る':'に近づく'));
+    label.addEventListener('click',()=>{if(!transitioning)onSelect(node.id)});
+    pickables.push(entity.hit);
+   }
+   const scale=frames.get(node.parentId).scale;
+   const clearance=[0,2.1,STAR_RADIUS,.92,.58][target.depth]*scale;
+   anchors.push({button:label,position:entity.object.position.clone(),clearance});
+   labels.append(label);
   }
  }
  function settle(id,labelsReady=false){
@@ -313,22 +326,28 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   });
  }
  function portalTravel(id,direction){
-  const start=camera.position.clone();
-  const duration=reduced?0:direction>0?1450:1100;
+  const start=camera.position.clone(),entering=direction>0;
+  const duration=reduced?0:entering?3200:1100;
+  const crossing=entering?.72:.63;
   return animateTravel(duration,raw=>{
-   if(raw<.63){
-    const destination=new T.Vector3(0,0,direction>0?3:baseDistance*1.65);
-    camera.position.lerpVectors(start,destination,Math.min(1,smooth(raw)/.7));
-    labels.style.opacity=String(Math.max(0,1-raw*3));
+   if(raw<crossing){
+    const destination=new T.Vector3(0,0,entering?3.24:baseDistance*1.65);
+    const approach=entering?Math.pow(raw/crossing,1.6):Math.min(1,smooth(raw)/.7);
+    camera.position.lerpVectors(start,destination,approach);
+    labels.style.opacity=String(1-smooth(raw/.34));
    }else{
     if(currentNode!==id)fill(id);
-    const progress=(raw-.63)/.37;
-    camera.position.z=center.z+T.MathUtils.lerp(direction>0?baseDistance*1.45:baseDistance*.6,baseDistance,1-Math.pow(1-progress,3));
+    const progress=(raw-crossing)/(1-crossing);
+    const ease=entering?smooth(progress):1-Math.pow(1-progress,3);
+    camera.position.z=center.z+T.MathUtils.lerp(entering?baseDistance*1.55:baseDistance*.6,baseDistance,ease);
     labels.style.opacity=String(progress);
+   }
+   if(entering){
+    const cover=smooth((raw-.57)/.15)*(1-smooth((raw-.72)/.25));
+    host.style.setProperty('--portal-cover',String(cover));
    }
    warp.material.opacity=Math.sin(raw*Math.PI)*.25;
    warp.position.set(camera.position.x,camera.position.y,camera.position.z-18);
-   host.style.setProperty('--travel',String(Math.sin(raw*Math.PI)*.6));
   });
  }
  async function approach(id,routeLength){
@@ -337,7 +356,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   const observation=spaceObservation(frames,id,camera.aspect,camera.fov);
   const start=camera.position.clone();
   const destination=new T.Vector3(observation.x,observation.y,observation.z+observation.distance);
-  if(movingIn&&frame.depth!==3)destination.z=Math.min(destination.z,frame.z+Math.max(frame.distance*.48,(start.z-frame.z)*.86));
+  if(movingIn&&frame.depth<3)destination.z=Math.min(destination.z,frame.z+Math.max(frame.distance*.48,(start.z-frame.z)*.86));
   const incoming=[...after].filter(bodyId=>!before.has(bodyId)).map(body);
   const outgoing=[...before].filter(bodyId=>!after.has(bodyId)).map(body);
   const fromRings=rings(currentNode),toRings=rings(id);
@@ -373,7 +392,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    return true;
   }finally{
    transitioning=false;labels.inert=false;labels.style.opacity='1';
-   warp.material.opacity=0;host.classList.remove('in-transit');host.style.setProperty('--travel','0');
+   warp.material.opacity=0;host.classList.remove('in-transit');host.style.removeProperty('--portal-cover');
   }
  }
  function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix()}
@@ -393,13 +412,45 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  function zoomTo(distance){camera.position.z=center.z+T.MathUtils.clamp(distance,baseDistance*.45,baseDistance*2)}
  function wheel(e){e.preventDefault();if(!transitioning&&currentNode!==UNIVERSE_ORIGIN)zoomTo((camera.position.z-center.z)*(1+e.deltaY*.001))}
  renderer.domElement.addEventListener('pointerdown',downEvent);renderer.domElement.addEventListener('pointermove',moveEvent);renderer.domElement.addEventListener('pointerup',upEvent);renderer.domElement.addEventListener('pointercancel',upEvent);renderer.domElement.addEventListener('wheel',wheel,{passive:false});
+ function positionLabels(){
+  const used=[],slope=Math.tan(T.MathUtils.degToRad(camera.fov/2));
+  const detail=host.parentElement?.querySelector('.space-detail-button');
+  if(detail){
+   const area=host.getBoundingClientRect(),box=detail.getBoundingClientRect();
+   if(box.width&&box.height)used.push({x:box.left-area.left+box.width/2,y:box.top-area.top,w:box.width,h:box.height});
+  }
+  for(const anchor of anchors){
+   const projected=anchor.position.clone().project(camera);
+   const screenX=(projected.x*.5+.5)*width,screenY=(-projected.y*.5+.5)*height;
+   const label=anchor.button;
+   if(anchor.origin){
+    const diameter=Math.min(width*.85,height*3.2/(slope*camera.position.z));
+    label.style.width=label.style.height=diameter+'px';
+    label.style.transform=`translate(${screenX}px,${screenY}px) translate(-50%,-50%)`;
+    continue;
+   }
+   const w=label.offsetWidth||130,h=label.offsetHeight||44;
+   const x=T.MathUtils.clamp(screenX,w/2+8,width-w/2-8);
+   const depth=camera.position.z-anchor.position.z;
+   const gap=depth>0?anchor.clearance*height/(2*slope*depth)+8:0;
+   const minY=76,maxY=height-h-57;
+   const below=screenY+gap,above=screenY-gap-h;
+   const fits=y=>y>=minY&&y<=maxY&&!used.some(other=>
+    Math.abs(x-other.x)<(w+other.w)/2+5&&y<other.y+other.h+4&&y+h>other.y-4);
+   const candidates=[below,above,T.MathUtils.clamp(below,minY,maxY),T.MathUtils.clamp(above,minY,maxY)];
+   for(let step=1;step<=3;step++)candidates.push(below+step*(h+5),above-step*(h+5));
+   const y=candidates.find(fits);
+   const visible=projected.z<1&&projected.z>-1&&Math.abs(projected.x)<1+w/width
+    &&screenY+gap>=0&&screenY-gap<=height&&y!==undefined;
+   label.style.visibility=visible?'visible':'hidden';
+   if(!visible)continue;
+   used.push({x,y,w,h});
+   label.style.transform=`translate(${x}px,${y}px) translate(-50%,0)`;
+  }
+ }
  function animate(time){if(disposed)return;raf=requestAnimationFrame(animate);if(document.hidden||time-last<(low?42:32))return;const dt=Math.min(.05,(time-last)/1000);last=time;if(!reduced){for(const o of animated){o.rotation.y+=(o.userData.spin||.02)*dt;const u=o.material?.uniforms;if(u?.uTime)u.uTime.value=time*.001;if(o.userData.birth){const f=Math.min(1,(time-o.userData.birth)/1400);o.scale.setScalar((o.userData.finalScale||1)*(.01+.99*(1-Math.pow(1-f,3))));if(f===1)delete o.userData.birth}}}
  if(burstCloud){const age=(time-burstStart)/1000,arr=burstCloud.geometry.attributes.position;for(let i=0;i<arr.count;i++)arr.setXYZ(i,burstVelocities[i*3]*age,burstVelocities[i*3+1]*age,burstVelocities[i*3+2]*age);arr.needsUpdate=true;burstCloud.material.uniforms.uFade.value=Math.max(0,1-age/4.5);if(age>4.5){cleanup(burstCloud);burstCloud=null}}
- if(tween)tween(time);bg.position.x=-camera.position.x*.08;bg.position.y=-camera.position.y*.08;updateGalaxyBackdrop();camera.updateMatrixWorld();const used=[];for(const a of anchors){const p=a.position.clone().project(camera);let x=(p.x*.5+.5)*width,y=(-p.y*.5+.5)*height;if(a.origin){const diameter=Math.min(width*.85,height*3.2/(Math.tan(T.MathUtils.degToRad(camera.fov/2))*camera.position.z));a.button.style.width=a.button.style.height=diameter+'px';a.button.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`;continue}const w=a.button.offsetWidth||130,h=a.button.offsetHeight||44;
- x=Math.max(w/2+8,Math.min(width-w/2-8,x));
- for(let tries=0;tries<4&&used.some(r=>Math.abs(x-r.x)<(w+r.w)/2+5&&y<r.y+r.h+4&&y+h>r.y-4);tries++)y+=h+5;
- const visible=p.z<1&&Math.abs(p.x)<1+w/width&&y>10&&y<height-h-2;
- if(visible)used.push({x,y,w,h});a.button.style.transform=`translate(${x}px,${y}px) translate(-50%,0)`;a.button.style.visibility=visible?'visible':'hidden';}onZoom?.(Math.round(baseDistance/(camera.position.z-center.z)*100));composer.render()}
+ if(tween)tween(time);bg.position.x=-camera.position.x*.08;bg.position.y=-camera.position.y*.08;updateGalaxyBackdrop();camera.updateMatrixWorld();positionLabels();onZoom?.(Math.round(baseDistance/(camera.position.z-center.z)*100));composer.render()}
  raf=requestAnimationFrame(animate);
  return {navigate,
   zoom(factor){if(!transitioning)zoomTo((camera.position.z-center.z)/factor)},

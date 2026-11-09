@@ -28,16 +28,21 @@ test('横長でも縦長でも、下位の天体へ進むほど観察距離が�
  }
 });
 
-test('縦長の惑星画面では惑星と親の恒星を一緒に収める',()=>{
+test('縦長でも、選んだ惑星や衛星とその親天体を一緒に収める',()=>{
  const width=390,height=780,aspect=width/height;
  const frames=createSpaceLayout(nodes,width,height,12);
- const planet=frames.get('planet-a'),star=frames.get('star-a');
- const view=spaceObservation(frames,planet.node.id,aspect);
+ const planet=frames.get('planet-a'),star=frames.get('star-a'),moon=frames.get('moon-a');
  const slope=Math.tan(21*Math.PI/180);
- for(const [body,radius] of [[planet,1.5*star.scale],[star,STAR_RADIUS*frames.get(star.node.parentId).scale]]){
-  const depth=view.z+view.distance-body.z-radius;
-  assert.ok(Math.abs(body.x-view.x)+radius<depth*slope*aspect);
-  assert.ok(Math.abs(body.y-view.y)+radius<depth*slope);
+ for(const [selected,subjects] of [
+  [planet,[[planet,1.5*star.scale],[star,STAR_RADIUS*frames.get(star.node.parentId).scale]]],
+  [moon,[[moon,.92*planet.scale],[planet,1.5*star.scale]]]
+ ]){
+  const view=spaceObservation(frames,selected.node.id,aspect);
+  for(const [body,radius] of subjects){
+   const depth=view.z+view.distance-body.z-radius;
+   assert.ok(Math.abs(body.x-view.x)+radius<depth*slope*aspect);
+   assert.ok(Math.abs(body.y-view.y)+radius<depth*slope);
+  }
+  assert.ok(view.distance<spaceObservation(frames,selected.node.parentId,aspect).distance);
  }
- assert.ok(view.distance<star.distance);
 });
