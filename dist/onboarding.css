@@ -199,9 +199,6 @@ body.birth-page, body.birth-active {
   content: "";
 }
 .birth-screen .birth-conversation {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
   min-height: 0;
   padding: 0 3px 4px;
   overflow: auto;
@@ -209,10 +206,8 @@ body.birth-page, body.birth-active {
   scrollbar-color: #80719e80 transparent;
   overscroll-behavior: contain;
 }
-.birth-conversation[data-scrolled] { mask-image: linear-gradient(transparent, #000 26px); }
 .birth-conversation:not(:empty) { margin-bottom: 17px; }
 .birth-turn {
-  flex: none;
   animation: birth-rise .42s ease both;
 }
 .birth-speaker {
@@ -244,10 +239,6 @@ body.birth-page, body.birth-active {
   font: 400 clamp(22px, 5.4vw, 29px)/1.52 var(--birth-serif);
   letter-spacing: .018em;
   text-wrap: pretty;
-}
-.birth-screen .birth-turn:is(.birth-emphasis, .birth-question):not(:nth-last-child(-n+2)) .birth-copy {
-  color: #bdb0ce;
-  font-size: 14px;
 }
 .birth-screen .birth-answer .birth-copy {
   color: #dcc9fa;

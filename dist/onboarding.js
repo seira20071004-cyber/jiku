@@ -7,9 +7,14 @@ const opening = {
   gather: ['もう少し、しっかり見つめてみて。', 2000]
 };
 
-const welcomeLines = [
-  'あなたの宇宙が、誕生しました。',
-  'ここでは、大きな目標を今日できる一歩まで分けられます。'
+const welcomeTurns = [
+  ['あなたの宇宙が、誕生しました。', 'birth-emphasis', 1700],
+  ['ここでは、大きな目標を今日できる一歩まで分けられます。', 'birth-welcome', 2700],
+  ['最近、もう少し時間を使えたらいいなと思うことはありますか？', 'birth-question', 700, 'JIKU', 'h1']
+];
+const saveTurns = [
+  ['最初の一歩から記録していきましょう。', 'birth-reply', 1750],
+  ['積み重ねると、目の前の宇宙に色と光が育ちます。', 'birth-reply', 0]
 ];
 
 const interests = {
@@ -138,13 +143,6 @@ export function mountOnboarding(host, {
   const note = screen.querySelector('.birth-error');
   const skip = screen.querySelector('[data-birth="skip"]');
   const persist = () => onDraft?.({...draft});
-  const updateConversationEdge = () => conversation.toggleAttribute('data-scrolled', conversation.scrollTop > 1);
-  const scrollToLatest = () => {
-    conversation.scrollTop = conversation.scrollHeight;
-    updateConversationEdge();
-  };
-  conversation.addEventListener('scroll', updateConversationEdge, {signal, passive: true});
-
   function showError(message) {
     note.textContent = message;
     note.hidden = !message;
@@ -157,19 +155,26 @@ export function mountOnboarding(host, {
     return node;
   }
 
-  function addTurn(text, className, from = 'JIKU', tag = 'p') {
+  function showTurn(text, className, from = 'JIKU', tag = 'p') {
     const turn = document.createElement('div');
     turn.className = `birth-turn ${className}`;
     turn.append(message('span', from, 'birth-speaker'));
     const copy = message(tag, text, 'birth-copy');
     turn.append(copy);
-    conversation.append(turn);
-    scrollToLatest();
+    conversation.replaceChildren(turn);
+    conversation.scrollTop = 0;
     return copy;
   }
 
-  function askInterest() {
-    return addTurn('最近、もう少し時間を使えたらいいなと思うことはありますか？', 'birth-question birth-interest', 'JIKU', 'h1');
+  function showSequence(turns, onReady) {
+    const show = index => {
+      const [text, className, wait, from, tag] = turns[index];
+      const copy = showTurn(text, className, from, tag);
+      if (index + 1 < turns.length) timer = setTimeout(() => show(index + 1), wait);
+      else if (wait) timer = setTimeout(() => onReady(copy), wait);
+      else onReady(copy);
+    };
+    show(0);
   }
 
   function focusTurn(copy, focus) {
@@ -178,67 +183,41 @@ export function mountOnboarding(host, {
     copy.focus({preventScroll: true});
   }
 
-  function choiceControls(options, stage, label) {
+  function choiceControls(options, label, canGoBack = false) {
     controls.innerHTML = `<div class="birth-choices" role="group" aria-label="${label}">${Object.entries(options).map(([id, option]) =>
       `<button class="birth-choice" type="button" data-choice="${id}">${option.label}<span aria-hidden="true">→</span></button>`
-    ).join('')}</div>${stage === 'friction' ? '<button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>' : ''}`;
-    scrollToLatest();
+    ).join('')}</div>${canGoBack ? '<button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>' : ''}`;
   }
 
-  function showInterests(focus) {
-    const question = conversation.querySelector('.birth-interest .birth-copy') || askInterest();
-    choiceControls(interests, 'interest', '今の気持ち');
-    focusTurn(question, focus);
+  function showInterests(previous, focus) {
+    const showChoices = question => {
+      choiceControls(interests, '今の気持ち');
+      focusTurn(question, focus);
+    };
+    if (previous && !Object.hasOwn(opening, previous) && previous !== 'bang') {
+      const [text, className, , from, tag] = welcomeTurns.at(-1);
+      showChoices(showTurn(text, className, from, tag));
+    } else {
+      showSequence(welcomeTurns, showChoices);
+    }
   }
 
-  function revealFirstQuestion(focus) {
-    addTurn(welcomeLines[0], 'birth-emphasis');
-    timer = setTimeout(() => {
-      addTurn(welcomeLines[1], 'birth-welcome');
-      timer = setTimeout(() => {
-        askInterest();
-        timer = setTimeout(() => showInterests(focus), 700);
-      }, 2700);
-    }, 1700);
-  }
-
-  function restoreChoice() {
-    if (!draft.interest || conversation.querySelector('.birth-choice-answer')) return;
-    if (!conversation.querySelector('.birth-interest')) askInterest();
-    addTurn(interests[draft.interest].label, 'birth-answer birth-choice-answer', 'あなた');
-  }
-
-  function askFriction() {
-    restoreChoice();
-    return conversation.querySelector('.birth-friction .birth-copy') ||
-      addTurn('何かを始めたり続けたりするとき、何がいちばん難しいですか？', 'birth-question birth-friction', 'JIKU', 'h2');
-  }
-
-  function explainPractice(focus, showAction) {
-    askFriction();
+  function showPractice(focus) {
     const option = frictionOptions[draft.friction];
-    addTurn(option.label, 'birth-answer birth-practice-turn', 'あなた');
-    addTurn(option.reply, 'birth-practice-turn');
-    const animated = showAction && !motion.matches;
-    const showExample = () => {
-      addTurn('「' + option.example + '」を試しに記録してみましょう。', 'birth-practice-turn');
-      showAction?.();
-    };
-    const showHighlight = () => {
-      const highlight = addTurn('小さな一歩が、宇宙の光になる。', 'birth-emphasis birth-practice-turn');
-      focusTurn(highlight, focus);
-      if (animated) timer = setTimeout(showExample, 1050);
-      else showExample();
-    };
-    if (animated) timer = setTimeout(showHighlight, 900);
-    else showHighlight();
+    showSequence([
+      [option.reply, 'birth-reply', 2200],
+      ['小さな一歩が、宇宙の光になる。', 'birth-emphasis', 1800],
+      ['「' + option.example + '」を試しに記録してみましょう。', 'birth-reply', 0]
+    ], example => {
+      controls.innerHTML = `<button class="birth-primary" type="button" data-birth="practice">一歩を記録してみる <span aria-hidden="true">✧</span></button>
+        <button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
+      focusTurn(example, focus);
+    });
   }
 
   function askGoal(focus) {
-    restoreChoice();
     const option = interests[draft.interest];
-    const tag = option ? 'h2' : 'h1';
-    const question = addTurn(option?.question || 'これから、どんなことを少しずつ育てたいですか？', 'birth-question birth-goal-question', 'JIKU', tag);
+    const question = showTurn(option?.question || 'これから、どんなことを少しずつ育てたいですか？', 'birth-question', 'JIKU', 'h1');
     focusTurn(question, focus);
   }
 
@@ -252,15 +231,12 @@ export function mountOnboarding(host, {
     input.placeholder = '例：' + (interests[draft.interest]?.example || interests.try.example);
     input.value = draft.name;
     controls.querySelector('button').disabled = !draft.name.trim();
-    scrollToLatest();
   }
 
   function showSave() {
-    addTurn('最初の一歩から記録していきましょう。積み重ねると、目の前の宇宙に色と光が育ちます。', 'birth-reply');
     controls.innerHTML = `<button class="birth-primary" type="button" data-birth="save">
       ${guest ? '<span class="birth-google" aria-hidden="true">G</span> Googleで続けて保存' : '保存して宇宙へ <span aria-hidden="true">→</span>'}
     </button><button class="birth-quiet birth-edit" type="button" data-birth="edit">目標を書き直す</button>`;
-    scrollToLatest();
   }
 
   function prepareOrigin() {
@@ -298,54 +274,32 @@ export function mountOnboarding(host, {
     draft.step = next;
     persist();
     screen.dataset.chat = '';
-    if (!conversation.children.length) {
-      if (next === 'interest') {
-        revealFirstQuestion(focus);
-        return;
-      }
-      addTurn(welcomeLines[0], 'birth-emphasis');
-      addTurn(welcomeLines[1], 'birth-welcome');
-    }
     if (next === 'interest') {
-      conversation.querySelectorAll('.birth-answer, .birth-friction, .birth-practice-turn, .birth-peak, .birth-goal-question, .birth-reply').forEach(turn => turn.remove());
-      showInterests(focus);
+      showInterests(previous, focus);
     } else if (next === 'friction') {
-      conversation.querySelectorAll('.birth-practice-turn, .birth-peak, .birth-goal-question, .birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
-      focusTurn(askFriction(), focus);
-      choiceControls(frictionOptions, 'friction', '続けるうえで難しいこと');
+      const question = showTurn('何かを始めたり続けたりするとき、何がいちばん難しいですか？', 'birth-question', 'JIKU', 'h1');
+      choiceControls(frictionOptions, '続けるうえで難しいこと', true);
+      focusTurn(question, focus);
     } else if (next === 'practice') {
-      conversation.querySelectorAll('.birth-practice-turn, .birth-peak, .birth-goal-question, .birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
-      explainPractice(focus, () => {
-        controls.innerHTML = `<button class="birth-primary" type="button" data-birth="practice">一歩を記録してみる <span aria-hidden="true">✧</span></button>
-          <button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
-        scrollToLatest();
-      });
+      showPractice(focus);
     } else if (next === 'name') {
-      conversation.querySelectorAll('.birth-goal-answer, .birth-reply').forEach(turn => turn.remove());
       const openComposer = () => {
-        if (!conversation.querySelector('.birth-goal-question')) askGoal(focus);
+        askGoal(focus);
         showComposer();
         if (previous === 'confirm') controls.querySelector('input').focus();
       };
-      if (draft.friction && !conversation.querySelector('.birth-peak')) {
-        if (!conversation.querySelector('.birth-practice-turn')) explainPractice(false);
-        addTurn('いまの一歩が、宇宙に光を灯しました。', 'birth-emphasis birth-peak');
-      }
-      if (previous === 'practice' && !motion.matches) timer = setTimeout(openComposer, 1050);
-      else openComposer();
+      if (previous === 'practice') {
+        showTurn('いまの一歩が、宇宙に光を灯しました。', 'birth-emphasis');
+        timer = setTimeout(openComposer, 2000);
+      } else openComposer();
     } else {
-      if (draft.friction && !conversation.querySelector('.birth-practice-turn')) {
-        explainPractice(false);
-        addTurn('いまの一歩が、宇宙に光を灯しました。', 'birth-emphasis birth-peak');
-      }
-      if (!conversation.querySelector('.birth-goal-question')) askGoal(false);
-      const answer = addTurn(draft.name, 'birth-answer birth-goal-answer', 'あなた');
-      if (focus) {
-        answer.tabIndex = -1;
-        answer.focus({preventScroll: true});
-      }
-      if (previous === 'name' && !motion.matches) timer = setTimeout(showSave, 240);
-      else showSave();
+      const turns = previous === 'name'
+        ? [[draft.name, 'birth-answer', 1200, 'あなた'], ...saveTurns]
+        : [saveTurns.at(-1)];
+      showSequence(turns, reply => {
+        showSave();
+        focusTurn(reply, focus);
+      });
     }
   }
 
@@ -408,7 +362,6 @@ export function mountOnboarding(host, {
     screen.classList.toggle('birth-keyboard', Boolean(keyboard));
     screen.style.setProperty('--birth-viewport', keyboard ? `${viewport.height}px` : '100dvh');
     screen.style.setProperty('--birth-top', keyboard ? `${viewport.offsetTop}px` : '0px');
-    scrollToLatest();
   }
   viewport?.addEventListener('resize', resizeViewport, {signal});
   viewport?.addEventListener('scroll', resizeViewport, {signal});
