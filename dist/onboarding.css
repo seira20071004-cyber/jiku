@@ -170,46 +170,82 @@ body.birth-page, body.birth-active {
   padding: 4px;
   inset: auto 0 var(--birth-bottom);
   margin: 0 auto;
-  max-height: calc(100% - 68px - var(--birth-bottom));
-  overflow: auto;
-  scrollbar-width: none;
+  max-height: min(45%, calc(100% - 64px - var(--birth-bottom)));
+  display: flex;
+  flex-direction: column;
 }
-.birth-content:has(.birth-conversation:not(:empty))::before {
+.birth-screen[data-chat] .birth-content::before {
   position: fixed;
-  inset: 36% 0 0;
+  inset: 50% 0 0;
   z-index: -1;
-  background: linear-gradient(transparent, #04030a80 46%, #04030aee);
+  background: linear-gradient(transparent, #04030a8c 40%, #04030aee);
   pointer-events: none;
   content: "";
 }
-.birth-screen .birth-conversation { margin: 0 0 16px; }
-.birth-conversation > * { animation: birth-rise .5s ease both; }
-.birth-conversation > :nth-child(2) { animation-delay: .1s; }
-.birth-screen .birth-question, .birth-screen .birth-answer {
-  margin: 4px 0 0;
-  color: #fcf4ff;
-  font: 400 clamp(24px, 5.5vw, 34px)/1.48 var(--birth-serif);
-  overflow-wrap: anywhere;
-  letter-spacing: .028em;
-  text-wrap: pretty;
+.birth-screen .birth-conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-height: 0;
+  padding: 0 3px 4px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #80719e80 transparent;
+  overscroll-behavior: contain;
 }
-.birth-screen .birth-answer { color: #fff0ff; text-shadow: 0 0 28px #b16cdf65; }
-.birth-screen .birth-previous, .birth-screen .birth-reply {
-  margin: 0 0 8px;
-  color: #c5bbd7;
+.birth-conversation:not(:empty) { margin-bottom: 17px; }
+.birth-turn {
+  flex: none;
+  animation: birth-rise .42s ease both;
+}
+.birth-speaker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.birth-screen .birth-copy {
+  color: #f3ebfb;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.birth-screen .birth-welcome .birth-copy {
+  color: #bbb1c9;
   font-size: 13px;
 }
-.birth-screen .birth-reply { margin: 9px 0 0; color: #e1d6ef; }
-.birth-form { display: grid; gap: 9px; margin: 0; }
+.birth-screen .birth-question .birth-copy {
+  font: 400 clamp(20px, 4.6vw, 26px)/1.53 var(--birth-serif);
+  letter-spacing: .025em;
+  text-wrap: pretty;
+}
+.birth-screen[data-stage="confirm"] .birth-question .birth-copy {
+  color: #bdb0ce;
+  font-size: 15px;
+}
+.birth-screen .birth-answer .birth-copy {
+  color: #dcc9fa;
+  font-weight: 500;
+}
+.birth-screen .birth-reply .birth-copy { font-family: var(--birth-serif); }
+.birth-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 0; }
+.birth-controls { flex: none; }
+.birth-screen .birth-form .birth-primary { width: auto; white-space: nowrap; padding-inline: 14px; }
+@media (max-height: 600px) {
+  .birth-content { max-height: min(53%, calc(100% - 64px - var(--birth-bottom))); }
+}
+.birth-keyboard .birth-content { max-height: calc(100% - 56px - var(--birth-bottom)); }
 .birth-screen .birth-form input {
   width: 100%;
   min-width: 0;
   min-height: 50px;
   margin: 0;
   padding: 10px 14px;
-  border: 1px solid #a29abc68;
-  border-radius: 12px;
-  background: #0d0b18db;
+  border: 1px solid #a29abc35;
+  border-radius: 25px;
+  background: #181425e8;
   color: #faf0ff;
   font-size: 16px;
   box-shadow: none;
@@ -224,10 +260,10 @@ body.birth-page, body.birth-active {
   gap: 10px;
   margin: 0;
   padding: 9px 14px;
-  border-radius: 12px;
-  border: 1px solid #cab8ff96;
+  border-radius: 25px;
+  border: 1px solid #c6b4f36b;
   color: #fff6ff;
-  background: linear-gradient(105deg, #604896, #3f4085);
+  background: linear-gradient(115deg, #544276, #393556 65%, #3f4963);
   font-size: 14px;
   font-weight: 600;
 }

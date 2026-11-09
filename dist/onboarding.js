@@ -74,7 +74,7 @@ export function mountOnboarding(host, {
       </header>
       <div class="birth-intro" aria-live="polite"></div>
       <div class="birth-content">
-        <div class="birth-conversation" aria-live="polite"></div>
+        <div class="birth-conversation" role="log" aria-label="JIKUとの会話" aria-relevant="additions"></div>
         <div class="birth-controls"></div>
         <p class="birth-error" role="alert" hidden></p>
       </div>
@@ -89,6 +89,7 @@ export function mountOnboarding(host, {
   const note = screen.querySelector('.birth-error');
   const skip = screen.querySelector('[data-birth="skip"]');
   const persist = () => onDraft?.({...draft});
+  const scrollToLatest = () => { conversation.scrollTop = conversation.scrollHeight; };
 
   function showError(message) {
     note.textContent = message;
@@ -102,6 +103,44 @@ export function mountOnboarding(host, {
     return node;
   }
 
+  function addTurn(text, className, from = 'JIKU', tag = 'p') {
+    const turn = document.createElement('div');
+    turn.className = `birth-turn ${className}`;
+    turn.append(message('span', from, 'birth-speaker'));
+    const copy = message(tag, text, 'birth-copy');
+    turn.append(copy);
+    conversation.append(turn);
+    scrollToLatest();
+    return copy;
+  }
+
+  function askGoal(focus) {
+    const question = addTurn('この宇宙で、いちばん叶えたいことは何ですか？', 'birth-question', 'JIKU', 'h1');
+    question.tabIndex = -1;
+    if (focus) question.focus({preventScroll: true});
+    return question;
+  }
+
+  function showComposer() {
+    controls.innerHTML = `<form class="birth-form">
+      <label class="birth-visually-hidden" for="birth-input">いちばん大きな目標</label>
+      <input id="birth-input" maxlength="80" required placeholder="例：自分のサービスを作りたい" enterkeyhint="send" autocomplete="off">
+      <button class="birth-primary" type="submit">送る <span aria-hidden="true">↑</span></button>
+    </form>`;
+    const input = controls.querySelector('input');
+    input.value = draft.name;
+    controls.querySelector('button').disabled = !draft.name.trim();
+    scrollToLatest();
+  }
+
+  function showSave() {
+    addTurn('この目標から、あなたの宇宙を育てていきましょう。', 'birth-reply');
+    controls.innerHTML = `<button class="birth-primary" type="button" data-birth="save">
+      ${guest ? '<span class="birth-google" aria-hidden="true">G</span> Googleで続けて保存' : '保存して宇宙へ <span aria-hidden="true">→</span>'}
+    </button><button class="birth-quiet birth-edit" type="button" data-birth="edit">目標を書き直す</button>`;
+    scrollToLatest();
+  }
+
   function prepareOrigin() {
     if (originRequested) return;
     originRequested = true;
@@ -112,6 +151,7 @@ export function mountOnboarding(host, {
   function enter(next, {focus = false} = {}) {
     clearTimeout(timer);
     clearTimeout(formingTimer);
+    const previous = step;
     step = next;
     screen.dataset.stage = next;
     sky?.stage(next);
@@ -134,27 +174,28 @@ export function mountOnboarding(host, {
 
     draft.step = next;
     persist();
+    screen.dataset.chat = '';
+    if (!conversation.children.length) {
+      addTurn('あなたの宇宙が、誕生しました。', 'birth-welcome');
+    }
     if (next === 'name') {
-      const title = message('h1', 'この宇宙で、いちばん叶えたいことは何ですか？', 'birth-question');
-      title.tabIndex = -1;
-      conversation.replaceChildren(message('p', 'あなたの宇宙が、誕生しました。', 'birth-previous'), title);
-      controls.innerHTML = `<form class="birth-form">
-        <label class="birth-visually-hidden" for="birth-input">いちばん大きな目標</label>
-        <input id="birth-input" maxlength="80" required placeholder="例：自分のサービスを作りたい" enterkeyhint="next" autocomplete="off">
-        <button class="birth-primary" type="submit">続ける <span aria-hidden="true">→</span></button>
-      </form>`;
-      const input = controls.querySelector('input');
-      input.value = draft.name;
-      controls.querySelector('button').disabled = !draft.name.trim();
-      if (focus) title.focus({preventScroll: true});
+      conversation.querySelectorAll('.birth-answer, .birth-reply').forEach(turn => turn.remove());
+      const openComposer = () => {
+        if (!conversation.querySelector('.birth-question')) askGoal(focus);
+        showComposer();
+        if (previous === 'confirm') controls.querySelector('input').focus();
+      };
+      if (previous === 'bang' && !motion.matches) timer = setTimeout(openComposer, 460);
+      else openComposer();
     } else {
-      const title = message('h1', draft.name, 'birth-answer');
-      title.tabIndex = -1;
-      conversation.replaceChildren(title, message('p', 'この目標から、あなたの宇宙を育てていきましょう。', 'birth-reply'));
-      controls.innerHTML = `<button class="birth-primary" type="button" data-birth="save">
-        ${guest ? '<span class="birth-google" aria-hidden="true">G</span> Googleで続けて保存' : '保存して宇宙へ <span aria-hidden="true">→</span>'}
-      </button><button class="birth-quiet birth-edit" type="button" data-birth="edit">目標を書き直す</button>`;
-      if (focus) title.focus({preventScroll: true});
+      if (!conversation.querySelector('.birth-question')) askGoal(false);
+      const answer = addTurn(draft.name, 'birth-answer', 'あなた');
+      if (focus) {
+        answer.tabIndex = -1;
+        answer.focus({preventScroll: true});
+      }
+      if (previous === 'name' && !motion.matches) timer = setTimeout(showSave, 240);
+      else showSave();
     }
   }
 
@@ -201,6 +242,7 @@ export function mountOnboarding(host, {
     screen.classList.toggle('birth-keyboard', Boolean(keyboard));
     screen.style.setProperty('--birth-viewport', keyboard ? `${viewport.height}px` : '100dvh');
     screen.style.setProperty('--birth-top', keyboard ? `${viewport.offsetTop}px` : '0px');
+    scrollToLatest();
   }
   viewport?.addEventListener('resize', resizeViewport, {signal});
   viewport?.addEventListener('scroll', resizeViewport, {signal});
