@@ -11,15 +11,12 @@ test('旧版で銀河の入力まで進んだユーザーは宇宙名を引き�
   assert.equal(draft.name, 'ものづくりを続ける');
 });
 
-test('命名の下書きと自由回答を保持し、不整合のある分岐は戻す', () => {
-  const saved = {step:'ready',goal:'まだない',direction:'自分の時間を持ちたい',name:'自分の時間を持つ'};
-  const draft = onboardingDraft(saved);
-  assert.equal(draft.step, 'ready');
-  assert.equal(draft.name, saved.name);
-  assert.equal(draft.direction, saved.direction);
-  assert.equal(onboardingDraft({...saved,name:' '}).step, 'name');
-  assert.equal(onboardingDraft({step:'custom',goal:'ある',direction:'古い回答'}).step, 'goal');
-  assert.equal(onboardingDraft({step:'goal',goal:'ある',direction:'古い回答'}).direction, '');
+test('以前の回答を引き継いで一問にまとめ、空の名前では確認画面へ進まない', () => {
+  const saved = {step:'ready',name:'自分の時間を持つ'};
+  assert.deepEqual(onboardingDraft(saved), {step:'confirm',name:saved.name});
+  assert.deepEqual(onboardingDraft({step:'custom',direction:'自分の時間を持ちたい'}), {step:'name',name:'自分の時間を持ちたい'});
+  assert.deepEqual(onboardingDraft({step:'confirm',name:' '}), {step:'name',name:' '});
+  assert.deepEqual(onboardingDraft(null), {step:'gaze',name:''});
 });
 
 test('宇宙の誕生は根だけを保存し、再実行で名前や後から作った銀河を変更しない', () => {

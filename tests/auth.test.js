@@ -17,7 +17,7 @@ test('公開Workerは認証設定なし・セッションなしでアプリを�
  assert.equal((await worker.fetch(req('/app.js'),env)).status,401);
  assert.equal((await worker.fetch(req('/model.js'),env)).status,401);assert.equal((await worker.fetch(req('/tree3d.js'),env)).status,401);
  assert.equal((await worker.fetch(req('/api/session'),env)).status,401);
- for(const name of ['onboarding.css','onboarding.js']){
+ for(const name of ['onboarding.css','onboarding.js','onboarding-sky.js']){
   const asset=await worker.fetch(req('/'+name),env);assert.equal(asset.status,200);
  }
  assert.equal((await worker.fetch(req('/universe-model.js'),env)).status,401);
@@ -28,3 +28,14 @@ test('公開Workerは認証設定なし・セッションなしでアプリを�
 });
 
 test('プロフィール画像はGoogleのHTTPS画像のみ許可し、古いセッションでも安全に省略できる',()=>{assert.equal(googlePicture(undefined),null);assert.equal(googlePicture('https://evil.example/avatar'),null);assert.equal(googlePicture('javascript:alert(1)'),null);assert.equal(googlePicture('https://lh3.googleusercontent.com/a/test'),'https://lh3.googleusercontent.com/a/test')});
+
+test('宇宙作成からのGoogleログインは署名済みの開始情報でだけ再開する',async()=>{
+ const start=await authRoute(req('/api/auth/google?onboarding=1'),c);
+ const flow=start.headers.get('set-cookie').match(/__Host-jiku-flow=([^;]+)/)[1];
+ const signed=await readSigned(req('/',flow),'flow',c);
+ const fetcher=async url=>Response.json(url.endsWith('/token')?{access_token:'a'}:{sub:'owner-id',email:'owner@example.com',email_verified:true});
+ const result=await authRoute(req('/api/auth/google/callback?code=1&state='+signed.state,flow),c,fetcher);
+ assert.equal(result.headers.get('location'),'https://jiku.example/?onboarding=resume#tree');
+ const canceled=await authRoute(req('/api/auth/google/callback?error=access_denied&state='+signed.state,flow),c,fetcher);
+ assert.equal(canceled.headers.get('location'),'https://jiku.example/?login=retry&onboarding=resume');
+});

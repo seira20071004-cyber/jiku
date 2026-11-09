@@ -1,4 +1,4 @@
-import {mountOnboarding,onboardingDraft} from './onboarding.js';
+import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse} from './onboarding.js';
 import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,presetPanel,modePickerContent,recordPanel,weeklyPanel,numberText,hoursText} from './quantity-view.js';
 import {createUniverse} from './universe.js';
@@ -31,6 +31,15 @@ function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n
 let universeOutside=true,navigating=false,onboardingScene=null;
 let onboardingPreview=new URLSearchParams(location.search).get('preview')==='welcome';
 const onboardingKey=storageKey+':onboarding-draft';
+const authReturn=!!account&&!demoMode&&new URLSearchParams(location.search).get('onboarding')==='resume';
+let guestHandoff=authReturn?pendingUniverse():null;
+function finishOnboardingReturn(){
+ if(!authReturn)return;
+ clearPendingUniverse();
+ guestHandoff=null;
+ const url=new URL(location.href);url.searchParams.delete('onboarding');history.replaceState(null,'',url);
+}
+if(authReturn&&(state.universe?.onboarded||!guestHandoff))finishOnboardingReturn();
 function currentSpace(){return state.nodes.find(n=>n.id===focus)||state.nodes.find(n=>n.parentId===null)}
 function spaceTrail(){
  const path=nodePath(state,currentSpace().id);
@@ -72,11 +81,13 @@ function showOnboarding(){
  let saved;
  try{if(!preview)saved=JSON.parse(localStorage.getItem(onboardingKey))}catch{}
  onboardingScene=mountOnboarding($('#app'),{
-  welcome:preview,preview,initial:onboardingDraft(saved,preview?null:state.universe),
+  preview,initial:preview?null:guestHandoff||onboardingDraft(saved,state.universe),
+  autoSave:!preview&&!!guestHandoff&&!needsLegacyImport,
   onDraft:preview?null:draft=>{try{localStorage.setItem(onboardingKey,JSON.stringify(draft))}catch{}},
-  onBirth:preview?name=>name:commitUniverseBirth,
-  onExplore:()=>{
+  onSave:async name=>{
    if(preview){endOnboardingPreview();return}
+   await commitUniverseBirth(name);
+   finishOnboardingReturn();
    onboardingScene?.dispose();onboardingScene=null;
    view='tree';focus=null;universeOutside=false;
    history.replaceState(null,'','#tree');
@@ -317,4 +328,4 @@ function applyLabelVisibility(){}
 $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}});
 window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar')statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today){render();promptDailyMode()}});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}render();if(!onboardingPreview&&needsLegacyImport)offerLegacyImport();else promptDailyMode();
 
-function offerLegacyImport(){modal(`<div class="dialog-title"><h2>以前の記録を引き継ぎますか？</h2></div><p>このブラウザでGoogleログイン前に使っていた記録が残っています。現在ログインしているあなたのアカウントへコピーできます。</p><p class="footnote">元の記録はそのまま残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">新しく始める</button><button id="copy-legacy" class="primary">記録を引き継ぐ</button></div>`);$('#copy-legacy').onclick=()=>{try{const old=localStorage.getItem('jiku-v1');localStorage.setItem(storageKey+':before-universe',old);state=migrateUniverse(validate(JSON.parse(old)));onboardingScene?.dispose();onboardingScene=null;applyPending(state,today);save();close();render();toast('以前の記録を引き継ぎました');promptDailyMode()}catch{toast('以前の記録を読み込めませんでした。バックアップから読み込んでください。')}}}
+function offerLegacyImport(){modal(`<div class="dialog-title"><h2>以前の記録を引き継ぎますか？</h2></div><p>このブラウザでGoogleログイン前に使っていた記録が残っています。現在ログインしているあなたのアカウントへコピーできます。</p><p class="footnote">元の記録はそのまま残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">新しく始める</button><button id="copy-legacy" class="primary">記録を引き継ぐ</button></div>`);$('#copy-legacy').onclick=()=>{try{const old=localStorage.getItem('jiku-v1');localStorage.setItem(storageKey+':before-universe',old);state=migrateUniverse(validate(JSON.parse(old)));finishOnboardingReturn();onboardingScene?.dispose();onboardingScene=null;applyPending(state,today);save();close();render();toast('以前の記録を引き継ぎました');promptDailyMode()}catch{toast('以前の記録を読み込めませんでした。バックアップから読み込んでください。')}}}

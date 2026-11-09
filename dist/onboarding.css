@@ -1,15 +1,13 @@
-/* The welcome page and the authenticated conversation share this stage. */
 body.birth-page, body.birth-active {
   margin: 0;
-  background: #050612;
+  background: #030308;
   overflow: hidden;
   overscroll-behavior: none;
 }
 .birth-screen {
-  --birth-serif: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --birth-text: #f4effd;
-  --birth-point-height: 39%;
-  --birth-muted: #b6bed9;
+  --birth-serif: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  --birth-point-height: 41%;
+  --birth-bottom: max(24px, env(safe-area-inset-bottom));
   position: fixed;
   inset: var(--birth-top, 0px) 0 auto;
   z-index: 2;
@@ -18,23 +16,20 @@ body.birth-page, body.birth-active {
   min-height: 0;
   height: 100vh;
   height: var(--birth-viewport, 100dvh);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
   overflow: hidden;
   isolation: isolate;
   color-scheme: dark;
-  background: #050612;
-  color: var(--birth-text);
-  font: 400 15px/1.7 "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
+  background: #030308;
+  color: #f6f0ff;
+  font: 400 15px/1.7 "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
   text-align: left;
   -webkit-tap-highlight-color: transparent;
 }
 .birth-screen *, .birth-screen *::before, .birth-screen *::after { box-sizing: border-box; }
-.birth-screen button, .birth-screen input { font: inherit; letter-spacing: inherit; }
+.birth-screen [hidden] { display: none !important; }
+.birth-screen :is(button, input) { font: inherit; }
 .birth-screen button { cursor: pointer; }
-.birth-screen button[hidden] { display: none; }
-.birth-screen :is(button, a, input, [tabindex]):focus-visible { outline: 2px solid #ccc5ff; outline-offset: 4px; }
+.birth-screen :is(button, a, input):focus-visible { outline: 2px solid #ccc5ff; outline-offset: 4px; }
 .birth-sky, .birth-sky canvas, .birth-haze {
   position: absolute;
   inset: 0;
@@ -45,205 +40,178 @@ body.birth-page, body.birth-active {
 .birth-sky { z-index: -1; overflow: hidden; }
 .birth-haze {
   background:
-    radial-gradient(ellipse at 45% 38%, #5354a83f, transparent 32%),
-    radial-gradient(ellipse at 63% 43%, #a85fb735, transparent 37%),
-    radial-gradient(ellipse at 36% 39%, #396e9f3d, transparent 41%),
-    radial-gradient(ellipse at 50% 60%, #141d49, transparent 70%);
-  opacity: .24;
-  transition: opacity 1.5s ease;
+    radial-gradient(ellipse at 48% 38%, #381d613d, transparent 49%),
+    radial-gradient(ellipse at 71% 29%, #0b305339, transparent 56%),
+    radial-gradient(ellipse at 31% 48%, #56245d35, transparent 49%);
+  opacity: 0;
+  transition: opacity 1.8s;
 }
-.birth-light, .birth-wave {
+.birth-screen:is([data-stage="name"], [data-stage="confirm"]) .birth-haze { opacity: 1; }
+.birth-light {
   position: absolute;
   top: var(--birth-point-height);
   left: 50%;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
+  background: #fff7ee;
+  box-shadow: 0 0 10px 1px #fbddffbf, 0 0 31px 7px #ad7cff38;
+  animation: birth-pulse 2.8s ease-in-out infinite;
+  transition: width 1.5s, height 1.5s, box-shadow 1.5s, opacity .8s;
 }
-.birth-light {
-  --point: 5px;
-  width: var(--point);
-  height: var(--point);
-  background: #fff5ed;
-  box-shadow: 0 0 7px 1px #ece2ffb8, 0 0 34px 11px #9a91f739, 0 0 80px 21px #6464be24;
-  animation: birth-pulse 4.8s ease-in-out infinite;
-  transition: width 1.25s, height 1.25s, box-shadow 1.25s, opacity 1s;
+.birth-screen[data-stage="gather"] .birth-light {
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(circle, #fff6e4 31%, #ecc0ff 65%, #8ec8ff);
+  box-shadow: 0 0 17px 3px #e6cdffc4, 0 0 45px 14px #8a73ff61, 0 0 85px 25px #6d4bd030;
 }
-.birth-wave { width: 14px; height: 14px; opacity: 0; }
-.birth-screen:is([data-stage="goal"], [data-stage="clarity"], [data-stage="direction"], [data-stage="custom"]) .birth-light { --point: 7px; }
-.birth-screen:is([data-stage="value"], [data-stage="name"]) .birth-light { --point: 11px; }
-.birth-screen:is([data-stage="value"], [data-stage="name"], [data-stage="ready"]) .birth-haze { opacity: .65; }
-.birth-screen[data-stage="ready"] .birth-light {
-  --point: 15px;
-  background: radial-gradient(circle, #fffef9 28%, #ffe1ff 55%, #9cc8ff 85%);
-  box-shadow: 0 0 14px 4px #eee6ffb3, 0 0 44px 13px #ae8cf782, 0 0 102px 28px #516bca50;
-  animation-duration: 3.2s;
-}
-.birth-screen[data-stage="bang"] .birth-light { animation: birth-expand 3.9s ease-out both; }
-.birth-screen[data-stage="bang"] .birth-haze { animation: birth-cloud 3.9s ease-out both; }
-.birth-screen[data-stage="bang"] .birth-wave {
-  border: 1px solid #dccdffc2;
-  box-shadow: 0 0 5px #a5b5fd7a;
-  animation: birth-wave 3.15s .48s ease-out both;
-}
-.birth-screen[data-stage="born"] .birth-haze { opacity: 1; }
-.birth-screen[data-stage="born"] .birth-light { opacity: .55; }
+.birth-screen[data-stage="bang"] .birth-light { animation: birth-collapse .65s ease-in both; }
+.birth-screen:is([data-stage="name"], [data-stage="confirm"]) .birth-light { display: none; }
 @keyframes birth-pulse {
-  0%, 100% { transform: translate(-50%, -50%) scale(.88); opacity: .79; }
-  50% { transform: translate(-50%, -50%) scale(1.18); opacity: 1; }
+  0%, 100% { transform: translate(-50%, -50%) scale(.83); opacity: .76; }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
 }
-@keyframes birth-expand {
-  0% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
-  12% { transform: translate(-50%, -50%) scale(.22); opacity: .66; }
-  22% { transform: translate(-50%, -50%) scale(3.5); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(15); opacity: 0; }
-}
-@keyframes birth-wave {
-  0% { transform: translate(-50%, -50%) scale(.35); opacity: 0; }
-  14% { opacity: .7; }
-  100% { transform: translate(-50%, -50%) scale(105); opacity: 0; }
-}
-@keyframes birth-cloud {
-  0%, 13% { opacity: .4; transform: scale(.48); }
-  37% { opacity: 1; }
-  100% { opacity: 1; transform: scale(1); }
+@keyframes birth-collapse {
+  0% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+  79% { transform: translate(-50%, -50%) scale(.25); opacity: .52; }
+  100% { transform: translate(-50%, -50%) scale(.12); opacity: 0; }
 }
 .birth-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: max(14px, env(safe-area-inset-top)) clamp(20px, 5vw, 56px) 0;
+  gap: 12px;
+  padding: max(15px, env(safe-area-inset-top)) clamp(20px, 5vw, 48px) 0;
 }
-.birth-wordmark { font: 600 31px/1 "Outfit", system-ui, sans-serif; letter-spacing: -.065em; color: #f7f3ff; }
-.birth-wordmark span { color: #bbb3f1; margin-left: 3px; font-size: .39em; }
-.birth-edition { color: #a4accd; font: 500 9px/1.4 system-ui, sans-serif; letter-spacing: .24em; }
-.birth-header .birth-quiet { margin-left: auto; }
+.birth-wordmark { color: #f3edf9; font: 600 28px/1 "Outfit", system-ui, sans-serif; letter-spacing: -.065em; }
+.birth-wordmark span { color: #c1a7ec; margin-left: 3px; font-size: .39em; }
+.birth-edition { color: #afabc1; font-size: 10px; letter-spacing: .12em; }
+.birth-screen .birth-quiet {
+  border: 0;
+  background: transparent;
+  color: #bbb4cd;
+  font-size: 12px;
+  min-height: 44px;
+  padding: 10px 7px;
+  text-decoration: none;
+}
+.birth-screen .birth-quiet:hover { color: #fff; }
+.birth-header .birth-quiet { display: grid; place-items: center; margin-left: auto; }
+.birth-intro {
+  position: absolute;
+  inset: calc(var(--birth-point-height) + 52px) 22px auto;
+  pointer-events: none;
+  display: grid;
+  justify-content: center;
+}
+.birth-screen .birth-prompt {
+  margin: 0;
+  text-align: center;
+  color: #f4eefb;
+  font: 400 clamp(16px, 4vw, 22px)/1.7 var(--birth-serif);
+  letter-spacing: .09em;
+  animation: birth-rise .8s ease both;
+}
+.birth-screen[data-stage="gather"] .birth-prompt { animation: birth-rise .7s ease both, birth-fade .28s 1.72s ease-in forwards; }
+@keyframes birth-fade { to { opacity: 0; } }
+.birth-screen .birth-skip {
+  position: absolute;
+  left: 50%;
+  bottom: var(--birth-bottom);
+  transform: translateX(-50%);
+  color: #a59eb9;
+  white-space: nowrap;
+}
+.birth-screen[data-stage="bang"] .birth-skip { opacity: .65; }
 .birth-content {
-  --birth-column: min(100%, 31rem);
-  width: min(100% - 40px, 35rem);
-  height: min(56%, 32rem);
-  min-height: 0;
-  margin-inline: auto;
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-}
-.birth-transcript {
-  flex: 1 1 0;
-  min-height: 0;
+  position: absolute;
+  width: min(100% - 36px, 32.5rem);
+  padding: 4px;
+  inset: auto 0 var(--birth-bottom);
+  margin: 0 auto;
+  max-height: calc(100% - 68px - var(--birth-bottom));
   overflow: auto;
   scrollbar-width: none;
-  overscroll-behavior: contain;
-  overflow-anchor: none;
-  mask-image: linear-gradient(transparent, black 18%);
-  padding: 25px 5px 5px;
 }
-.birth-transcript::-webkit-scrollbar { display: none; }
-.birth-messages { min-height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 12px; }
-.birth-screen .birth-message {
-  color: var(--birth-muted);
-  margin: 0;
-  max-width: var(--birth-column);
-  font: 400 14px/1.85 "Noto Sans JP", "Hiragino Sans", system-ui, sans-serif;
-  overflow-wrap: anywhere;
-  animation: birth-message-in .55s ease both;
-  transition: color .35s;
-}
-.birth-screen .birth-lead {
-  font: 400 clamp(21px, 4vw, 31px)/1.52 var(--birth-serif);
-  letter-spacing: .025em;
-  color: var(--birth-text);
-}
-.birth-screen .birth-prior:not(.birth-lead) { color: #a4adca; }
-.birth-screen [data-speaker="you"] {
-  align-self: flex-end;
-  max-width: 85%;
-  background: #25244a;
-  color: #edeaff;
-  border: 1px solid #958dde3d;
-  border-radius: 15px 15px 4px 15px;
-  padding: 8px 14px;
-}
-.birth-controls { flex-shrink: 0; padding-top: 14px; }
-.birth-controls:empty { padding-top: 0; }
-.birth-controls > * { animation: birth-message-in .48s ease both; }
-@keyframes birth-message-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.birth-screen[data-stage="bang"] .birth-transcript {
+.birth-content:has(.birth-conversation:not(:empty))::before {
+  position: fixed;
+  inset: 36% 0 0;
+  z-index: -1;
+  background: linear-gradient(transparent, #04030a80 46%, #04030aee);
   pointer-events: none;
-  animation: birth-messages-out .38s ease both;
+  content: "";
 }
-.birth-screen[data-stage="born"] .birth-message:not([data-turn="born"]) { display: none; }
-@keyframes birth-messages-out { to { opacity: 0; transform: translateY(-10px); } }
-.birth-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.birth-screen[data-stage="direction"] .birth-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.birth-screen .birth-choice,
+.birth-screen .birth-conversation { margin: 0 0 16px; }
+.birth-conversation > * { animation: birth-rise .5s ease both; }
+.birth-conversation > :nth-child(2) { animation-delay: .1s; }
+.birth-screen .birth-question, .birth-screen .birth-answer {
+  margin: 4px 0 0;
+  color: #fcf4ff;
+  font: 400 clamp(24px, 5.5vw, 34px)/1.48 var(--birth-serif);
+  overflow-wrap: anywhere;
+  letter-spacing: .028em;
+  text-wrap: pretty;
+}
+.birth-screen .birth-answer { color: #fff0ff; text-shadow: 0 0 28px #b16cdf65; }
+.birth-screen .birth-previous, .birth-screen .birth-reply {
+  margin: 0 0 8px;
+  color: #c5bbd7;
+  font-size: 13px;
+}
+.birth-screen .birth-reply { margin: 9px 0 0; color: #e1d6ef; }
+.birth-form { display: grid; gap: 9px; margin: 0; }
+.birth-screen .birth-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid #a29abc68;
+  border-radius: 12px;
+  background: #0d0b18db;
+  color: #faf0ff;
+  font-size: 16px;
+  box-shadow: none;
+}
+.birth-form input::placeholder { color: #a39bb5; }
 .birth-screen .birth-primary {
-  min-height: 48px;
+  width: 100%;
+  min-height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  border: 1px solid #a7a2e84a;
-  border-radius: 13px;
-  padding: 9px 11px;
-  text-align: center;
-  color: #efebff;
-  background: #171a36;
-  line-height: 1.5;
-  font-size: 13px;
-  text-decoration: none;
-  transition: background .2s, border-color .2s;
-}
-.birth-screen .birth-primary {
-  width: 100%;
-  min-height: 49px;
+  gap: 10px;
+  margin: 0;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 1px solid #cab8ff96;
+  color: #fff6ff;
+  background: linear-gradient(105deg, #604896, #3f4085);
   font-size: 14px;
   font-weight: 600;
-  background: linear-gradient(112deg, #5a57a6, #3e3f7c);
-  border-color: #c2b7ff70;
 }
-.birth-screen .birth-google { color: #fff; font: 700 16px system-ui, sans-serif; }
-.birth-screen .birth-primary:disabled { opacity: .45; cursor: default; }
-.birth-screen :is(.birth-choice, .birth-primary):hover:not(:disabled) { background: #4b4882; border-color: #c9bfff; }
-.birth-tools { display: flex; align-items: center; min-height: 44px; max-width: none; margin: 0; padding: 0; }
-.birth-screen .birth-quiet, .birth-screen .birth-suggestion {
-  min-height: 44px;
-  border: 0;
-  background: transparent;
-  color: #aab2d2;
-  font-size: 12px;
-  padding: 3px 5px;
+.birth-screen .birth-primary:disabled { opacity: .48; cursor: default; }
+.birth-screen .birth-primary:hover:not(:disabled) { background: #66539b; }
+.birth-google { color: #fff; font: 700 17px system-ui, sans-serif; }
+.birth-screen .birth-edit { display: block; margin: 1px auto 0; }
+.birth-controls > * { animation: birth-rise .46s .1s ease both; }
+.birth-screen .birth-error { margin: 8px 0 0; color: #ffd6e5; font-size: 13px; }
+.birth-screen .birth-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
-.birth-screen .birth-skip { margin-left: auto; }
-.birth-screen .birth-quiet:hover { color: #fff; }
-.birth-form { display: flex; flex-direction: column; gap: 7px; }
-.birth-form label, .birth-screen .birth-note { font-size: 12px; margin: 0; color: #b4bdd9; }
-.birth-screen .birth-note { padding: 0 0 3px; }
-.birth-screen .birth-form input {
-  min-height: 47px;
-  min-width: 0;
-  width: 100%;
-  border-radius: 11px;
-  border: 1px solid #aba9e860;
-  padding: 9px 12px;
-  margin: 0;
-  color: var(--birth-text);
-  background: #131730;
-  font-size: 16px;
+@keyframes birth-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.birth-screen .birth-form input::placeholder { color: #929bbc; }
-.birth-screen .birth-suggestion { text-align: left; color: #d7cdff; overflow-wrap: anywhere; }
-.birth-screen .birth-error { font-size: 13px; color: #ffd7e3; margin: 0 0 9px; }
-.birth-screen .birth-settings { font-size: 11px; }
-.birth-keyboard .birth-content { height: calc(100% - 59px); }
-.birth-keyboard .birth-sky { opacity: .55; }
-@media (max-height: 630px) {
-  .birth-content { height: min(66%, 32rem); }
-  .birth-screen { --birth-point-height: 31%; }
-  .birth-keyboard .birth-content { height: calc(100% - 59px); }
+@media (max-height: 600px) {
+  .birth-screen { --birth-point-height: 35%; --birth-bottom: max(16px, env(safe-area-inset-bottom)); }
 }
+.birth-screen.birth-keyboard { --birth-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .birth-screen *, .birth-screen *::before, .birth-screen *::after { animation: none !important; transition: none !important; }
 }
