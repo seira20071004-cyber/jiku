@@ -10,44 +10,65 @@ const opening = {
 };
 
 const witnessedBirthTurns = [
-  ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis', 2800],
-  ['さっき光に向けた集中を、日々の大切なことにも向けられます。', 'birth-welcome', 3100]
+  ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis'],
+  ['さっき光に向けた集中を、日々の大切なことにも向けられます。', 'birth-welcome']
 ];
 const welcomeTurns = [
-  ['JIKUでは、大きな目標を、今日できる一歩まで分けられます。', 'birth-welcome', 2900],
-  ['最近、もう少し時間を使えたらいいなと思うことはありますか？', 'birth-question', 700, 'JIKU', 'h1']
+  ['JIKUでは、大きな目標を、今日できる一歩まで分けられます。', 'birth-welcome']
 ];
+const interestQuestion = '今、あなたが少し時間を使いたいのはどんなことですか？';
 
 const interests = {
   try: {
-    label: 'やってみたいことがある',
+    label: '新しく始めたいことがある',
+    question: '新しいことを始めるとき、いちばん引っかかるのは何ですか？',
+    reflection: 'その挑戦を少しずつ続けたら、何を実現できたらうれしいですか？',
+    steps: {
+      start: ['何から始めたらいいか分からない', '気になることを一つだけ調べる'],
+      time: ['始める時間がなかなか取れない', '試しに5分だけ触れてみる'],
+      progress: ['うまくできるか自信がない', 'すぐに試せそうなことを一つ書く']
+    },
     example: '自分のサービスを作りたい'
   },
   continue: {
-    label: '続けたいことがある',
+    label: '今やっていることを続けたい',
+    question: '続けたいことに取り組むとき、いちばん難しいのは何ですか？',
+    reflection: 'それを続けた先で、今よりどんなことができるようになりたいですか？',
+    steps: {
+      start: ['毎回、何をするか迷う', '次にやることを一つ決めておく'],
+      time: ['忙しい日に後回しになる', 'いつもの取り組みを5分だけやる'],
+      progress: ['上達している実感がない', '前よりできるようになったことを一つ書く']
+    },
     example: '英語で気軽に話せるようになりたい'
   },
   unsure: {
-    label: 'まだ思いつかない',
-    example: '好きなことをする時間を増やしたい'
+    label: 'まだ決まっていない',
+    question: '何に時間を使いたいか考えるとき、今の気持ちに近いのはどれですか？',
+    reflection: 'そんな時間が増えたら、どんな毎日を過ごしたいですか？',
+    steps: {
+      start: ['自分が何を好きなのか思い浮かばない', '最近楽しかったことを一つ思い出す'],
+      time: ['考える余裕がなかなかない', '今週、自分のために5分空けてみる'],
+      progress: ['気になることが多くて選べない', '一週間だけ試したいことを一つ選ぶ']
+    },
+    example: '自分の好きなことを楽しめる暮らしにしたい'
   }
 };
 
-const frictionOptions = {
+const replies = {
   start: {
-    label: '何から始めるか迷う',
-    reply: 'まずは、今日できることを一つ決めてみましょう。',
-    example: '気になっていることを5分調べる'
+    try: '始め方が見えないときは、まず小さく調べるだけでも一歩です。',
+    continue: '取り組む内容を先に一つ決めておくと、次に始めやすくなります。',
+    unsure: '最近楽しかったことを思い出すと、自分が大切にしたい時間のヒントになります。'
   },
   time: {
-    label: '続ける時間が取れない',
-    reply: '忙しい日は、短い時間でできる一歩にしてみましょう。',
-    example: '好きなことに5分だけ触れる'
+    try: '最初は5分だけでも、試してみる時間をつくれます。',
+    continue: '忙しい日は、いつもの取り組みを短くすると続けやすくなります。',
+    unsure: '自分のための5分があると、何をしたいか少し考える余裕が生まれます。'
   },
   progress: {
-    label: '進んでいる実感がない',
-    reply: '小さな行動も記録に残すと、積み重ねが見えてきます。',
-    example: '今日できたことを一つ書く'
+    try: 'うまくできるか不安なときは、試せそうなことを一つ見つけるところから始められます。',
+    continue: '前よりできることを書いておくと、積み重ねが見えてきます。',
+    unsure: '一つを短い期間だけ試すと、自分に合っているか確かめられます。'
   }
 };
 
@@ -57,7 +78,7 @@ export function onboardingDraft(saved, legacy) {
   const name = (typeof source.name === 'string' ? source.name : legacyName).slice(0, 80);
   const priorAnswer = source.direction || source.custom;
   const interest = Object.hasOwn(interests, source.interest) ? source.interest : null;
-  const friction = Object.hasOwn(frictionOptions, source.friction) ? source.friction : null;
+  const friction = interest && Object.hasOwn(replies, source.friction) ? source.friction : null;
   const hasNamedStage = ['name', 'ready', 'confirm'].includes(source.step) ||
     ['universe-name', 'galaxy', 'bang'].includes(legacy?.step) || Boolean(name || priorAnswer);
   return {
@@ -136,6 +157,7 @@ export function mountOnboarding(host, {
   const screen = host.firstElementChild;
   const origin = screen.querySelector('.birth-origin');
   const intro = screen.querySelector('.birth-intro');
+  const content = screen.querySelector('.birth-content');
   const conversation = screen.querySelector('.birth-conversation');
   const controls = screen.querySelector('.birth-controls');
   const note = screen.querySelector('.birth-error');
@@ -160,19 +182,23 @@ export function mountOnboarding(host, {
     const copy = message(tag, text, 'birth-copy');
     turn.append(copy);
     conversation.replaceChildren(turn);
-    conversation.scrollTop = 0;
+    content.scrollTop = 0;
     return copy;
   }
 
-  function showSequence(turns, onReady) {
-    const show = index => {
-      const [text, className, wait, from, tag] = turns[index];
-      const copy = showTurn(text, className, from, tag);
-      if (index + 1 < turns.length) timer = setTimeout(() => show(index + 1), wait);
-      else if (wait) timer = setTimeout(() => onReady(copy), wait);
-      else onReady(copy);
+  function showSequence(turns, onReady, focus) {
+    const show = (index, shouldFocus) => {
+      if (index === turns.length) {
+        onReady(shouldFocus);
+        return;
+      }
+      const [text, className] = turns[index];
+      const copy = showTurn(text, className);
+      focusTurn(copy, shouldFocus);
+      const readingTime = Math.max(4600, 1700 + text.length * 110);
+      timer = setTimeout(() => show(index + 1, shouldFocus), readingTime);
     };
-    show(0);
+    show(0, focus);
   }
 
   function focusTurn(copy, focus) {
@@ -182,35 +208,34 @@ export function mountOnboarding(host, {
   }
 
   function choiceControls(options, label, canGoBack = false) {
-    controls.innerHTML = `<div class="birth-choices" role="group" aria-label="${label}">${Object.entries(options).map(([id, option]) =>
-      `<button class="birth-choice" type="button" data-choice="${id}">${option.label}<span aria-hidden="true">→</span></button>`
+    controls.innerHTML = `<div class="birth-choices" role="group" aria-label="${label}">${options.map(([id, text]) =>
+      `<button class="birth-choice" type="button" data-choice="${id}">${text}<span aria-hidden="true">→</span></button>`
     ).join('')}</div>${canGoBack ? '<button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>' : ''}`;
   }
 
   function showInterests(previous, focus, witnessedBirth) {
-    const showChoices = question => {
-      choiceControls(interests, '今の気持ち');
-      focusTurn(question, focus);
+    const showChoices = shouldFocus => {
+      const question = showTurn(interestQuestion, 'birth-question', 'JIKU', 'h1');
+      choiceControls(Object.entries(interests).map(([id, option]) => [id, option.label]), '今、時間を使いたいこと');
+      focusTurn(question, shouldFocus);
     };
     if (previous && !Object.hasOwn(opening, previous) && previous !== 'bang') {
-      const [text, className, , from, tag] = welcomeTurns.at(-1);
-      showChoices(showTurn(text, className, from, tag));
+      showChoices(focus);
     } else {
-      showSequence(witnessedBirth ? [...witnessedBirthTurns, ...welcomeTurns] : welcomeTurns, showChoices);
+      showSequence(witnessedBirth ? [...witnessedBirthTurns, ...welcomeTurns] : welcomeTurns, showChoices, focus);
     }
   }
 
   function showPractice(focus) {
-    const option = frictionOptions[draft.friction];
+    const [, example] = interests[draft.interest].steps[draft.friction];
     showSequence([
-      [option.reply, 'birth-reply', 2200],
-      ['小さな一歩が、宇宙の光になる。', 'birth-emphasis', 1800],
-      ['「' + option.example + '」を試しに記録してみましょう。', 'birth-reply', 0]
-    ], example => {
-      controls.innerHTML = `<button class="birth-primary" type="button" data-birth="practice">一歩を記録してみる <span aria-hidden="true">✧</span></button>
+      [replies[draft.friction][draft.interest], 'birth-reply']
+    ], shouldFocus => {
+      const copy = showTurn('たとえば「' + example + '」。', 'birth-emphasis');
+      controls.innerHTML = `<button class="birth-primary" type="button" data-birth="practice">この一歩を例に進む <span aria-hidden="true">✧</span></button>
         <button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
-      focusTurn(example, focus);
-    });
+      focusTurn(copy, shouldFocus);
+    }, focus);
   }
 
   function showComposer() {
@@ -271,24 +296,22 @@ export function mountOnboarding(host, {
     if (next === 'interest') {
       showInterests(previous, focus, witnessedBirth);
     } else if (next === 'friction') {
-      const question = showTurn('何かを始めたり続けたりするとき、何がいちばん難しいですか？', 'birth-question', 'JIKU', 'h1');
-      choiceControls(frictionOptions, '続けるうえで難しいこと', true);
+      const interest = interests[draft.interest];
+      const question = showTurn(interest.question, 'birth-question', 'JIKU', 'h1');
+      choiceControls(Object.entries(interest.steps).map(([id, [label]]) => [id, label]), '今の気持ちに近い答え', true);
       focusTurn(question, focus);
     } else if (next === 'practice') {
       showPractice(focus);
     } else if (next === 'name') {
-      const goalQuestion = ['この宇宙で叶えたい、いちばん大きな目標は何ですか？', 'birth-question', 0, 'JIKU', 'h1'];
-      const openComposer = question => {
+      const openComposer = shouldFocus => {
+        const question = showTurn('この宇宙で叶えたい、いちばん大きな目標は何ですか？', 'birth-question', 'JIKU', 'h1');
         showComposer();
         if (previous === 'confirm') controls.querySelector('input').focus();
-        else focusTurn(question, focus);
+        else focusTurn(question, shouldFocus);
       };
-      const turns = previous === 'practice' ? [
-        ['いまの小さな一歩が、宇宙に光を灯しました。', 'birth-emphasis', 2200],
-        ['今度は、その一歩を重ねた先の未来を思い浮かべてみてください。', 'birth-welcome', 2900],
-        goalQuestion
-      ] : [goalQuestion];
-      showSequence(turns, openComposer);
+      if (previous === 'practice') {
+        showSequence([[interests[draft.interest].reflection, 'birth-question']], openComposer, focus);
+      } else openComposer(focus);
     } else {
       const answer = showTurn(draft.name, 'birth-answer', 'あなた');
       showSave();
@@ -320,7 +343,7 @@ export function mountOnboarding(host, {
       delete draft.friction;
       enter('friction', {focus: true});
     }
-    if (step === 'friction' && Object.hasOwn(frictionOptions, choice)) {
+    if (step === 'friction' && Object.hasOwn(replies, choice)) {
       draft.friction = choice;
       enter('practice', {focus: true});
     }
@@ -353,7 +376,7 @@ export function mountOnboarding(host, {
   function resizeViewport() {
     const keyboard = viewport && viewport.scale === 1 && innerHeight - viewport.height > 110;
     screen.classList.toggle('birth-keyboard', Boolean(keyboard));
-    screen.style.setProperty('--birth-viewport', keyboard ? `${viewport.height}px` : '100dvh');
+    screen.style.setProperty('--birth-viewport', keyboard ? `${viewport.height}px` : '100svh');
     screen.style.setProperty('--birth-top', keyboard ? `${viewport.offsetTop}px` : '0px');
   }
   viewport?.addEventListener('resize', resizeViewport, {signal});

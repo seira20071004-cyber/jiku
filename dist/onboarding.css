@@ -15,7 +15,7 @@ body.birth-page, body.birth-active {
   padding: 0;
   min-height: 0;
   height: 100vh;
-  height: var(--birth-viewport, 100dvh);
+  height: var(--birth-viewport, 100svh);
   overflow: hidden;
   isolation: isolate;
   color-scheme: dark;
@@ -55,15 +55,14 @@ body.birth-page, body.birth-active {
   height: calc(100% - 140px);
   transform: translateY(-50%);
   opacity: 0;
-  transition: opacity 1.4s ease;
+  transition: opacity 1.4s ease, top 1.6s cubic-bezier(.2,.65,.3,1), transform 1.6s cubic-bezier(.2,.65,.3,1);
 }
 .birth-origin canvas {
   display: block;
   width: 100%;
   height: 100%;
-  mask-image: radial-gradient(circle closest-side, #000 46%, transparent 93%);
 }
-.birth-origin:not(:has(canvas))::before {
+.birth-origin:not(:has(canvas:not([hidden])))::before {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -75,12 +74,15 @@ body.birth-page, body.birth-active {
     radial-gradient(ellipse at center, #090619 20%, #120d2680 53%, transparent 73%),
     conic-gradient(from 16deg, #7853a2, #6fb5d2, #cc8ad9, #cd987a, #739ca5, #7853a2);
   box-shadow: inset 0 0 14px #e7d9ff64;
-  filter: grayscale(1);
   content: "";
 }
 .birth-origin { container-type: size; }
 .birth-screen:is([data-forming], [data-chat]) .birth-origin {
   opacity: 1;
+}
+.birth-screen[data-chat] .birth-origin {
+  top: clamp(64px, 23%, 220px);
+  transform: translateY(-50%) scale(.66);
 }
 .birth-origin[data-lit]::after {
   position: absolute;
@@ -223,28 +225,28 @@ body.birth-page, body.birth-active {
   position: absolute;
   width: min(100% - 36px, 32.5rem);
   padding: 4px;
-  inset: auto 0 var(--birth-bottom);
+  inset: 41% 0 var(--birth-bottom);
   margin: 0 auto;
-  max-height: min(45%, calc(100% - 64px - var(--birth-bottom)));
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 .birth-screen[data-chat] .birth-content::before {
   position: fixed;
-  inset: 50% 0 0;
+  inset: 38% 0 0;
   z-index: -1;
   background: linear-gradient(transparent, #04030a8c 40%, #04030aee);
   pointer-events: none;
   content: "";
 }
 .birth-screen .birth-conversation {
-  min-height: 0;
-  padding: 0 3px 4px;
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #80719e80 transparent;
-  overscroll-behavior: contain;
+  display: grid;
+  align-content: center;
+  min-height: clamp(64px, 13svh, 110px);
+  padding: 4px 6px;
+  text-align: center;
 }
+.birth-conversation:empty { display: none; }
 .birth-conversation:not(:empty) { margin-bottom: 17px; }
 .birth-turn {
   animation: birth-rise .42s ease both;
@@ -265,11 +267,11 @@ body.birth-page, body.birth-active {
   overflow-wrap: anywhere;
 }
 .birth-screen .birth-welcome .birth-copy {
-  color: #bbb1c9;
-  font-size: 13px;
+  color: #e2d9ef;
+  font-size: clamp(16px, 4vw, 19px);
 }
 .birth-screen .birth-question .birth-copy {
-  font: 400 clamp(17px, 4vw, 21px)/1.55 var(--birth-serif);
+  font: 400 clamp(18px, 4.8vw, 24px)/1.55 var(--birth-serif);
   letter-spacing: .025em;
   text-wrap: pretty;
 }
@@ -283,7 +285,7 @@ body.birth-page, body.birth-active {
   color: #dcc9fa;
 }
 .birth-screen .birth-turn:last-child .birth-copy { font-weight: 650; }
-.birth-screen .birth-reply .birth-copy { font-family: var(--birth-serif); }
+.birth-screen .birth-reply .birth-copy { font: 650 clamp(16px, 4vw, 20px)/1.65 var(--birth-serif); }
 .birth-choices {
   display: grid;
   gap: 5px;
@@ -307,12 +309,13 @@ body.birth-page, body.birth-active {
 .birth-screen .birth-choice:hover { background: #302544; }
 .birth-choice span { color: #c4b3e4; }
 .birth-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 0; }
-.birth-controls { flex: none; }
 .birth-screen .birth-form .birth-primary { width: auto; white-space: nowrap; padding-inline: 14px; }
 @media (max-height: 600px) {
-  .birth-content { max-height: min(53%, calc(100% - 64px - var(--birth-bottom))); }
+  .birth-content { top: 34%; }
+  .birth-screen .birth-conversation { min-height: 52px; }
 }
-.birth-keyboard .birth-content { max-height: calc(100% - 56px - var(--birth-bottom)); }
+.birth-keyboard .birth-content { top: clamp(56px, 30%, 125px); }
+.birth-screen.birth-keyboard .birth-origin { opacity: .4; }
 .birth-screen .birth-form input {
   width: 100%;
   min-width: 0;

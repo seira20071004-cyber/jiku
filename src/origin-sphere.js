@@ -4,7 +4,7 @@ import {ORIGIN_RADIUS} from '../dist/origin-framing.js';
 export {ORIGIN_FOV, ORIGIN_RADIUS, originDistance} from '../dist/origin-framing.js';
 
 // A glass-like shell with interference bands over slowly moving clouds of light.
-export function originSphere(noise, colorStrength=0) {
+export function originSphere(noise, colorStrength=0, preview=false) {
  const geometry=new SphereGeometry(ORIGIN_RADIUS,80,56);
  const material=new ShaderMaterial({
   uniforms:{uTime:{value:0},uColorStrength:{value:colorStrength}},
@@ -39,10 +39,16 @@ export function originSphere(noise, colorStrength=0) {
     vec3 light=interior*(.65+upper*.55)+thin*(glass*.38+edge*.55);
     float glint=pow(max(0.,dot(n,normalize(vec3(-.44,.68,.82)))),34.);
     light+=vec3(.54,.72,1.)*glint*.48;
+    ${preview ? '' : `
     float speck=noise(s*290.);
     light+=spectrum(tint+.37)*pow(speck,35.)*.6*(.45+ribbons);
+    `}
     float silver=dot(light,vec3(.2126,.7152,.0722));
     gl_FragColor=vec4(mix(vec3(silver),light,uColorStrength),1.);
+    ${preview ? `
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    ` : ''}
    }`
  });
  const sphere=new Mesh(geometry,material);

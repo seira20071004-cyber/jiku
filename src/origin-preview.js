@@ -1,8 +1,4 @@
-import {ACESFilmicToneMapping, PerspectiveCamera, Scene, Vector2, WebGLRenderer} from 'three';
-import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {ACESFilmicToneMapping, PerspectiveCamera, Scene, WebGLRenderer} from 'three';
 import {ORIGIN_FOV, originDistance, originSphere} from './origin-sphere.js';
 import {noiseGLSL} from './space-noise.js';
 
@@ -10,42 +6,48 @@ import {noiseGLSL} from './space-noise.js';
 // layer so the last stars from the explosion can fade underneath it.
 export function mountOriginPreview(host, motion) {
  const renderer=new WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
- renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));
  renderer.toneMapping=ACESFilmicToneMapping;
  renderer.toneMappingExposure=1.18;
  renderer.setClearColor(0,0);
  const scene=new Scene(),camera=new PerspectiveCamera(ORIGIN_FOV,1,.01,100);
- const sphere=originSphere(noiseGLSL);
+ const sphere=originSphere(noiseGLSL,1,true);
  scene.add(sphere);
- const composer=new EffectComposer(renderer);
- composer.addPass(new RenderPass(scene,camera));
- const bloom=new UnrealBloomPass(new Vector2(800,600),innerWidth<600?.42:.65,.65,.82);
- const output=new OutputPass();
- composer.addPass(bloom);
- composer.addPass(output);
- host.append(renderer.domElement);
+ const canvas=renderer.domElement;
+ const screen=host.closest('.birth-screen');
+ host.append(canvas);
 
- let frame=0,last=0;
+ let frame=0,last=0,startedAt;
  function draw(time){
+  if(canvas.hidden)return;
   if(!motion.matches){
-   sphere.material.uniforms.uTime.value=time*.001;
-   sphere.rotation.y=time*.000045;
+   startedAt ??= time;
+   const elapsed=time-startedAt;
+   sphere.material.uniforms.uTime.value=elapsed*.0007;
+   sphere.rotation.y=elapsed*.000026;
   }
-  composer.render();
+  renderer.render(scene,camera);
  }
  function resize(){
-  if(!host.clientWidth||!host.clientHeight)return;
-  camera.aspect=host.clientWidth/host.clientHeight;
+  const {clientWidth:width,clientHeight:height}=host;
+  if(!width||!height)return;
+  camera.aspect=width/height;
   camera.position.z=originDistance(camera.aspect);
   camera.updateProjectionMatrix();
-  renderer.setSize(host.clientWidth,host.clientHeight,false);
-  composer.setSize(host.clientWidth,host.clientHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1,2.5,Math.sqrt(1_650_000/(width*height))));
+  renderer.setSize(width,height,false);
   draw(performance.now());
  }
  function animate(time){
   frame=requestAnimationFrame(animate);
-  if(!document.hidden&&!motion.matches&&host.parentElement?.closest('.birth-screen')?.matches('[data-forming], [data-chat]')&&time-last>=40){last=time;draw(time)}
+  if(!document.hidden&&!motion.matches&&screen?.matches('[data-forming], [data-chat]')&&time-last>=32){
+   last=time;
+   draw(time);
+  }
  }
+ function loseContext(event){event.preventDefault();canvas.hidden=true;}
+ function restoreContext(){canvas.hidden=false;resize();}
+ canvas.addEventListener('webglcontextlost',loseContext);
+ canvas.addEventListener('webglcontextrestored',restoreContext);
  const observer=new ResizeObserver(resize);
  observer.observe(host);
  resize();
@@ -53,7 +55,8 @@ export function mountOriginPreview(host, motion) {
  return ()=>{
   cancelAnimationFrame(frame);observer.disconnect();
   sphere.geometry.dispose();sphere.material.dispose();
-  bloom.dispose();output.dispose();composer.dispose();
-  renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();
+  canvas.removeEventListener('webglcontextlost',loseContext);
+  canvas.removeEventListener('webglcontextrestored',restoreContext);
+  renderer.dispose();renderer.forceContextLoss();canvas.remove();
  };
 }

@@ -77,7 +77,7 @@ export function startBirthSky(canvas, origin, motion) {
   if (!ctx) return null;
   const stars = Array.from({length: 255}, (_, i) => ({
     x: (grain(i, 27) - .5) * 2.85, y: (grain(i, 39) - .5) * 2.85,
-    depth: .27 + grain(i, 61) * .73, phase: grain(i, 45) * Math.PI * 2,
+    depth: .27 + grain(i, 61) * .73,
     color: ['#e4edff', '#9bc7ff', '#fbe1ff', '#ffdcab'][i % 4],
     size: .32 + grain(i, 87) ** 3 * 1.4
   }));
@@ -96,7 +96,8 @@ export function startBirthSky(canvas, origin, motion) {
     center = height * (parseFloat(getComputedStyle(canvas).getPropertyValue('--birth-point-height')) || 42) / 100;
     sphereRadius = projectedOriginRadius(origin.clientWidth, origin.clientHeight);
     if (sphereRadius) origin.style.setProperty('--birth-orb-diameter', sphereRadius * 2 + 'px');
-    const ratio = Math.min(devicePixelRatio || 1, 1.6);
+    if (!width || !height) return;
+    const ratio = Math.min(devicePixelRatio || 1, 2.5, Math.sqrt(1_900_000 / (width * height)));
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -105,7 +106,8 @@ export function startBirthSky(canvas, origin, motion) {
 
   function paint(time) {
     frame = requestAnimationFrame(paint);
-    if (!width || !height || (motion.matches && drawnStage === stage) || time - lastDraw < 24) return;
+    const changing = ['gather', 'still', 'bang'].includes(stage) && !motion.matches;
+    if (!width || !height || (!changing && drawnStage === stage) || time - lastDraw < 16) return;
     lastDraw = time;
     drawnStage = stage;
     const elapsed = (time - entered) / 1000;
@@ -143,9 +145,8 @@ export function startBirthSky(canvas, origin, motion) {
         const perspective = .12 + (.72 * flight + .28 * launch) * (.4 + star.depth * .9);
         const x = star.x * width * perspective, y = star.y * height * perspective;
         if (cx + x < -5 || cx + x > width + 5 || cy + y < -5 || cy + y > height + 5) continue;
-        const shimmer = motion.matches ? .85 : .82 + Math.sin(time / 1250 + star.phase) * .18;
         const streak = expanding ? Math.sin(launch * Math.PI) * star.depth * .16 + Math.sin(flight * Math.PI) * star.depth * .065 : 0;
-        ctx.globalAlpha = skyAlpha * (.28 + star.depth * .6) * shimmer;
+        ctx.globalAlpha = skyAlpha * (.25 + star.depth * .54);
         ctx.strokeStyle = ctx.fillStyle = star.color;
         ctx.beginPath();
         if (streak > .01) {
@@ -219,7 +220,7 @@ export function startBirthSky(canvas, origin, motion) {
       ctx.globalAlpha = (1 - wave ** 1.55) * .97;
       glow(ctx, cx, cy, radius + 1, [
         [0, '#0000'], [.59, '#0000'], [.79, '#664fd633'], [.9, '#a976ff96'],
-        [.955, '#e3cfffd9'], [.975, '#fff8ee'], [.988, '#9ae5ffa8'], [1, '#0000']
+        [.948, '#e3cfffb8'], [.968, '#fff8eedd'], [.985, '#9ae5ff94'], [1, '#0000']
       ]);
       const echo = smooth((burst - .19) / .43);
       if (echo > 0 && echo < 1) {
