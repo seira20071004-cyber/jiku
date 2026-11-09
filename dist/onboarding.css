@@ -226,6 +226,7 @@ body.birth-page, body.birth-active {
   color: #f3ebfb;
   margin: 0;
   font-size: 15px;
+  font-weight: 400;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -250,8 +251,8 @@ body.birth-page, body.birth-active {
 }
 .birth-screen .birth-answer .birth-copy {
   color: #dcc9fa;
-  font-weight: 500;
 }
+.birth-screen .birth-turn:last-child .birth-copy { font-weight: 650; }
 .birth-screen .birth-reply .birth-copy { font-family: var(--birth-serif); }
 .birth-choices {
   display: grid;
