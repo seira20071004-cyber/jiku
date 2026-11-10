@@ -11,7 +11,7 @@ melloで使った方式はFirebaseではなく、Google CloudのOAuthクライ�
 
    `https://jiku-life-tree.seira20071004.chatgpt.site/api/auth/google/callback`
 
-3. 公開先の秘密設定に `.env.example` に記載した変数を登録します。セッション署名キーはjiku専用の新しいランダムな32バイト以上の値を使います。`JIKU_ALLOWED_EMAILS` はまず所有者だけのGoogleメールアドレスにします。
+3. 公開先の秘密設定に `.env.example` に記載した変数を登録します。セッション署名キーはJiku専用の新しいランダムな32バイト以上の値を使います。`JIKU_ALLOWED_EMAILS` はまず所有者だけのGoogleメールアドレスにします。既存の設定を維持したまま利用者を追加する場合は、`JIKU_ADDITIONAL_ALLOWED_EMAILS` に追加で許可するGoogleメールアドレスをカンマ区切りで登録します。
 4. `.openai/hosting.json` から `static` の指定を外して `npm run build` を実行し、生成された `dist/server/index.js` をデプロイします。秘密情報はビルド時には埋め込まれず、ランタイム環境変数から読み込みます。
 5. 現在のSitesの外側のChatGPTログインとGoogleログインは別の認証です。Googleのみを入口とするには、Sites側の入口のアクセス設定変更、または別の公開先への配置が必要です。これは公開範囲の変更になるため、所有者が方針を選んでから行います。入口を公開してもGoogleモードのサーバーは許可されたアカウント以外にアプリのHTML・JS・データ操作を提供しません。
 6. Googleでの実ログイン、許可外アカウントの拒否、ログアウト、アカウントを切り替えた際のデータ分離を実環境で確認します。

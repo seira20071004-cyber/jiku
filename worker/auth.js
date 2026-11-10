@@ -9,7 +9,11 @@ export function googleConfig(env){
   const origin=new URL(env.JIKU_AUTH_ORIGIN||'');
   const local=['localhost','127.0.0.1'].includes(origin.hostname);
   if(origin.origin!==env.JIKU_AUTH_ORIGIN||(!local&&origin.protocol!=='https:')||!env.GOOGLE_CLIENT_ID||!env.GOOGLE_CLIENT_SECRET||(env.JIKU_SESSION_SECRET||'').length<32||!env.JIKU_ALLOWED_EMAILS)throw Error('Google authentication is not configured');
-  return {origin:origin.origin,secure:origin.protocol==='https:',clientId:env.GOOGLE_CLIENT_ID,clientSecret:env.GOOGLE_CLIENT_SECRET,secret:env.JIKU_SESSION_SECRET,allowedEmails:env.JIKU_ALLOWED_EMAILS.split(',').map(s=>s.trim().toLowerCase()),redirectUri:origin.origin+'/api/auth/google/callback'};
+  const allowedEmails = [env.JIKU_ALLOWED_EMAILS, env.JIKU_ADDITIONAL_ALLOWED_EMAILS ?? '']
+    .flatMap(list => list.split(','))
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean);
+  return {origin:origin.origin,secure:origin.protocol==='https:',clientId:env.GOOGLE_CLIENT_ID,clientSecret:env.GOOGLE_CLIENT_SECRET,secret:env.JIKU_SESSION_SECRET,allowedEmails,redirectUri:origin.origin+'/api/auth/google/callback'};
 }
 const cookieName=(kind,c)=>(c.secure?'__Host-':'')+'jiku-'+kind;
 const cookie=(request,name)=>request.headers.get('cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='))?.slice(name.length+1);

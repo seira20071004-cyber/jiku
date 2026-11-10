@@ -10,6 +10,25 @@ test('認証済みプロフィールと許可メールのみセッションを�
 test('未許可アカウントはログインできない',async()=>{const t=await sign({state:'s',verifier:'v',exp:Math.floor(Date.now()/1000)+60},'flow',c);const r=await authRoute(req('/api/auth/google/callback?state=s&code=1',t),c,async url=>Response.json(url.endsWith('/token')?{access_token:'a'}:{sub:'other',email:'other@example.com',email_verified:true}));assert.match(r.headers.get('location'),/login=denied/);assert(!r.headers.get('set-cookie').includes('jiku-session='))});
 test('ログアウトは同一オリジンPOSTのみ許可',async()=>{assert.equal((await authRoute(req('/api/auth/logout'),c)).status,405);assert.equal((await authRoute(new Request('https://jiku.example/api/auth/logout',{method:'POST',headers:{Origin:'https://other.example'}}),c)).status,403)});
 
+test('追加で許可したGoogleアカウントが、既存アカウントとともにログインできる', async () => {
+ const config = googleConfig({
+  JIKU_AUTH_MODE: 'google', JIKU_AUTH_ORIGIN: c.origin,
+  GOOGLE_CLIENT_ID: c.clientId, GOOGLE_CLIENT_SECRET: c.clientSecret, JIKU_SESSION_SECRET: c.secret,
+  JIKU_ALLOWED_EMAILS: 'owner@example.com', JIKU_ADDITIONAL_ALLOWED_EMAILS: ' Friend@example.com, '
+ });
+ assert.deepEqual(config.allowedEmails, ['owner@example.com', 'friend@example.com']);
+ const flow = await sign({state: 's', verifier: 'v', exp: Math.floor(Date.now() / 1000) + 60}, 'flow', config);
+ const result = await authRoute(req('/api/auth/google/callback?state=s&code=1', flow), config, async url =>
+  Response.json(url.endsWith('/token')
+   ? {access_token: 'test-token'}
+   : {sub: 'friend-id', email: 'friend@example.com', email_verified: true}));
+ assert.equal(result.headers.get('location'), c.origin + '/#tree');
+ const token = result.headers.get('set-cookie').match(/__Host-jiku-session=([^;]+)/)[1];
+ const request = new Request(c.origin, {headers: {Cookie: '__Host-jiku-session=' + token}});
+ assert.equal((await session(request, config)).sub, 'friend-id');
+ assert.equal(await session(request, c), null);
+});
+
 test('公開Workerは認証設定なし・セッションなしでアプリを返さない',async()=>{
  const {default:worker}=await import('../dist/server/index.js');
  const env={JIKU_AUTH_MODE:'google',JIKU_AUTH_ORIGIN:'https://jiku.example',GOOGLE_CLIENT_ID:'test-id',GOOGLE_CLIENT_SECRET:'test-secret',JIKU_SESSION_SECRET:'a'.repeat(40),JIKU_ALLOWED_EMAILS:'owner@example.com'};
