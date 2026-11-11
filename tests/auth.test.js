@@ -40,7 +40,12 @@ test('公開Workerは認証設定なし・セッションなしでアプリを�
   const asset=await worker.fetch(req('/'+name),env);assert.equal(asset.status,200);
  }
  assert.equal((await worker.fetch(req('/universe-model.js'),env)).status,401);
- const page=await worker.fetch(req('/'),env);assert.equal(page.status,200);assert.match(await page.text(),/Googleでログイン/);
+ const page=await worker.fetch(req('/'),env);
+ assert.equal(page.status,200);
+ const welcome=await page.text();
+ assert.match(welcome,/Jikuへようこそ。/);
+ assert.match(welcome,/href="\/api\/auth\/google"[^>]*>Googleでログイン/);
+ assert.doesNotMatch(welcome,/すでに大きな目標/);
  const token=await sign({sub:'owner-id',email:'owner@example.com',name:'Owner',exp:Math.floor(Date.now()/1000)+60},'session',c);
  const authed=new Request('https://jiku.example/app.js',{headers:{Cookie:'__Host-jiku-session='+token}});
  const js=await worker.fetch(authed,env);assert.equal(js.status,200);assert.match(await js.text(),/const storageKey/);

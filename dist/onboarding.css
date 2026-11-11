@@ -228,6 +228,8 @@ body.birth-page, body.birth-active {
   padding: 4px;
   inset: 41% 0 var(--birth-bottom);
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -243,6 +245,7 @@ body.birth-page, body.birth-active {
 .birth-screen .birth-conversation {
   display: grid;
   align-content: center;
+  flex: none;
   min-height: clamp(64px, 13svh, 110px);
   padding: 4px 6px;
   text-align: center;
@@ -250,8 +253,22 @@ body.birth-page, body.birth-active {
 .birth-conversation:empty { display: none; }
 .birth-conversation:not(:empty) { margin-bottom: 17px; }
 .birth-turn {
-  animation: birth-rise .42s ease both;
+  grid-area: 1 / 1;
+  animation: birth-rise .32s cubic-bezier(.2,.65,.3,1) both;
 }
+.birth-turn.is-leaving { animation: birth-leave .2s ease-in both; pointer-events: none; }
+.birth-turn.is-arriving { animation-delay: .13s; }
+.birth-welcome-card h1 {
+  margin: 0;
+  font: 650 clamp(18px, 4.8vw, 24px)/1.55 var(--birth-serif);
+  letter-spacing: .025em;
+}
+.birth-welcome-card p,.birth-welcome-description {
+  margin: 9px 0 0;
+  color: #e2d9ef;
+  font-size: clamp(14px, 4vw, 17px);
+}
+.birth-login-instruction { margin: 0 0 12px; color: #e2d9ef; text-align: center; }
 .birth-speaker {
   position: absolute;
   width: 1px;
@@ -344,15 +361,16 @@ body.birth-page, body.birth-active {
   border-radius: 25px;
   border: 1px solid #c6b4f36b;
   color: #fff6ff;
+  text-decoration: none;
   background: linear-gradient(115deg, #544276, #393556 65%, #3f4963);
   font-size: 14px;
   font-weight: 600;
 }
 .birth-screen .birth-primary:disabled { opacity: .48; cursor: default; }
 .birth-screen .birth-primary:hover:not(:disabled) { background: #66539b; }
-.birth-google { color: #fff; font: 700 17px system-ui, sans-serif; }
 .birth-screen .birth-edit { display: block; margin: 1px auto 0; }
-.birth-controls > * { animation: birth-rise .46s .1s ease both; }
+.birth-controls { flex: none; margin-top: auto; }
+.birth-controls > * { animation: birth-rise .32s .13s ease both; }
 .birth-screen .birth-error { margin: 8px 0 0; color: #ffd6e5; font-size: 13px; }
 .birth-screen .birth-visually-hidden {
   position: absolute;
@@ -363,8 +381,12 @@ body.birth-page, body.birth-active {
   clip-path: inset(50%);
 }
 @keyframes birth-rise {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(19px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes birth-leave {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-20px); }
 }
 @media (max-height: 600px) {
   .birth-screen { --birth-point-height: 35%; --birth-bottom: max(16px, env(safe-area-inset-bottom)); }

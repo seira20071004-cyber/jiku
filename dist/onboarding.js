@@ -1,7 +1,6 @@
 import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
 
 const guestDraftKey = 'jiku:pending-universe';
-const googlePath = '/api/auth/google';
 const opening = {
   gaze: {prompt: '光を見つめてください。', duration: 4400, reducedDuration: 2800, next: 'gather'},
   gather: {prompt: 'もう少し、しっかり見つめてみて。', duration: GATHER_DURATION, reducedDuration: 2000, next: 'ignite'},
@@ -68,23 +67,8 @@ export function clearPendingUniverse() {
   try { sessionStorage.removeItem(guestDraftKey); } catch {}
 }
 
-export function mountGuestOnboarding(host, error) {
-  return mountOnboarding(host, {
-    initial: guestDraft(),
-    guest: true,
-    error,
-    onDraft(draft) {
-      try { sessionStorage.setItem(guestDraftKey, JSON.stringify(draft)); } catch {}
-    },
-    onSave(name, draft) {
-      sessionStorage.setItem(guestDraftKey, JSON.stringify({...draft, name}));
-      window.open(googlePath + '?onboarding=1', '_top');
-    }
-  });
-}
-
 export function mountOnboarding(host, {
-  initial, guest = false, preview = false, autoSave = false, error = '',
+  initial, preview = false, autoSave = false,
   onDraft, onSave, onClose, onSettings, renderOrigin
 } = {}) {
   const draft = onboardingDraft(initial);
@@ -103,7 +87,6 @@ export function mountOnboarding(host, {
         <span class="birth-wordmark">Jiku<span>●</span></span>
         ${preview ? '<span class="birth-edition">初回体験プレビュー</span>' : ''}
         ${onClose ? '<button type="button" class="birth-quiet" data-birth="close">閉じる</button>' : ''}
-        ${guest ? '<a class="birth-quiet" href="/api/auth/google" target="_top" aria-label="Googleでログイン">ログイン</a>' : ''}
         ${onSettings ? '<button type="button" class="birth-quiet" data-birth="settings" aria-label="Googleアカウントと設定">設定</button>' : ''}
       </header>
       <div class="birth-intro" aria-live="polite"></div>
@@ -136,13 +119,31 @@ export function mountOnboarding(host, {
     return node;
   }
 
+  function retireTurn() {
+    conversation.querySelector('.is-leaving')?.remove();
+    const previous = conversation.lastElementChild;
+    if (!previous) return false;
+    if (motion.matches) {
+      previous.remove();
+      return false;
+    }
+    previous.classList.add('is-leaving');
+    if (previous.contains(document.activeElement)) document.activeElement.blur();
+    previous.inert = true;
+    previous.setAttribute('aria-hidden', 'true');
+    previous.addEventListener('animationend', () => previous.remove(), {once: true, signal});
+    return true;
+  }
+
   function showTurn(text, className, from = 'Jiku', tag = 'p') {
+    const transitioning = retireTurn();
     const turn = document.createElement('div');
     turn.className = `birth-turn ${className}`;
+    turn.classList.toggle('is-arriving', transitioning);
     turn.append(message('span', from, 'birth-speaker'));
     const copy = message(tag, text, 'birth-copy');
     turn.append(copy);
-    conversation.replaceChildren(turn);
+    conversation.append(turn);
     content.scrollTop = 0;
     return copy;
   }
@@ -224,7 +225,7 @@ export function mountOnboarding(host, {
   function showSave(focus) {
     focusTurn(showTurn('さっそく、あなたの宇宙に入っていきましょう。', 'birth-emphasis'), focus);
     controls.innerHTML = `<button class="birth-primary" type="button" data-birth="save">
-      ${guest ? '<span class="birth-google" aria-hidden="true">G</span> Googleでログインして宇宙へ' : '宇宙に入る <span aria-hidden="true">→</span>'}
+      宇宙に入る <span aria-hidden="true">→</span>
     </button><button class="birth-quiet birth-edit" type="button" data-birth="edit">目標を書き直す</button>`;
   }
 
@@ -247,7 +248,7 @@ export function mountOnboarding(host, {
     const previous = step;
     step = next;
     screen.dataset.stage = next;
-    const choosing = ['goal', 'name', 'suggest'].includes(next);
+    const choosing = ['welcome', 'goal', 'name', 'suggest'].includes(next);
     screen.toggleAttribute('data-choosing', choosing);
     screen.toggleAttribute('data-chat', !choosing && !Object.hasOwn(opening, next) && next !== 'bang');
     if (choosing || next === 'gaze') delete screen.dataset.forming;
@@ -255,17 +256,32 @@ export function mountOnboarding(host, {
     skip.hidden = !Object.hasOwn(opening, next) && next !== 'bang';
     origin.toggleAttribute('data-lit', next === 'confirm');
     intro.replaceChildren();
-    conversation.replaceChildren();
     controls.replaceChildren();
     showError('');
 
     if (choosing || ['gaze', 'focus', 'explain', 'confirm'].includes(next)) {
-      draft.step = next;
-      persist();
+      if (next !== 'welcome') {
+        draft.step = next;
+        persist();
+      }
+    }
+    if (next === 'welcome') {
+      showQuestion('Jikuへようこそ。', focus);
+      const description = message('p', 'あなたの目標達成をサポートします。', 'birth-welcome-description');
+      conversation.lastElementChild.append(description);
+      controls.innerHTML = `<p class="birth-login-instruction">まずはログインしてください。</p>
+        <button class="birth-primary" type="button" data-birth="preview-login">ログイン後の画面へ <span aria-hidden="true">→</span></button>`;
+      return;
     }
     if (next === 'goal') {
-      showQuestion('すでに大きな目標が明確に決まっていますか？', focus);
-      choiceControls(goalOptions, '目標について');
+      const showGoal = shouldFocus => {
+        showQuestion('すでに大きな目標が明確に決まっていますか？', shouldFocus);
+        choiceControls(goalOptions, '目標について');
+      };
+      if (previous === undefined || previous === 'welcome') {
+        focusTurn(showTurn('最初にあなたに聞きたいことがあります！', 'birth-emphasis'), focus);
+        timer = setTimeout(() => showGoal(focus), 2200);
+      } else showGoal(focus);
       return;
     }
     if (next === 'name') {
@@ -281,6 +297,7 @@ export function mountOnboarding(host, {
 
     if (next !== 'gaze') prepareOrigin();
     if (Object.hasOwn(opening, next)) {
+      retireTurn();
       const {prompt, duration, reducedDuration, next: following} = opening[next];
       if (prompt) intro.append(message('p', prompt, 'birth-prompt'));
       timer = setTimeout(() => {
@@ -289,6 +306,7 @@ export function mountOnboarding(host, {
       return;
     }
     if (next === 'bang') {
+      retireTurn();
       formingTimer = setTimeout(() => {screen.dataset.forming = '';}, SPHERE_FORMATION_AT);
       timer = setTimeout(() => enter('focus', {witnessedBirth: true}), BANG_DURATION);
       return;
@@ -318,6 +336,7 @@ export function mountOnboarding(host, {
     const action = button?.dataset.birth;
     const choice = button?.dataset.choice;
     if (step === 'goal' && choice === 'known') enter('name', {focus: true});
+    if (step === 'welcome' && action === 'preview-login') enter('goal', {focus: true});
     if (step === 'goal' && choice === 'unsure') enter('suggest', {focus: true});
     if (step === 'focus' && Object.hasOwn(focusOptions, choice)) {
       draft.focusBarrier = choice;
@@ -355,8 +374,7 @@ export function mountOnboarding(host, {
   viewport?.addEventListener('scroll', resizeViewport, {signal});
   resizeViewport();
   sky = startBirthSky(screen.querySelector('.birth-stars'), origin, motion);
-  enter(draft.step);
-  if (error) showError(error);
+  enter(preview ? 'welcome' : draft.step);
   if (autoSave && step === 'confirm') queueMicrotask(() => {if (!signal.aborted) saveName();});
   return {dispose() {
     clearTimeout(timer); clearTimeout(formingTimer); events.abort();

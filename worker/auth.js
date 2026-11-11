@@ -67,22 +67,25 @@ export function loginPage(error=''){
  <link rel="stylesheet" href="/onboarding.css">
 </head>
 <body class="birth-page">
- <div id="welcome">
-  <main class="birth-screen" data-stage="goal" data-choosing aria-label="Jiku はじまりの宇宙">
-   <div class="birth-sky" aria-hidden="true"><div class="birth-light"></div></div>
+  <main class="birth-screen" data-stage="welcome" data-choosing aria-label="Jiku ログイン">
+   <div class="birth-sky" aria-hidden="true"><div class="birth-haze"></div></div>
    <header class="birth-header">
     <span class="birth-wordmark">Jiku<span>●</span></span>
-    <a class="birth-quiet" href="/api/auth/google" target="_top" aria-label="Googleでログイン">ログイン</a>
    </header>
-   <div class="birth-intro"><p class="birth-prompt">すでに大きな目標が明確に決まっていますか？</p></div>
-   ${message?`<div class="birth-content"><p class="birth-error" role="alert">${message}</p></div>`:''}
+   <div class="birth-content">
+    <div class="birth-conversation">
+     <div class="birth-turn birth-welcome-card">
+      <h1>Jikuへようこそ。</h1>
+      <p>あなたの目標達成をサポートします。</p>
+     </div>
+    </div>
+    <div class="birth-controls">
+     <p class="birth-login-instruction">まずはログインしてください。</p>
+     <a class="birth-primary" href="/api/auth/google" target="_top">Googleでログイン <span aria-hidden="true">→</span></a>
+     ${message?`<p class="birth-error" role="alert">${message}</p>`:''}
+    </div>
+   </div>
   </main>
- </div>
- <script type="module">
-  import {mountGuestOnboarding} from '/onboarding.js';
-  const host=document.getElementById('welcome');
-  mountGuestOnboarding(host,host.querySelector('[role="alert"]')?.textContent);
- </script>
 </body>
 </html>`;
 }
