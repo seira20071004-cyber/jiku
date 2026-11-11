@@ -47,6 +47,7 @@ body.birth-page, body.birth-active {
   transition: opacity 1.8s;
 }
 .birth-screen:is([data-chat]) .birth-haze { opacity: 1; }
+.birth-screen[data-choosing] .birth-haze { opacity: .58; }
 .birth-stars { transition: opacity 1.45s ease; }
 .birth-origin {
   position: absolute;
@@ -153,7 +154,7 @@ body.birth-page, body.birth-active {
 }
 .birth-screen[data-stage="still"] .birth-light { animation: birth-collapse .38s ease-in both; }
 .birth-screen[data-stage="bang"] .birth-light { opacity: 0; animation: none; }
-.birth-screen:is([data-chat]) .birth-light { display: none; }
+.birth-screen:is([data-chat], [data-choosing]) .birth-light { display: none; }
 @keyframes birth-breathe {
   0% { scale: 1; opacity: .78; }
   48% { scale: 1.18; opacity: 1; }
@@ -310,6 +311,7 @@ body.birth-page, body.birth-active {
 .birth-choice span { color: #c4b3e4; }
 .birth-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 0; }
 .birth-screen .birth-form .birth-primary { width: auto; white-space: nowrap; padding-inline: 14px; }
+.birth-screen[data-choosing] .birth-form { grid-template-columns: minmax(0, 1fr); }
 @media (max-height: 600px) {
   .birth-content { top: 34%; }
   .birth-screen .birth-conversation { min-height: 52px; }

@@ -9,88 +9,49 @@ const opening = {
   still: {duration: 1050, next: 'bang'}
 };
 
-const witnessedBirthTurns = [
-  ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis'],
-  ['あの光を見つめたときのように、大切なことに意識を向けられる時間を想像してみてください。', 'birth-welcome']
+const suggestedGoal = '幸せな人生';
+const goalOptions = [
+  ['known', '明確に決まっている'],
+  ['unsure', 'まだ決まっていない']
 ];
-const welcomeTurns = [
-  ['やりたい気持ちはあるのに、一日が終わると何も進んでいないと感じることはありませんか？', 'birth-welcome']
-];
-const interestQuestion = '大切なことを前に進めたいとき、どこでつまずきますか？';
-
-const interests = {
-  try: {
-    label: 'やりたいことがあるのに、始められない',
-    question: '最初の一歩を踏み出すとき、何がいちばん気になりますか？',
-    reflection: 'その挑戦が形になったら、どんな自分になっていたいですか？',
-    steps: {
-      start: ['何から始めたらいいか分からない', '気になることを一つだけ調べる'],
-      time: ['始める時間がなかなか取れない', '試しに5分だけ触れてみる'],
-      progress: ['うまくできるか自信がない', 'すぐに試せそうなことを一つ書く']
-    },
-    example: '自分のサービスを作りたい'
+const focusOptions = {
+  motivation: {
+    label: 'やる気が湧かないとき',
+    reply: 'やる気が湧かない日は、最初の一歩が重く感じますよね。',
+    benefit: '宇宙を育てて自分の積み重ねが見えると、また取り組むきっかけが生まれます。'
   },
-  continue: {
-    label: '始めても、なかなか続かない',
-    question: '続けたいと思っていても、どんなときに止まってしまいますか？',
-    reflection: '続けた先で、何ができるようになったらうれしいですか？',
-    steps: {
-      start: ['毎回、何をするか迷う', '次にやることを一つ決めておく'],
-      time: ['忙しい日に後回しになる', 'いつもの取り組みを5分だけやる'],
-      progress: ['上達している実感がない', '今日取り組んだ時間を記録する']
-    },
-    example: '英語で気軽に話せるようになりたい'
+  unclear: {
+    label: '何から手をつけるか迷うとき',
+    reply: 'やることが大きすぎると、どこから始めればいいか迷いますよね。',
+    benefit: '今日できることを一つ決めておくと、最初の一歩が見えてきます。'
   },
-  unsure: {
-    label: '何に時間を使いたいか、まだ見えていない',
-    question: 'やりたいことを見つけるうえで、何がいちばん難しいですか？',
-    reflection: '夢中になれることが見つかったら、どんな毎日を過ごしたいですか？',
-    steps: {
-      start: ['自分が何を好きなのか思い浮かばない', '最近楽しかったことを一つ思い出す'],
-      time: ['考える余裕がなかなかない', '今週、自分のために5分空けてみる'],
-      progress: ['気になることが多くて選べない', '一週間だけ試したいことを一つ選ぶ']
-    },
-    example: '自分の好きなことを楽しめる暮らしにしたい'
-  }
-};
-
-const replies = {
-  start: {
-    try: 'Jikuでは、大きな目標を分けて、今日すぐにできる一歩を決められます。',
-    continue: 'Jikuに次の一歩を置いておけば、次に開いたときに何をするか迷わずに済みます。',
-    unsure: '最近楽しかったことを手がかりに、もう一度試したいことをJikuに置いておけます。'
+  distractions: {
+    label: 'ほかのことに気を取られるとき',
+    reply: '目の前にいろいろあると、大切にしたいことに戻るのは難しいですよね。',
+    benefit: '今日の一歩を宇宙に置いておけば、気がそれたあとも何に戻るか思い出せます。'
   },
-  time: {
-    try: 'まとまった時間が取れない日も、Jikuで5分から試せる一歩を決められます。',
-    continue: 'Jikuなら、忙しい日でも取り組める小さな行動を、余裕のある日と分けて用意できます。',
-    unsure: 'Jikuでは、やりたいことを探すための5分も、ひとつの行動として決められます。'
-  },
-  progress: {
-    try: 'うまくできるか不安なときは、Jikuで挑戦を分けて、まずは試せそうなことから始められます。',
-    continue: 'Jikuに取り組んだ時間を残せば、結果が出る前でも積み重ねを振り返れます。',
-    unsure: '気になることを一つ選んでJikuに置き、短い期間だけ試して自分に合うか確かめられます。'
+  busy: {
+    label: '忙しくて余裕がないとき',
+    reply: '忙しい日は、やりたいことに手が回らないこともありますよね。',
+    benefit: 'Jikuでは、忙しい日にもできる小さな行動をあらかじめ用意できます。'
   }
 };
 
 export function onboardingDraft(saved, legacy) {
   const source = saved && typeof saved === 'object' ? saved : {};
   const legacyName = typeof legacy?.draftName === 'string' ? legacy.draftName : '';
-  const name = (typeof source.name === 'string' ? source.name : legacyName).slice(0, 80);
   const priorAnswer = source.direction || source.custom;
-  const interest = Object.hasOwn(interests, source.interest) ? source.interest : null;
-  const friction = interest && Object.hasOwn(replies, source.friction) ? source.friction : null;
-  const hasNamedStage = ['name', 'ready', 'confirm'].includes(source.step) ||
-    ['universe-name', 'galaxy', 'bang'].includes(legacy?.step) || Boolean(name || priorAnswer);
-  return {
-    name: name || (typeof priorAnswer === 'string' ? priorAnswer.slice(0, 80) : ''),
-    ...(interest ? {interest} : {}),
-    ...(friction ? {friction} : {}),
-    step: source.step === 'practice' && interest && friction ? 'practice'
-      : source.step === 'friction' && interest ? 'friction'
-      : source.step === 'interest' ? 'interest'
-      : ['ready', 'confirm'].includes(source.step) && name.trim() ? 'confirm'
-      : hasNamedStage ? 'name' : 'gaze'
-  };
+  const name = ((typeof source.name === 'string' ? source.name : legacyName) ||
+    (typeof priorAnswer === 'string' ? priorAnswer : '')).slice(0, 80);
+  const focusBarrier = Object.hasOwn(focusOptions, source.focusBarrier) ? source.focusBarrier : null;
+  let step = 'goal';
+  if (name.trim() && ['ready', 'confirm'].includes(source.step)) step = 'confirm';
+  else if (name.trim() && ['gaze', 'focus'].includes(source.step)) step = source.step;
+  else if (name.trim() && source.step === 'explain') step = focusBarrier ? 'explain' : 'focus';
+  else if (source.step === 'suggest') step = 'suggest';
+  else if (source.step === 'goal') step = 'goal';
+  else if (name || source.step === 'name' || ['universe-name', 'galaxy', 'bang'].includes(legacy?.step)) step = 'name';
+  return {name, ...(focusBarrier ? {focusBarrier} : {}), step};
 }
 
 function guestDraft() {
@@ -213,47 +174,64 @@ export function mountOnboarding(host, {
     ).join('')}</div>${canGoBack ? '<button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>' : ''}`;
   }
 
-  function showInterests(previous, focus, witnessedBirth) {
-    const showChoices = shouldFocus => {
-      const question = showTurn(interestQuestion, 'birth-question', 'Jiku', 'h1');
-      choiceControls(Object.entries(interests).map(([id, option]) => [id, option.label]), '当てはまる困りごと');
-      focusTurn(question, shouldFocus);
-    };
-    if (previous && !Object.hasOwn(opening, previous) && previous !== 'bang') {
-      showChoices(focus);
-    } else {
-      showSequence(witnessedBirth ? [...witnessedBirthTurns, ...welcomeTurns] : welcomeTurns, showChoices, focus);
-    }
+  function showQuestion(text, focus) {
+    focusTurn(showTurn(text, 'birth-question', 'Jiku', 'h1'), focus);
   }
 
-  function showPractice(focus) {
-    const [, example] = interests[draft.interest].steps[draft.friction];
-    showSequence([
-      [replies[draft.friction][draft.interest], 'birth-reply']
-    ], shouldFocus => {
-      const copy = showTurn('たとえば「' + example + '」。', 'birth-emphasis');
-      controls.innerHTML = `<button class="birth-primary" type="button" data-birth="practice">この一歩を例に進む <span aria-hidden="true">✧</span></button>
-        <button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
-      focusTurn(copy, shouldFocus);
-    }, focus);
-  }
-
-  function showComposer() {
+  function showComposer(focus) {
+    showQuestion('いちばん大きな目標を教えてください。', focus);
     controls.innerHTML = `<form class="birth-form">
       <label class="birth-visually-hidden" for="birth-input">いちばん大きな目標</label>
-      <input id="birth-input" maxlength="80" required enterkeyhint="send" autocomplete="off">
-      <button class="birth-primary" type="submit">送る <span aria-hidden="true">↑</span></button>
+      <input id="birth-input" maxlength="80" required enterkeyhint="done" autocomplete="off" placeholder="例：幸せな人生">
+      <button class="birth-primary" type="submit">この目標で始める <span aria-hidden="true">→</span></button>
     </form><button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
     const input = controls.querySelector('input');
-    input.placeholder = '例：' + (interests[draft.interest]?.example || interests.try.example);
     input.value = draft.name;
     controls.querySelector('button').disabled = !draft.name.trim();
   }
 
-  function showSave() {
+  function showFocusQuestion(focus, previous, witnessedBirth) {
+    const showChoices = shouldFocus => {
+      showQuestion('あなたは、どんなときに集中できませんか？', shouldFocus);
+      choiceControls(Object.entries(focusOptions).map(([id, option]) => [id, option.label]), '集中しづらい場面');
+    };
+    if (previous === undefined) {
+      showChoices(focus);
+      return;
+    }
+    const turns = witnessedBirth ? [
+      ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis']
+    ] : [];
+    turns.push(
+      ['目標に向かうときも、ひとつの光を見つめるときと同じです。', 'birth-welcome'],
+      ['大切なことに意識を向けるところから、最初の一歩が始まります。', 'birth-emphasis']
+    );
+    showSequence(turns, showChoices, focus);
+  }
+
+  function explain(focus) {
+    const option = focusOptions[draft.focusBarrier];
+    showSequence([
+      [option.reply, 'birth-reply'],
+      ['でも、いい知らせがあります。', 'birth-emphasis'],
+      [option.benefit, 'birth-reply'],
+      ['この宇宙では、大きな目標を日々のタスクまで分けられます。', 'birth-emphasis'],
+      ['欲しいものがはっきりしていると、そのために働いてお金を貯めようと思えますよね。', 'birth-welcome'],
+      ['目標も同じで、何のためかがわかると、今日やることを自分で選びやすくなります。', 'birth-reply']
+    ], shouldFocus => enter('confirm', {focus: shouldFocus}), focus);
+  }
+
+  function showSave(focus) {
+    focusTurn(showTurn('さっそく、あなたの宇宙に入っていきましょう。', 'birth-emphasis'), focus);
     controls.innerHTML = `<button class="birth-primary" type="button" data-birth="save">
-      ${guest ? '<span class="birth-google" aria-hidden="true">G</span> Googleで続けて保存' : '保存して宇宙へ <span aria-hidden="true">→</span>'}
+      ${guest ? '<span class="birth-google" aria-hidden="true">G</span> Googleでログインして宇宙へ' : '宇宙に入る <span aria-hidden="true">→</span>'}
     </button><button class="birth-quiet birth-edit" type="button" data-birth="edit">目標を書き直す</button>`;
+  }
+
+  function chooseGoal(name) {
+    draft.name = name;
+    delete draft.focusBarrier;
+    enter('gaze');
   }
 
   function prepareOrigin() {
@@ -269,54 +247,55 @@ export function mountOnboarding(host, {
     const previous = step;
     step = next;
     screen.dataset.stage = next;
+    const choosing = ['goal', 'name', 'suggest'].includes(next);
+    screen.toggleAttribute('data-choosing', choosing);
+    screen.toggleAttribute('data-chat', !choosing && !Object.hasOwn(opening, next) && next !== 'bang');
+    if (choosing || next === 'gaze') delete screen.dataset.forming;
     sky?.stage(next);
     skip.hidden = !Object.hasOwn(opening, next) && next !== 'bang';
-    origin.toggleAttribute('data-lit', Boolean(draft.friction && ['name', 'confirm'].includes(next)));
+    origin.toggleAttribute('data-lit', next === 'confirm');
     intro.replaceChildren();
+    conversation.replaceChildren();
     controls.replaceChildren();
     showError('');
+
+    if (choosing || ['gaze', 'focus', 'explain', 'confirm'].includes(next)) {
+      draft.step = next;
+      persist();
+    }
+    if (next === 'goal') {
+      showQuestion('すでに大きな目標が明確に決まっていますか？', focus);
+      choiceControls(goalOptions, '目標について');
+      return;
+    }
+    if (next === 'name') {
+      showComposer(focus);
+      return;
+    }
+    if (next === 'suggest') {
+      showQuestion('では、まず「幸せな人生」を目標にしてみましょう。', focus);
+      controls.innerHTML = `<button class="birth-primary" type="button" data-birth="suggested">「幸せな人生」で始める <span aria-hidden="true">→</span></button>
+        <button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
+      return;
+    }
+
     if (next !== 'gaze') prepareOrigin();
-    if (opening[next]) {
+    if (Object.hasOwn(opening, next)) {
       const {prompt, duration, reducedDuration, next: following} = opening[next];
       if (prompt) intro.append(message('p', prompt, 'birth-prompt'));
       timer = setTimeout(() => {
-        enter(motion.matches && next !== 'gaze' ? 'interest' : following);
+        enter(motion.matches && next !== 'gaze' ? 'focus' : following);
       }, motion.matches ? reducedDuration ?? 0 : duration);
       return;
     }
     if (next === 'bang') {
       formingTimer = setTimeout(() => {screen.dataset.forming = '';}, SPHERE_FORMATION_AT);
-      timer = setTimeout(() => enter('interest', {witnessedBirth: true}), BANG_DURATION);
+      timer = setTimeout(() => enter('focus', {witnessedBirth: true}), BANG_DURATION);
       return;
     }
-
-    draft.step = next;
-    persist();
-    screen.dataset.chat = '';
-    if (next === 'interest') {
-      showInterests(previous, focus, witnessedBirth);
-    } else if (next === 'friction') {
-      const interest = interests[draft.interest];
-      const question = showTurn(interest.question, 'birth-question', 'Jiku', 'h1');
-      choiceControls(Object.entries(interest.steps).map(([id, [label]]) => [id, label]), '今の気持ちに近い答え', true);
-      focusTurn(question, focus);
-    } else if (next === 'practice') {
-      showPractice(focus);
-    } else if (next === 'name') {
-      const openComposer = shouldFocus => {
-        const question = showTurn('この宇宙で叶えたい、いちばん大きな目標は何ですか？', 'birth-question', 'Jiku', 'h1');
-        showComposer();
-        if (previous === 'confirm') controls.querySelector('input').focus();
-        else focusTurn(question, shouldFocus);
-      };
-      if (previous === 'practice') {
-        showSequence([[interests[draft.interest].reflection, 'birth-question']], openComposer, focus);
-      } else openComposer(focus);
-    } else {
-      const answer = showTurn(draft.name, 'birth-answer', 'あなた');
-      showSave();
-      focusTurn(answer, focus);
-    }
+    if (next === 'focus') showFocusQuestion(focus, previous, witnessedBirth);
+    else if (next === 'explain') explain(focus);
+    else showSave(focus);
   }
 
   async function saveName() {
@@ -338,21 +317,15 @@ export function mountOnboarding(host, {
     const button = event.target.closest('button');
     const action = button?.dataset.birth;
     const choice = button?.dataset.choice;
-    if (step === 'interest' && Object.hasOwn(interests, choice)) {
-      draft.interest = choice;
-      delete draft.friction;
-      enter('friction', {focus: true});
+    if (step === 'goal' && choice === 'known') enter('name', {focus: true});
+    if (step === 'goal' && choice === 'unsure') enter('suggest', {focus: true});
+    if (step === 'focus' && Object.hasOwn(focusOptions, choice)) {
+      draft.focusBarrier = choice;
+      enter('explain', {focus: true});
     }
-    if (step === 'friction' && Object.hasOwn(replies, choice)) {
-      draft.friction = choice;
-      enter('practice', {focus: true});
-    }
-    if (action === 'skip') enter('interest', {focus: true});
-    if (action === 'practice') enter('name', {focus: true});
-    if (action === 'back') {
-      const previous = {friction: 'interest', practice: 'friction', name: draft.friction ? 'practice' : 'interest'}[step];
-      if (previous) enter(previous, {focus: true});
-    }
+    if (action === 'suggested') chooseGoal(suggestedGoal);
+    if (action === 'skip') enter('focus', {focus: true});
+    if (action === 'back') enter('goal', {focus: true});
     if (action === 'close') onClose?.();
     if (action === 'settings') onSettings?.();
     if (action === 'edit') enter('name', {focus: true});
@@ -369,8 +342,7 @@ export function mountOnboarding(host, {
     event.stopPropagation();
     const value = controls.querySelector('input').value.trim();
     if (!value) return;
-    draft.name = value;
-    enter('confirm', {focus: true});
+    chooseGoal(value);
   }, {signal});
 
   function resizeViewport() {

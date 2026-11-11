@@ -68,13 +68,13 @@ export function loginPage(error=''){
 </head>
 <body class="birth-page">
  <div id="welcome">
-  <main class="birth-screen" data-stage="gaze" aria-label="Jiku はじまりの宇宙">
+  <main class="birth-screen" data-stage="goal" data-choosing aria-label="Jiku はじまりの宇宙">
    <div class="birth-sky" aria-hidden="true"><div class="birth-light"></div></div>
    <header class="birth-header">
     <span class="birth-wordmark">Jiku<span>●</span></span>
     <a class="birth-quiet" href="/api/auth/google" target="_top" aria-label="Googleでログイン">ログイン</a>
    </header>
-   <div class="birth-intro"><p class="birth-prompt">光を見つめてください。</p></div>
+   <div class="birth-intro"><p class="birth-prompt">すでに大きな目標が明確に決まっていますか？</p></div>
    ${message?`<div class="birth-content"><p class="birth-error" role="alert">${message}</p></div>`:''}
   </main>
  </div>

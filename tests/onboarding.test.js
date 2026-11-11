@@ -16,19 +16,25 @@ test('以前の回答を引き継ぎ、空の名前では確認画面へ進ま�
   assert.deepEqual(onboardingDraft(saved), {step:'confirm',name:saved.name});
   assert.deepEqual(onboardingDraft({step:'custom',direction:'自分の時間を持ちたい'}), {step:'name',name:'自分の時間を持ちたい'});
   assert.deepEqual(onboardingDraft({step:'confirm',name:' '}), {step:'name',name:' '});
-  assert.deepEqual(onboardingDraft(null), {step:'gaze',name:''});
+  assert.deepEqual(onboardingDraft(null), {step:'goal',name:''});
 });
 
-test('会話の途中から再開すると、選んだ関心と入力した目標が引き継がれる', () => {
+test('新しい会話では目標と集中の回答が残り、以前の入力とログイン直前の状態も引き継ぐ', () => {
   assert.deepEqual(onboardingDraft({step:'interest',name:'仮の目標',interest:'try'}),
-    {step:'interest',name:'仮の目標',interest:'try'});
+    {step:'name',name:'仮の目標'});
   assert.deepEqual(onboardingDraft({step:'name',name:'学び直したい',interest:'continue'}),
-    {step:'name',name:'学び直したい',interest:'continue'});
-  assert.deepEqual(onboardingDraft({step:'interest',interest:'invalid'}), {step:'interest',name:''});
+    {step:'name',name:'学び直したい'});
+  assert.deepEqual(onboardingDraft({step:'interest',interest:'invalid'}), {step:'goal',name:''});
   assert.deepEqual(onboardingDraft({step:'practice',interest:'continue',friction:'time'}),
-    {step:'practice',name:'',interest:'continue',friction:'time'});
+    {step:'goal',name:''});
   assert.deepEqual(onboardingDraft({step:'confirm',name:'学び直したい',interest:'continue',friction:'time'}),
-    {step:'confirm',name:'学び直したい',interest:'continue',friction:'time'});
+    {step:'confirm',name:'学び直したい'});
+  assert.deepEqual(onboardingDraft({step:'gaze',name:'幸せな人生'}),
+    {step:'gaze',name:'幸せな人生'});
+  assert.deepEqual(onboardingDraft({step:'explain',name:'幸せな人生',focusBarrier:'motivation'}),
+    {step:'explain',name:'幸せな人生',focusBarrier:'motivation'});
+  assert.deepEqual(onboardingDraft({step:'explain',name:'幸せな人生',focusBarrier:'invalid'}),
+    {step:'focus',name:'幸せな人生'});
 });
 
 test('宇宙の誕生は根だけを保存し、再実行で名前や後から作った銀河を変更しない', () => {

@@ -121,7 +121,7 @@ export function startBirthSky(canvas, origin, motion) {
     const igniting = stage === 'ignite';
     const gatheringLight = stage === 'gather' || igniting;
     const still = stage === 'still';
-    const close = stage === 'gaze' || gatheringLight || still;
+    const close = ['goal', 'name', 'suggest', 'gaze'].includes(stage) || gatheringLight || still;
     const expanding = stage === 'bang';
     const burst = expanding ? mix(.11, 1, clamp(elapsed / (BANG_DURATION / 1000))) : close ? 0 : 1;
     const scale = Math.min(width, height);
@@ -276,7 +276,7 @@ export function startBirthSky(canvas, origin, motion) {
       stage = next;
       heartbeat = undefined;
       entered = performance.now();
-      if (next !== 'gaze' && !nebula) nebula = makeNebula();
+      if (!['goal', 'name', 'suggest', 'gaze'].includes(next) && !nebula) nebula = makeNebula();
     },
     dispose() {cancelAnimationFrame(frame); observer.disconnect();}
   };

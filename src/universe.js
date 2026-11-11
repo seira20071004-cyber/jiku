@@ -16,7 +16,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches,small=innerWidth<600,low=quality==='low'||(navigator.hardwareConcurrency||8)<=4;
  const renderer=new T.WebGLRenderer({antialias:!small,alpha:false,powerPreference:'default'});renderer.setPixelRatio(Math.min(devicePixelRatio,low?1:small?1.35:1.65));renderer.setClearColor('#030611');renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;renderer.domElement.className='universe-webgl';renderer.domElement.setAttribute('aria-label','光と星雲で描く、自分の宇宙');host.append(renderer.domElement);
  const scene=new T.Scene(),camera=new T.PerspectiveCamera(ORIGIN_FOV,1,.01,360);camera.position.set(0,0,30);
- const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));const bloom=new UnrealBloomPass(new T.Vector2(800,600),low?.42:.65,.65,.82);composer.addPass(bloom);composer.addPass(new OutputPass());
+ const composer=new EffectComposer(renderer);const renderPass=new RenderPass(scene,camera);composer.addPass(renderPass);const bloom=new UnrealBloomPass(new T.Vector2(800,600),low?.42:.65,.65,.82);composer.addPass(bloom);composer.addPass(new OutputPass());
  const glow=glowTexture(),labels=document.createElement('div');labels.className='universe-labels';host.append(labels);const bg=new T.Group();scene.add(bg);
  const nebula=new T.Mesh(new T.PlaneGeometry(440,300),new T.ShaderMaterial({depthWrite:false,uniforms:{uTime:{value:0}},vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec2 vUv;uniform float uTime;${noiseGLSL}void main(){vec2 uv=vUv;vec3 p=vec3(uv*5.,.8);float n=fbm(p+fbm(p*1.7));float ridge=pow(max(0.,1.-abs(uv.y-.48+sin(uv.x*4.)*.15)*2.8),3.);float dust=pow(n,2.8)*ridge;vec3 c=vec3(.007,.012,.035)+mix(vec3(.09,.07,.24),vec3(.045,.16,.23),uv.x)*dust*1.3;float cloud=fbm(p*2.+4.);c+=vec3(.2,.09,.15)*pow(cloud,4.)*ridge*.42;gl_FragColor=vec4(c,1.);}`}));nebula.position.z=-65;bg.add(nebula);
  const rand=random(9938);
@@ -173,7 +173,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   }
  }
  function star(seed,radius=.8){const g=new T.Group(),col=palettes[seed%palettes.length],sphere=new T.Mesh(new T.SphereGeometry(radius,40,28),new T.ShaderMaterial({uniforms:{uTime:{value:0},uColor:{value:new T.Color(col)}},vertexShader:`varying vec3 vPos;varying vec3 vNormal;void main(){vPos=position;vNormal=normal;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uTime;uniform vec3 uColor;varying vec3 vPos;varying vec3 vNormal;${noiseGLSL}void main(){float n=fbm(vPos*8.+vec3(uTime*.03));float rim=pow(1.-max(0.,vNormal.z),2.);gl_FragColor=vec4(uColor*(1.35+n*.6)+vec3(.35)*rim,1.);}`}));g.add(sphere);halo(g,col,radius*9,.65);halo(g,'#fff5dd',radius*3.3,.8);g.userData.spin=.035;animated.add(g);return g}
- function planet(seed,radius=1){const g=new T.Group(),r=random(seed),kind=seed%5,col=new T.Color(palettes[seed%palettes.length]);const body=new T.Mesh(new T.SphereGeometry(radius,56,40),new T.ShaderMaterial({uniforms:{uTime:{value:0},uColor:{value:col},uKind:{value:kind},uSeed:{value:r()*50}},vertexShader:`varying vec3 vNormal;varying vec3 vPos;void main(){vNormal=normalize(normalMatrix*normal);vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uTime,uKind,uSeed;uniform vec3 uColor;varying vec3 vNormal;varying vec3 vPos;${noiseGLSL}void main(){vec3 p=vPos*2.3+vec3(uSeed,0.,uTime*.008);float n=fbm(p*2.);float bands=sin(p.y*17.+n*5.)*.5+.5;vec3 land=mix(vec3(.035,.13,.22),uColor*.72,smoothstep(.42,.6,n));if(uKind>2.5)land=mix(uColor*.23,uColor,bands*.65+n*.35);if(uKind<.5)land=mix(vec3(.16,.25,.28),vec3(.5,.7,.73),n);float light=max(.0,dot(normalize(vNormal),normalize(vec3(-.7,.7,1.))));float rim=pow(1.-max(vNormal.z,0.),3.);vec3 clouds=vec3(1.)*smoothstep(.63,.76,fbm(p*3.3));vec3 c=(land+clouds*.35)*(.12+light*.95)+uColor*rim*.36;gl_FragColor=vec4(c,1.);}`}));g.add(body);const atmosphere=new T.Mesh(new T.SphereGeometry(radius*1.045,40,24),new T.ShaderMaterial({transparent:true,blending:T.AdditiveBlending,depthWrite:false,uniforms:{uColor:{value:col}},vertexShader:`varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec3 vN;uniform vec3 uColor;void main(){float a=pow(1.-max(0.,vN.z),3.5);gl_FragColor=vec4(uColor*.7,a*.5);}`}));g.add(atmosphere);if(seed%3===0){const ring=new T.Mesh(new T.RingGeometry(radius*1.4,radius*2,96),new T.MeshBasicMaterial({color:col,side:T.DoubleSide,transparent:true,opacity:.23,depthWrite:false}));ring.rotation.x=1.16;g.add(ring)}g.userData.spin=.025;animated.add(body);return g}
+ function planet(seed,radius=1,withRings=true){const g=new T.Group(),r=random(seed),kind=seed%5,col=new T.Color(palettes[seed%palettes.length]);const body=new T.Mesh(new T.SphereGeometry(radius,56,40),new T.ShaderMaterial({uniforms:{uTime:{value:0},uColor:{value:col},uKind:{value:kind},uSeed:{value:r()*50}},vertexShader:`varying vec3 vNormal;varying vec3 vPos;void main(){vNormal=normalize(normalMatrix*normal);vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uTime,uKind,uSeed;uniform vec3 uColor;varying vec3 vNormal;varying vec3 vPos;${noiseGLSL}void main(){vec3 p=vPos*2.3+vec3(uSeed,0.,uTime*.008);float n=fbm(p*2.);float bands=sin(p.y*17.+n*5.)*.5+.5;vec3 land=mix(vec3(.035,.13,.22),uColor*.72,smoothstep(.42,.6,n));if(uKind>2.5)land=mix(uColor*.23,uColor,bands*.65+n*.35);if(uKind<.5)land=mix(vec3(.16,.25,.28),vec3(.5,.7,.73),n);float light=max(.0,dot(normalize(vNormal),normalize(vec3(-.7,.7,1.))));float rim=pow(1.-max(vNormal.z,0.),3.);vec3 clouds=vec3(1.)*smoothstep(.63,.76,fbm(p*3.3));vec3 c=(land+clouds*.35)*(.12+light*.95)+uColor*rim*.36;gl_FragColor=vec4(c,1.);}`}));g.add(body);const atmosphere=new T.Mesh(new T.SphereGeometry(radius*1.045,40,24),new T.ShaderMaterial({transparent:true,blending:T.AdditiveBlending,depthWrite:false,uniforms:{uColor:{value:col}},vertexShader:`varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec3 vN;uniform vec3 uColor;void main(){float a=pow(1.-max(0.,vN.z),3.5);gl_FragColor=vec4(uColor*.7,a*.5);}`}));g.add(atmosphere);if(withRings&&seed%3===0){const ring=new T.Mesh(new T.RingGeometry(radius*1.4,radius*2,96),new T.MeshBasicMaterial({color:col,side:T.DoubleSide,transparent:true,opacity:.23,depthWrite:false}));ring.rotation.x=1.16;g.add(ring)}g.userData.spin=.025;animated.add(body);return g}
  function orbit(radius,color='#a0a9cf',opacity=.13){const pts=Array.from({length:129},(_,i)=>{const a=i/128*Math.PI*2;return new T.Vector3(Math.cos(a)*radius,Math.sin(a)*radius*.65,-.8)});return new T.LineLoop(new T.BufferGeometry().setFromPoints(pts),new T.LineBasicMaterial({color,transparent:true,opacity}))}
  let burstCloud=null,burstStart=0,burstVelocities=[];
  const warpVertices=[];for(let i=0;i<70;i++){const a=rand()*Math.PI*2,r=3+rand()*24;warpVertices.push(Math.cos(a)*r,Math.sin(a)*r,0,Math.cos(a)*r*1.2,Math.sin(a)*r*1.2,-7)}const warp=new T.LineSegments(new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(warpVertices,3)),new T.LineBasicMaterial({color:'#8caaff',transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false}));scene.add(warp);
@@ -181,6 +181,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  scene.add(active);
  let width=1,height=1,baseDistance=30,disposed=false,raf=0,last=0;
  let tween=null,pendingResolve=null,transitioning=false,currentNode=current,frames;
+ let scenery;
  let anchors=[],pickables=[];
  const bodies=new Map(),orbitGroups=new Map();
  const root=nodes.find(node=>node.parentId===null);
@@ -195,6 +196,61 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   geometries.forEach(geometry=>geometry.dispose());
   materials.forEach(material=>material.dispose());
   group.removeFromParent();
+ }
+ function showScenery(){
+  if(transitioning||disposed||scenery||currentNode===UNIVERSE_ORIGIN)return false;
+  const frame=frames.get(currentNode),{node,depth}=frame;
+  const parent=frames.get(node.parentId)?.node;
+  const view=new T.Scene();
+  const eye=new T.PerspectiveCamera(ORIGIN_FOV,camera.aspect,.05,150);
+  const sky=new T.Mesh(nebula.geometry.clone(),nebula.material.clone());
+  sky.position.z=-85;
+  view.add(sky);
+
+  const rng=random(hash(node.id)),positions=[],colors=[],sizes=[];
+  const tint=new T.Color();
+  for(let i=0;i<(low?280:540);i++){
+   positions.push((rng()-.5)*145,(rng()-.5)*85,-40-rng()*36);
+   tint.set(palettes[i%palettes.length]).multiplyScalar(.18+rng()*.45);
+   colors.push(tint.r,tint.g,tint.b);sizes.push(.55+rng()*1.6);
+  }
+  view.add(points(positions,colors,sizes));
+  if(depth>=3){
+   const target=depth===3?star(hash(parent.id),.95):planet(hash(parent.id),2.4);
+   target.position.set(0,1.7,-20);
+   view.add(target);
+   const horizon=planet(hash(node.id),1,false);
+   horizon.scale.setScalar(12);
+   horizon.position.set(0,-12.9,-9);
+   view.add(horizon);
+  }else if(depth===2){
+   const sun=star(hash(node.id),1.9);
+   sun.position.set(0,.7,-16);
+   view.add(sun);
+   const path=orbit(5.2,'#b6c3f1',.25);
+   path.position.copy(sun.position);path.rotation.x=-.45;view.add(path);
+  }else if(depth===1){
+   const core=galaxy(hash(node.id),2);
+   core.position.set(0,-.8,-24);view.add(core);
+  }else{
+   const galaxies=frame.visible.slice(0,4);
+   const offsets=[[0,1,-28],[-5,-3,-38],[5,3,-42],[5,-4,-44]];
+   galaxies.forEach((child,index)=>{
+    const cluster=galaxy(hash(child.id),index===0?1.35:.8);
+    cluster.position.set(...offsets[index]);view.add(cluster);
+   });
+  }
+  scenery={view,eye};
+  renderPass.scene=view;renderPass.camera=eye;
+  labels.hidden=true;labels.inert=true;
+  return true;
+ }
+ function hideScenery(){
+  if(!scenery)return;
+  cleanup(scenery.view);
+  scenery=null;
+  renderPass.scene=scene;renderPass.camera=camera;
+  labels.hidden=false;labels.inert=false;
  }
  function prepareFade(object){
   const materials=new Set();
@@ -385,7 +441,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   return true;
  }
  async function navigate(id,direction=1){
-  if(transitioning||disposed)return false;
+  if(transitioning||disposed||scenery)return false;
   transitioning=true;labels.inert=true;host.classList.add('in-transit');
   try{
    if(id===UNIVERSE_ORIGIN||currentNode===UNIVERSE_ORIGIN)return await portalTravel(id,direction);
@@ -397,7 +453,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    warp.material.opacity=0;host.classList.remove('in-transit');host.style.removeProperty('--portal-cover');
   }
  }
- function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix();if(currentNode===UNIVERSE_ORIGIN&&!transitioning){baseDistance=originDistance(camera.aspect);camera.position.z=baseDistance}}
+ function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix();if(scenery){scenery.eye.aspect=camera.aspect;scenery.eye.updateProjectionMatrix()}if(currentNode===UNIVERSE_ORIGIN&&!transitioning){baseDistance=originDistance(camera.aspect);camera.position.z=baseDistance}}
  function rebuildLayout(){
   frames=createSpaceLayout(nodes,width,height,small?12:24);
   fill(currentNode);
@@ -408,11 +464,11 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  });
  resize();rebuildLayout();ro.observe(host);
  const ray=new T.Raycaster(),pointer=new T.Vector2(),pointers=new Map();let down=null,pinch=null;
- function downEvent(e){if(transitioning||currentNode===UNIVERSE_ORIGIN)return;renderer.domElement.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);down={x:e.clientX,y:e.clientY,camera:camera.position.clone()};if(pointers.size===2){const a=[...pointers.values()];pinch=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])}}
+ function downEvent(e){if(transitioning||scenery||currentNode===UNIVERSE_ORIGIN)return;renderer.domElement.setPointerCapture(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);down={x:e.clientX,y:e.clientY,camera:camera.position.clone()};if(pointers.size===2){const a=[...pointers.values()];pinch=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])}}
  function moveEvent(e){if(transitioning||!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,[e.clientX,e.clientY]);if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);if(pinch){zoomTo((camera.position.z-center.z)*pinch/d);pinch=d}}else{const ratio=(camera.position.z-center.z)/height*.8;camera.position.x-=(e.clientX-old[0])*ratio;camera.position.y+=(e.clientY-old[1])*ratio}}
  function upEvent(e){pointers.delete(e.pointerId);pinch=null;if(!down||transitioning)return;if(Math.hypot(e.clientX-down.x,e.clientY-down.y)<6){const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(pickables)[0];if(hit)onSelect(hit.object.userData.id)}down=null}
  function zoomTo(distance){camera.position.z=center.z+T.MathUtils.clamp(distance,baseDistance*.45,baseDistance*2)}
- function wheel(e){e.preventDefault();if(!transitioning&&currentNode!==UNIVERSE_ORIGIN)zoomTo((camera.position.z-center.z)*(1+e.deltaY*.001))}
+ function wheel(e){e.preventDefault();if(!transitioning&&!scenery&&currentNode!==UNIVERSE_ORIGIN)zoomTo((camera.position.z-center.z)*(1+e.deltaY*.001))}
  renderer.domElement.addEventListener('pointerdown',downEvent);renderer.domElement.addEventListener('pointermove',moveEvent);renderer.domElement.addEventListener('pointerup',upEvent);renderer.domElement.addEventListener('pointercancel',upEvent);renderer.domElement.addEventListener('wheel',wheel,{passive:false});
  function positionLabels(){
   const used=[],slope=Math.tan(T.MathUtils.degToRad(camera.fov/2));
@@ -452,9 +508,10 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  }
  function animate(time){if(disposed)return;raf=requestAnimationFrame(animate);if(document.hidden||time-last<(low?42:32))return;const dt=Math.min(.05,(time-last)/1000);last=time;if(!reduced){for(const o of animated){o.rotation.y+=(o.userData.spin||.02)*dt;const u=o.material?.uniforms;if(u?.uTime)u.uTime.value=time*.001;if(o.userData.birth){const f=Math.min(1,(time-o.userData.birth)/1400);o.scale.setScalar((o.userData.finalScale||1)*(.01+.99*(1-Math.pow(1-f,3))));if(f===1)delete o.userData.birth}}}
  if(burstCloud){const age=(time-burstStart)/1000,arr=burstCloud.geometry.attributes.position;for(let i=0;i<arr.count;i++)arr.setXYZ(i,burstVelocities[i*3]*age,burstVelocities[i*3+1]*age,burstVelocities[i*3+2]*age);arr.needsUpdate=true;burstCloud.material.uniforms.uFade.value=Math.max(0,1-age/4.5);if(age>4.5){cleanup(burstCloud);burstCloud=null}}
+ if(scenery){composer.render();return}
  if(tween)tween(time);bg.position.x=-camera.position.x*.08;bg.position.y=-camera.position.y*.08;updateGalaxyBackdrop();camera.updateMatrixWorld();positionLabels();onZoom?.(Math.round(baseDistance/(camera.position.z-center.z)*100));composer.render()}
  raf=requestAnimationFrame(animate);
- return {navigate,
+ return {navigate,showScenery,hideScenery,
   zoom(factor){if(!transitioning)zoomTo((camera.position.z-center.z)/factor)},
   reset(){camera.position.copy(center);camera.position.z+=baseDistance},
   birth(id){
@@ -465,5 +522,5 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    entity.object.scale.setScalar(entity.scale*.01);
    animated.add(entity.object);
   },
-  burst(){if(reduced)return;const p=[],c=[],sizes=[],r=random(824);burstVelocities=[];for(let i=0;i<(low?350:750);i++){p.push(0,0,0);const a=r()*Math.PI*2,v=2+r()*13;burstVelocities.push(Math.cos(a)*v,Math.sin(a)*v,(r()-.5)*v);const col=new T.Color(palettes[i%palettes.length]);c.push(col.r,col.g,col.b);sizes.push(1+r()*2)}burstCloud=points(p,c,sizes);scene.add(burstCloud);burstStart=performance.now()},getView(){return null},dispose(){pendingResolve?.(false);pendingResolve=null;disposed=true;cancelAnimationFrame(raf);ro.disconnect();for(const [k,fn] of [['pointerdown',downEvent],['pointermove',moveEvent],['pointerup',upEvent],['pointercancel',upEvent],['wheel',wheel]])renderer.domElement.removeEventListener(k,fn);cleanup(active);cleanup(bg);cleanup(warp);if(burstCloud)cleanup(burstCloud);glow.dispose();composer.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();labels.remove()}};
+  burst(){if(reduced)return;const p=[],c=[],sizes=[],r=random(824);burstVelocities=[];for(let i=0;i<(low?350:750);i++){p.push(0,0,0);const a=r()*Math.PI*2,v=2+r()*13;burstVelocities.push(Math.cos(a)*v,Math.sin(a)*v,(r()-.5)*v);const col=new T.Color(palettes[i%palettes.length]);c.push(col.r,col.g,col.b);sizes.push(1+r()*2)}burstCloud=points(p,c,sizes);scene.add(burstCloud);burstStart=performance.now()},getView(){return null},dispose(){pendingResolve?.(false);pendingResolve=null;disposed=true;cancelAnimationFrame(raf);ro.disconnect();for(const [k,fn] of [['pointerdown',downEvent],['pointermove',moveEvent],['pointerup',upEvent],['pointercancel',upEvent],['wheel',wheel]])renderer.domElement.removeEventListener(k,fn);hideScenery();cleanup(active);cleanup(bg);cleanup(warp);if(burstCloud)cleanup(burstCloud);glow.dispose();composer.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();labels.remove()}};
 }

@@ -175,3 +175,24 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
  background:radial-gradient(ellipse at center,#25263f,#0a1025 72%,#070b18);
  opacity:var(--portal-cover,0);
 }
+.universe-hud[hidden],.universe-labels[hidden],.space-vista[hidden]{display:none}
+.space-vista{
+ position:absolute;
+ z-index:4;
+ inset:0;
+ display:flex;
+ flex-direction:column;
+ justify-content:space-between;
+ align-items:flex-end;
+ padding:clamp(16px,4vw,32px);
+ background:linear-gradient(180deg,#0507148c,transparent 24%,transparent 62%,#050714e8);
+}
+.space-vista .space-back{min-height:44px;padding:8px 16px}
+.space-vista-caption{width:100%;text-align:center;color:#f1edff}
+.space-vista-caption h2{margin:0;overflow-wrap:anywhere;font:600 clamp(18px,4vw,26px)/1.4 var(--serif)}
+.space-vista-caption p{margin:6px 0 4px;color:#c6cce6;font-size:13px;overflow-wrap:anywhere}
+.universe-topline .space-vista-trigger{white-space:nowrap}
+@media(max-width:560px){
+ .universe-topline:has(.space-vista-trigger) .space-breadcrumb{flex:1;min-width:0}
+ .universe-topline .space-vista-trigger{padding-inline:9px}
+}

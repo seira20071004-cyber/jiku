@@ -55,8 +55,33 @@ function originGrowthHUD(){
   ?`記録 ${days}日 · 次の変化まであと ${nextDay-days}日`:`記録 ${days}日 · 最終段階`;
  return `<div class="universe-growth"><p>${name}</p><small>${note}</small></div>`;
 }
-function spaceHUD(){if(showUniverseOrigin())return originGrowthHUD();const n=currentSpace(),depth=nodeDepth(state,n.id),children=visibleChildren(state,n.id);return `<div class="universe-topline"><nav class="space-breadcrumb" aria-label="現在地">${spaceTrail()}</nav><button class="space-map-trigger" data-do="space-map"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M8 5v3m-5 3V8h10v3"/><circle cx="8" cy="3.5" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><circle cx="13" cy="12.5" r="1.5"/></svg> 地図</button></div><div class="space-heading"><h1><button class="space-edit-title" data-edit-title="${esc(n.id)}" title="ダブルタップで編集" aria-label="${esc(n.name)}。ダブルタップで編集">${esc(n.name)}</button></h1></div><div class="space-primary-tools">${n.parentId?`<button data-space-enter="${esc(n.parentId)}" class="space-back">← <span>ひとつ上へ</span></button>`:`<button data-space-enter="${UNIVERSE_ORIGIN}" class="space-back">← <span>宇宙の外へ</span></button>`}${depth<4&&nodeKind(state,n.id)==='goal'?`<button class="space-add" data-space-add="${esc(n.id)}">＋ ${LEVELS[depth+1]}を追加</button>`:''}</div>${!children.length&&n.parentId?`<div class="space-empty"><button class="space-detail-button" data-space-detail="${esc(n.id)}">この目標・タスクの詳細 ↗</button></div>`:''}${depth>=4&&children.length?`<div class="space-legacy"><p>以前の5階層を超える目標は、元の構造とIDのまま保護しています。</p>${children.map(c=>`<button data-legacy-detail="${esc(c.id)}">${esc(c.name)} →</button>`).join('')}</div>`:''}`}
-function treePage(){return `<section class="universe-scene full-panel ${showUniverseOrigin()?'at-origin':''}" id="goal-tree" aria-label="自分の宇宙"><div class="universe-stage"></div><div class="space-travel-veil"></div><div class="universe-hud">${spaceHUD()}</div></section>`}
+function spaceHUD(){if(showUniverseOrigin())return originGrowthHUD();const n=currentSpace(),depth=nodeDepth(state,n.id),children=visibleChildren(state,n.id);return `<div class="universe-topline"><nav class="space-breadcrumb" aria-label="現在地">${spaceTrail()}</nav><button class="space-map-trigger" data-do="space-map"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M8 5v3m-5 3V8h10v3"/><circle cx="8" cy="3.5" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><circle cx="13" cy="12.5" r="1.5"/></svg> 地図</button><button class="space-map-trigger space-vista-trigger" data-do="open-scenery">景色を見る</button></div><div class="space-heading"><h1><button class="space-edit-title" data-edit-title="${esc(n.id)}" title="ダブルタップで編集" aria-label="${esc(n.name)}。ダブルタップで編集">${esc(n.name)}</button></h1></div><div class="space-primary-tools">${n.parentId?`<button data-space-enter="${esc(n.parentId)}" class="space-back">← <span>ひとつ上へ</span></button>`:`<button data-space-enter="${UNIVERSE_ORIGIN}" class="space-back">← <span>宇宙の外へ</span></button>`}${depth<4&&nodeKind(state,n.id)==='goal'?`<button class="space-add" data-space-add="${esc(n.id)}">＋ ${LEVELS[depth+1]}を追加</button>`:''}</div>${!children.length&&n.parentId?`<div class="space-empty"><button class="space-detail-button" data-space-detail="${esc(n.id)}">この目標・タスクの詳細 ↗</button></div>`:''}${depth>=4&&children.length?`<div class="space-legacy"><p>以前の5階層を超える目標は、元の構造とIDのまま保護しています。</p>${children.map(c=>`<button data-legacy-detail="${esc(c.id)}">${esc(c.name)} →</button>`).join('')}</div>`:''}`}
+function treePage(){return `<section class="universe-scene full-panel ${showUniverseOrigin()?'at-origin':''}" id="goal-tree" aria-label="自分の宇宙">
+ <div class="universe-stage"></div><div class="space-travel-veil"></div><div class="universe-hud">${spaceHUD()}</div>
+ <section class="space-vista" aria-label="この場所の景色" hidden>
+  <button class="space-back" data-do="close-scenery">← 景色を閉じる</button>
+  <div class="space-vista-caption"><h2></h2><p></p></div>
+ </section>
+</section>`}
+function openScenery(){
+ const panel=$('.space-vista'),hud=$('.universe-hud');
+ if(!panel||!hud||showUniverseOrigin()||navigating)return;
+ if(!treeScene?.showScenery()){toast('この端末では景色を表示できません');return}
+ const node=currentSpace(),depth=nodeDepth(state,node.id);
+ const parent=state.nodes.find(item=>item.id===node.parentId);
+ panel.querySelector('h2').textContent=depth===0?node.name:`${LEVELS[depth]}「${node.name}」から`;
+ panel.querySelector('p').textContent=depth>=3?`${LEVELS[depth-1]}「${parent.name}」の方向`:
+  ['宇宙の眺め','銀河の中心','恒星と軌道'][depth];
+ hud.hidden=true;panel.hidden=false;
+ panel.querySelector('button').focus({preventScroll:true});
+}
+function closeScenery(){
+ const panel=$('.space-vista'),hud=$('.universe-hud');
+ if(!panel||panel.hidden)return;
+ treeScene?.hideScenery();
+ panel.hidden=true;hud.hidden=false;
+ hud.querySelector('[data-do="open-scenery"]')?.focus({preventScroll:true});
+}
 async function enterSpace(id){
  if(navigating)return;
  const toOrigin=id===UNIVERSE_ORIGIN,fromOrigin=showUniverseOrigin();
@@ -91,13 +116,13 @@ function showOnboarding(){
   autoSave:!preview&&!!guestHandoff&&!needsLegacyImport,
   onDraft:preview?null:draft=>{try{localStorage.setItem(onboardingKey,JSON.stringify(draft))}catch{}},
   onSave:async name=>{
-   if(preview){endOnboardingPreview();return}
+   if(preview){endOnboardingPreview(true);return}
    await commitUniverseBirth(name);
    finishOnboardingReturn();
    onboardingScene?.dispose();onboardingScene=null;
-   view='tree';focus=null;universeOutside=true;
+   view='tree';focus=null;universeOutside=false;
    history.replaceState(null,'','#tree');
-   render();promptDailyMode();
+   render();
   },
   onClose:preview?endOnboardingPreview:null,
   onSettings:preview?null:settings
@@ -122,8 +147,9 @@ function previewOnboarding(){
  const url=new URL(location.href);url.searchParams.set('preview','welcome');url.hash='tree';
  history.replaceState(null,'',url);render();
 }
-function endOnboardingPreview(){
+function endOnboardingPreview(enterUniverse=false){
  onboardingScene?.dispose();onboardingScene=null;onboardingPreview=false;
+ if(enterUniverse){focus=null;universeOutside=false}
  const url=new URL(location.href);url.searchParams.delete('preview');history.replaceState(null,'',url);
  render();
 }
@@ -253,6 +279,8 @@ function review(){const ws=weekStart(today),end=shiftDate(ws,6),s=stats(state,ws
 function switchDemo(enabled){const url=new URL(location.href);if(enabled)url.searchParams.set('demo','1');else url.searchParams.delete('demo');url.searchParams.delete('preview');location.assign(url)}
 function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">YOUR OWN UNIVERSE</div><h2>設定・バックアップ</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${account?`<div class="account-info"><div class="account-profile-photo">${accountAvatar()}</div><strong>${esc(account.name)}</strong><p>${esc(account.email)}</p>${!account.picture?'<a class="text-button" href="/api/auth/google">Googleのプロフィール画像を取得</a>':''}<form method="post" action="/api/auth/logout" data-native-submit><button class="text-button" type="submit">ログアウト</button></form></div>`:''}<p>データはこの端末・ブラウザ内に保存されます。端末間での同期はありません。ブラウザのデータを消す前にバックアップしてください。</p><button class="text-button" data-do="open-demo">検証用の宇宙を開く →</button><br><button class="text-button" data-do="preview-onboarding">初めて開いたときの画面を見る →</button><br><button class="text-button" data-do="review">今週を振り返る →</button><div class="settings-actions"><button class="primary" data-do="export">↓ バックアップを書き出す</button><label class="import-button">↑ バックアップを読み込む<input type="file" id="import" accept="application/json,.json"></label></div><p class="footnote">読み込み時は現在のデータを置き換えます。先に現在のバックアップを保存することをおすすめします。日付は日本時間、週の始まりは月曜日です。</p><hr><p class="muted">Jiku v1.0 · 自分の軸を、日々のタスクへ。</p>`)}
 document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do],[data-view],[data-day],[data-focus]');if(!b)return;const d=b.dataset;
+ if(d.do==='open-scenery'){openScenery();return}
+ if(d.do==='close-scenery'){closeScenery();return}
  if(b.hasAttribute('data-map-expand')){
   const branches=b.closest('.hierarchy-branch').querySelector(':scope > .hierarchy-children');
   branches.hidden=!branches.hidden;
@@ -281,6 +309,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   render();
  }if(d.statsGoal){quantityScope=statisticsScope(state,d.statsGoal);close();render()}if(b.hasAttribute('data-reset-period')){if(statsTab==='monthly')statsMonth=today.slice(0,7);else statsWeek=weekStart(today);render()}if(d.quantityDimension){quantityDimension=d.quantityDimension;render()}if(d.addQuantity){const input=$('#quantity-form [name=record-minutes]');if(input)input.value=String(Math.round(((Number(input.value)||0)+Number(d.addQuantity))*1000000)/1000000)}if(d.removeQuantity){modal(`<h2>この日の量の記録を削除しますか？</h2><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-remove-quantity="${esc(d.removeQuantity)}" data-log-date="${d.logDate}">削除する</button></div>`)}if(d.confirmRemoveQuantity){removeQuantity(state,d.logDate,d.confirmRemoveQuantity);save();close();render();toast('この日の記録を削除しました')}if(b.hasAttribute('data-scroll-tree')){$('#goal-tree')?.scrollIntoView({behavior:'smooth',block:'start'})}if(d.statTab){statsTab=d.statTab;render()}if(d.view){view=d.view;location.hash=view;render();window.scrollTo(0,0)}if(d.mode){try{const count=applyMode(state,d.date,d.mode,today);save();render();close();toast(count?`${count}個のタスクの固定量を反映しました`:'モードを保存しました')}catch(error){toast(error.message)}}if(d.check){const n=state.nodes.find(n=>n.id===d.check);if(n){toggleLog(state,d.date,n);save();render()}}if(d.edit){addParent=null;editor(d.edit);if(b.hasAttribute('data-quantity-settings'))$('#node-form [name=quantity-unit]')?.focus()}if(d.selectDate){selected=d.selectDate;render();dayEditor(selected)}if(d.day){selected=d.day;month=selected.slice(0,7);view='stats';statsTab='calendar';render()}if(d.month){month=boundedMonth(month,Number(d.month),today);render()}if(d.focus){focus=d.focus;treeView=null;treeScene?.dispose();treeScene=null;zoom=1;pan={x:0,y:0};close();render()}if(d.delete){const id=d.delete,n=state.nodes.find(n=>n.id===id),count=descendants(state,id).size;modal(`<h2>「${esc(n.name)}」を削除しますか？</h2><p>子孫を含め ${count} 個の目標を削除します。過去の実行記録は残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-delete="${esc(id)}">削除する</button></div>`)}if(d.confirmDelete){deleteNode(state,d.confirmDelete);focus=null;treeScene?.dispose();treeScene=null;treeView=null;save();close();render();toast('目標を削除しました')}if(d.do)({close,settings,review,'open-demo':()=>switchDemo(true),'exit-demo':()=>switchDemo(false),'test-demo-mode':modePicker,'choose-stats-goal':()=>showHierarchy(true),'space-map':()=>showHierarchy(false),'preview-onboarding':previewOnboarding,'space-list':spaceList,'quick-actions':()=>chooseLeaf(today),'show-rhythm':()=>modal(`<div class="dialog-title"><h2>モードの割合</h2><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${rhythmPage()}`),'today-mode':modePicker,'labels':()=>{showGoalLabels=!showGoalLabels;applyLabelVisibility();b.setAttribute('aria-pressed',String(showGoalLabels))},'zoom-in':()=>{if(treeScene)treeScene.zoom(1.25);else{zoom=Math.min(2.5,zoom+.2);render()}},'zoom-out':()=>{if(treeScene)treeScene.zoom(.8);else{zoom=Math.max(.4,zoom-.2);render()}},'reset-tree':()=>{if(focus){focus=null;treeScene?.dispose();treeScene=null;treeView=null;render()}else if(treeScene)treeScene.reset();else{zoom=1;pan={x:0,y:0};render()}},today:()=>{month=today.slice(0,7);selected=today;render()},'clear-record':()=>{clearMode(state,selected);save();render();close();toast('モードを未記録に戻しました')},export:()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`jiku-${demoMode?'demo':'backup'}-${today}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}}[d.do])?.()});
 let lastTitleTap;
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&!$('.space-vista')?.hidden)closeScenery();
+});
 document.addEventListener('pointerup',event=>{
  if(event.pointerType!=='touch'&&event.pointerType!=='pen')return;
  const button=event.target.closest('[data-edit-title]');
