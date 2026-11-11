@@ -196,7 +196,9 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .first-steps p{margin:6px 0 12px;color:#c7cce7;font-size:13px;line-height:1.55}
 .first-steps .text-button{flex:none;min-height:36px;padding:4px;color:#b6bedb}
 .first-steps .primary{width:100%;min-height:43px}
-.universe-hud:has(.first-steps) .space-empty{display:none}
+.guide-location{padding-top:16px}
+.first-steps-label{color:#b6bedb;font-size:12px}
+.first-steps-top{min-height:30px}
 .universe-stage.in-transit~.universe-hud .first-steps{visibility:hidden}
 .universe-hud[hidden],.universe-labels[hidden],.space-vista[hidden]{display:none}
 .space-vista{

@@ -13,8 +13,8 @@ const storageKey=demoMode?personalStorageKey+':demo-v2':personalStorageKey;
 let needsLegacyImport=false,storageLocked=false;let state;try{const raw=localStorage.getItem(storageKey);needsLegacyImport=!demoMode&&!!account&&!raw&&!!localStorage.getItem('jiku-v1');state=raw?validate(JSON.parse(raw)):(demoMode?createDemoUniverse(dateKey()):freshUniverse());if(raw&&!state.universe){localStorage.setItem(storageKey+':before-universe',raw);state=migrateUniverse(state)}}catch{storageLocked=true;state=state||freshUniverse();setTimeout(()=>toast('保存データを保護しています。設定からバックアップを確認してください。'),300)}
 let treeScene=null,treeView=null,showGoalLabels=true,statsTab='quantity',quantityScope='all',statsWeek=weekStart(dateKey()),statsMonth=dateKey().slice(0,7),quantityDimension=null;
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
-let guidePreviewReturn=null;
-function save(){if(guidePreviewReturn)return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
+let guideSession=null,guideTimer;
+function save(){if(guideSession)return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 applyPending(state,today);if(state.universe?.onboarded)save();
 const icon=(name)=>({home:'⌂',tree:'✧',calendar:'▦',stats:'◴',settings:'⚙'}[name]);
 const names={tree:'自分の宇宙',stats:'統計'};
@@ -23,10 +23,10 @@ function modal(html){const d=$('#dialog');d.innerHTML=html;d.showModal();d.query
 function close(){$('#dialog').close()}
 function heading(k,title,sub,extra=''){return `<div class="page-heading"><div><div class="eyebrow">${k}</div><h1>${title}</h1><p>${sub}</p></div>${extra}</div>`}
 function accountAvatar(){const picture=account?.picture;return `<span class="google-account-fallback" aria-hidden="true">G</span>${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer" data-account-photo>`:''}`}
-function render(){const birthActive=onboardingScene||onboardingPreview||!storageLocked&&!state.universe?.onboarded;
+function render(){clearTimeout(guideTimer);const birthActive=onboardingScene||onboardingPreview||!storageLocked&&!state.universe?.onboarded;
  document.body.classList.toggle('birth-active',Boolean(birthActive));
  if(birthActive){if(treeScene){treeScene.dispose();treeScene=null}if(!onboardingScene)showOnboarding();return}
- if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){if(statsMonth===today.slice(0,7))statsMonth=latest.slice(0,7);if(statsWeek===weekStart(today))statsWeek=weekStart(latest);today=latest;selected=today;applyPending(state,today);save()}$('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" aria-label="Jiku 自分の宇宙">Jiku<span>●</span></a>${guidePreviewReturn?'<div class="demo-toolbar"><button data-guide="dismiss">プレビューを終了</button></div>':demoMode?'<div class="demo-toolbar"><span>検証用</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">戻る ↗</button></div>':''}<button class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></header><div class="content">${({tree:treePage,stats:statsPage}[view])()}</div></main><nav class="bottom-nav" aria-label="メインメニュー">${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree()}
+ if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){if(statsMonth===today.slice(0,7))statsMonth=latest.slice(0,7);if(statsWeek===weekStart(today))statsWeek=weekStart(latest);today=latest;selected=today;applyPending(state,today);save()}$('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" aria-label="Jiku 自分の宇宙">Jiku<span>●</span></a>${guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">プレビューを終了</button></div>':demoMode?'<div class="demo-toolbar"><span>検証用</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">戻る ↗</button></div>':''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></header><div class="content">${({tree:treePage,stats:statsPage}[view])()}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();scheduleGuide()}
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
 function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n.id];return `<div class="action-row ${done?'done':''}"><button class="check ${done?'checked':''}" data-check="${esc(n.id)}" data-date="${key}" aria-label="${esc(n.name)}の実行記録" aria-pressed="${done}">${done?'✓':''}</button><div class="action-copy"><strong>${esc(n.name)}</strong><small>${esc(ancestry(state,n.id).slice(1,-1).join(' / ')||'自分の宇宙')}</small></div><span class="priority p${a.priority}">${['高','中','低'][a.priority]}</span><button class="edit-action" data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">⋯</button></div>`}
 let universeOutside=!state.universe?.firstSteps,navigating=false,onboardingScene=null;
@@ -56,75 +56,87 @@ function originGrowthHUD(){
   ?`記録 ${days}日 · 次の変化まであと ${nextDay-days}日`:`記録 ${days}日 · 最終段階`;
  return `<div class="universe-growth"><p>${name}</p><small>${note}</small></div>`;
 }
-function spaceHUD(){if(showUniverseOrigin())return originGrowthHUD();const n=currentSpace(),depth=nodeDepth(state,n.id),children=visibleChildren(state,n.id);return `<div class="universe-topline"><nav class="space-breadcrumb" aria-label="現在地">${spaceTrail()}</nav><button class="space-map-trigger" data-do="space-map"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M8 5v3m-5 3V8h10v3"/><circle cx="8" cy="3.5" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><circle cx="13" cy="12.5" r="1.5"/></svg> 地図</button><button class="space-map-trigger space-vista-trigger" data-do="open-scenery">景色を見る</button></div><div class="space-heading"><h1><button class="space-edit-title" data-edit-title="${esc(n.id)}" title="ダブルタップで編集" aria-label="${esc(n.name)}。ダブルタップで編集">${esc(n.name)}</button></h1></div><div class="space-primary-tools">${n.parentId?`<button data-space-enter="${esc(n.parentId)}" class="space-back">← <span>ひとつ上へ</span></button>`:`<button data-space-enter="${UNIVERSE_ORIGIN}" class="space-back">← <span>宇宙の外へ</span></button>`}${depth<4&&nodeKind(state,n.id)==='goal'?`<button class="space-add" data-space-add="${esc(n.id)}">＋ ${LEVELS[depth+1]}を追加</button>`:''}</div>${!children.length&&n.parentId?`<div class="space-empty"><button class="space-detail-button" data-space-detail="${esc(n.id)}">この目標・タスクの詳細 ↗</button></div>`:''}${depth>=4&&children.length?`<div class="space-legacy"><p>以前の5階層を超える目標は、元の構造とIDのまま保護しています。</p>${children.map(c=>`<button data-legacy-detail="${esc(c.id)}">${esc(c.name)} →</button>`).join('')}</div>`:''}`}
-function guideGalaxy(){
- const root=state.nodes.find(node=>node.parentId===null);
- return visibleChildren(state,root.id).find(node=>nodeKind(state,node.id)==='goal');
-}
+function spaceHUD(){if(guideSession)return `<div class="space-heading guide-location"><h1>${esc(currentSpace().name)}</h1></div>`;if(showUniverseOrigin())return originGrowthHUD();const n=currentSpace(),depth=nodeDepth(state,n.id),children=visibleChildren(state,n.id);return `<div class="universe-topline"><nav class="space-breadcrumb" aria-label="現在地">${spaceTrail()}</nav><button class="space-map-trigger" data-do="space-map"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M8 5v3m-5 3V8h10v3"/><circle cx="8" cy="3.5" r="1.5"/><circle cx="3" cy="12.5" r="1.5"/><circle cx="13" cy="12.5" r="1.5"/></svg> 地図</button><button class="space-map-trigger space-vista-trigger" data-do="open-scenery">景色を見る</button></div><div class="space-heading"><h1><button class="space-edit-title" data-edit-title="${esc(n.id)}" title="ダブルタップで編集" aria-label="${esc(n.name)}。ダブルタップで編集">${esc(n.name)}</button></h1></div><div class="space-primary-tools">${n.parentId?`<button data-space-enter="${esc(n.parentId)}" class="space-back">← <span>ひとつ上へ</span></button>`:`<button data-space-enter="${UNIVERSE_ORIGIN}" class="space-back">← <span>宇宙の外へ</span></button>`}${depth<4&&nodeKind(state,n.id)==='goal'?`<button class="space-add" data-space-add="${esc(n.id)}">＋ ${LEVELS[depth+1]}を追加</button>`:''}</div>${!children.length&&n.parentId?`<div class="space-empty"><button class="space-detail-button" data-space-detail="${esc(n.id)}">この目標・タスクの詳細 ↗</button></div>`:''}${depth>=4&&children.length?`<div class="space-legacy"><p>以前の5階層を超える目標は、元の構造とIDのまま保護しています。</p>${children.map(c=>`<button data-legacy-detail="${esc(c.id)}">${esc(c.name)} →</button>`).join('')}</div>`:''}`}
+const guideCopy={
+ intro:['目標から、今日の一歩まで','「幸せな人生」という目標を、今日できることまで分けてみましょう。',2300],
+ galaxy:['銀河「健康を大切にする」','大きな目標の中に、大切にしたいテーマを銀河として作りました。',2700],
+ task:['タスク「10分歩く」','銀河の中に、今日からできる行動を置きました。これが日々のタスクです。',2800],
+ finish:['自分の宇宙へ','あなたの宇宙でも、銀河から始めて、自分に合う一歩を作れます。']
+};
+
 function guideHUD(){
- if(!state.universe?.firstSteps||showUniverseOrigin())return '';
- const galaxy=guideGalaxy();
- const hasTask=galaxy&&[...descendants(state,galaxy.id)].some(id=>nodeKind(state,id)==='action');
- let title,detail,action,label;
- if(!galaxy){
-  title='最初の銀河をつくろう';
-  detail='いちばん大きな目標につながるテーマを銀河にしましょう。たとえば「健康を大切にする」。';
-  action='galaxy';label='銀河をつくる';
- }else if(hasTask){
-  title='最初の一歩ができました';
-  detail='取り組んだら、タスクの詳細や統計のカレンダーから記録できます。';
-  action='finish';label='完了';
- }else if(currentSpace().id!==galaxy.id){
-  title='銀河に入ってみよう';
-  detail=`「${galaxy.name}」の中に、今日できる小さな一歩を置きます。`;
-  action='enter';label='銀河に入る';
- }else{
-  title='今日できる一歩をつくろう';
-  detail='短い時間でもできることを、タスクにしましょう。たとえば「10分歩く」。';
-  action='task';label='タスクをつくる';
- }
-  return `<aside class="first-steps" aria-label="はじめてのチュートリアル">
-  <div class="first-steps-top"><h2>${title}</h2>${guidePreviewReturn?'':'<button type="button" class="text-button" data-guide="dismiss">スキップ</button>'}</div>
-  <p>${esc(detail)}</p>
-  <button type="button" class="primary" data-guide="${action}">${label} <span aria-hidden="true">→</span></button>
+ if(!guideSession)return '';
+ const [title,detail]=guideCopy[guideSession.phase];
+ const preview=guideSession.preview;
+ return `<aside class="first-steps" aria-label="お手本チュートリアル">
+  <div class="first-steps-top"><span class="first-steps-label">お手本</span>${!preview&&guideSession.phase!=='finish'?'<button type="button" class="text-button" data-guide="dismiss">スキップ</button>':''}</div>
+  <div aria-live="polite"><h2>${title}</h2><p>${detail}</p></div>
+  ${guideSession.phase==='finish'?`<button type="button" class="primary" data-guide="dismiss">${preview?'元の宇宙へ戻る':'自分の宇宙へ'} <span aria-hidden="true">→</span></button>`:''}
  </aside>`;
 }
-function startGuidePreview(name='幸せな人生'){
- if(!guidePreviewReturn)guidePreviewReturn={state,view,focus,universeOutside};
+
+function startGuide(preview=false){
+ guideSession={preview,state,view,focus,universeOutside,phase:'intro',galaxyId:null};
  state=freshUniverse();
- completeUniverse(state,name);
- state.universe.firstSteps=true;
+ completeUniverse(state,'幸せな人生');
  view='tree';focus=null;universeOutside=false;
- const url=new URL(location.href);url.searchParams.set('preview','guide');url.hash='tree';
- history.replaceState(null,'',url);
-}
-function dismissGuide(){
- if(guidePreviewReturn){
-  ({state,view,focus,universeOutside}=guidePreviewReturn);
-  guidePreviewReturn=null;
-  const url=new URL(location.href);url.searchParams.delete('preview');url.hash=view;
+ if(preview){
+  const url=new URL(location.href);url.searchParams.set('preview','guide');url.hash='tree';
   history.replaceState(null,'',url);
- }else{
-  delete state.universe.firstSteps;
-  if(!save()){state.universe.firstSteps=true;return}
  }
+}
+
+function scheduleGuide(){
+ const guide=guideSession;
+ const delay=guide&&guideCopy[guide.phase][2];
+ if(!delay||view!=='tree')return;
+ guideTimer=setTimeout(async()=>{
+  if(guide!==guideSession)return;
+  if(guide.phase==='intro'){
+   guide.galaxyId=writeGoal(state,{name:'健康を大切にする',purpose:'元気に過ごせる日を増やす',parentId:currentSpace().id,kind:'goal'});
+   guide.phase='galaxy';
+   render();
+   treeScene?.birth(guide.galaxyId);
+   return;
+  }
+  if(guide.phase==='galaxy'){
+   await enterSpace(guide.galaxyId);
+   if(guide!==guideSession||currentSpace().id!==guide.galaxyId)return;
+   const taskId=writeGoal(state,{name:'10分歩く',purpose:'日々の中で体を動かす',parentId:guide.galaxyId,
+    kind:'action',measurement:{unit:'minutes',dailyAmount:10,weeklyTarget:30},mode:'rest'});
+   guide.phase='task';
+   render();
+   treeScene?.birth(taskId);
+   return;
+  }
+  guide.phase='finish';
+  const card=$('.first-steps');
+  if(card)card.outerHTML=guideHUD();
+ },delay);
+}
+
+function dismissGuide(){
+ const guide=guideSession;
+ if(!guide)return;
+ if(!guide.preview){
+  const example=state;
+  state=guide.state;
+  guideSession=null;
+  delete state.universe.firstSteps;
+  if(!save()){
+   state.universe.firstSteps=true;
+   state=example;guideSession=guide;
+   return;
+  }
+ }else{
+  state=guide.state;guideSession=null;
+  const url=new URL(location.href);url.searchParams.delete('preview');url.hash=guide.view;
+  history.replaceState(null,'',url);
+ }
+ view=guide.view;focus=guide.focus;universeOutside=guide.universeOutside;
  render();
 }
-function runGuideAction(action){
- if(!state.universe?.firstSteps||navigating)return;
- if(action==='dismiss'||action==='finish'){dismissGuide();return}
- const galaxy=guideGalaxy();
- if(action==='enter'&&galaxy){enterSpace(galaxy.id);return}
- if(action==='galaxy'){
-  addParent=state.nodes.find(node=>node.parentId===null).id;
-  creationDraft=null;
-  editor('new','goal');
- }else if(action==='task'&&galaxy&&currentSpace().id===galaxy.id){
-  addParent=galaxy.id;
-  creationDraft={'daily-minutes':'10','weekly-minutes':'30'};
-  editor('new','action');
- }
-}
+
 function treePage(){return `<section class="universe-scene full-panel ${showUniverseOrigin()?'at-origin':''}" id="goal-tree" aria-label="自分の宇宙">
  <div class="universe-stage"></div><div class="space-travel-veil"></div><div class="universe-hud">${spaceHUD()}${guideHUD()}</div>
  <section class="space-vista" aria-label="この場所の景色" hidden>
@@ -190,6 +202,7 @@ function showOnboarding(){
    onboardingScene?.dispose();onboardingScene=null;
    view='tree';focus=null;universeOutside=false;
    history.replaceState(null,'','#tree');
+   if(state.universe.firstSteps)startGuide();
    render();
   },
   onClose:preview?endOnboardingPreview:null,
@@ -218,7 +231,7 @@ function previewOnboarding(){
 }
 function endOnboardingPreview(goalName){
  onboardingScene?.dispose();onboardingScene=null;onboardingPreview=false;
- if(goalName)startGuidePreview(goalName);
+ if(goalName)startGuide(true);
  else{
   const url=new URL(location.href);url.searchParams.delete('preview');history.replaceState(null,'',url);
  }
@@ -349,7 +362,7 @@ function review(){const ws=weekStart(today),end=shiftDate(ws,6),s=stats(state,ws
 function switchDemo(enabled){const url=new URL(location.href);if(enabled)url.searchParams.set('demo','1');else url.searchParams.delete('demo');url.searchParams.delete('preview');location.assign(url)}
 function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">YOUR OWN UNIVERSE</div><h2>設定・バックアップ</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${account?`<div class="account-info"><div class="account-profile-photo">${accountAvatar()}</div><strong>${esc(account.name)}</strong><p>${esc(account.email)}</p>${!account.picture?'<a class="text-button" href="/api/auth/google">Googleのプロフィール画像を取得</a>':''}<form method="post" action="/api/auth/logout" data-native-submit><button class="text-button" type="submit">ログアウト</button></form></div>`:''}<p>データはこの端末・ブラウザ内に保存されます。端末間での同期はありません。ブラウザのデータを消す前にバックアップしてください。</p><button class="text-button" data-do="open-demo">検証用の宇宙を開く →</button><br><button class="text-button" data-do="preview-onboarding">初めて開いたときの画面を見る →</button><br><button class="text-button" data-do="review">今週を振り返る →</button><div class="settings-actions"><button class="primary" data-do="export">↓ バックアップを書き出す</button><label class="import-button">↑ バックアップを読み込む<input type="file" id="import" accept="application/json,.json"></label></div><p class="footnote">読み込み時は現在のデータを置き換えます。先に現在のバックアップを保存することをおすすめします。日付は日本時間、週の始まりは月曜日です。</p><hr><p class="muted">Jiku v1.0 · 自分の軸を、日々のタスクへ。</p>`)}
 document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do],[data-view],[data-day],[data-focus]');if(!b)return;const d=b.dataset;
- if(d.guide){runGuideAction(d.guide);return}
+ if(d.guide==='dismiss'){dismissGuide();return}
  if(d.do==='open-scenery'){openScenery();return}
  if(d.do==='close-scenery'){closeScenery();return}
  if(b.hasAttribute('data-map-expand')){
@@ -431,10 +444,11 @@ document.addEventListener('change',async e=>{if(e.target.name==='node-kind'){
  custom.hidden=input.disabled=!isCustom;
  input.required=isCustom;
  }if(e.target.name==='record-date'&&validDateKey(e.target.value)&&e.target.value<=today){leafPanel(e.target.closest('form').dataset.id,e.target.value)}if(e.target.id==='import'&&e.target.files[0]){try{const f=e.target.files[0];if(f.size>10*1024*1024)throw Error('10MB以下のバックアップを選んでください');const next=validate(JSON.parse(await f.text()));modal(`<h2>バックアップを読み込みますか？</h2><p>${next.nodes.length} 個の目標を読み込み、現在のデータを置き換えます。</p><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button id="confirm-import" class="primary">置き換える</button></div>`);$('#confirm-import').onclick=()=>{state=migrateUniverse(next);onboardingScene?.dispose();onboardingScene=null;storageLocked=false;focus=null;applyPending(state,today);focus=null;save();close();render();toast('バックアップを読み込みました')}}catch(err){toast('読み込めませんでした：'+err.message)}}});
-function bindTree(){const host=$('.universe-stage');if(!host)return;try{treeScene=createUniverse(host,{nodes:state.nodes,auraStrength:universeGrowth(state,today).strength,current:showUniverseOrigin()?UNIVERSE_ORIGIN:currentSpace().id,onSelect:openNode,onZoom:value=>{const label=$('[data-zoom-label]');if(label)label.textContent=value+'%'}})}catch(error){if(showUniverseOrigin()){host.innerHTML=`<button class="universe-origin-fallback" style="--fallback-growth:${universeGrowth(state,today).strength}" data-space-enter="${esc(currentSpace().id)}" aria-label="宇宙に入る"></button>`;return}host.innerHTML=`<div class="universe-fallback"><p>この端末では、目標一覧で宇宙を探索できます。</p>${visibleChildren(state,currentSpace().id).map(n=>`<button data-space-enter="${esc(n.id)}">✧ ${esc(n.name)} →</button>`).join('')}</div>`}}
+function bindTree(){const host=$('.universe-stage');if(!host)return;try{treeScene=createUniverse(host,{nodes:state.nodes,auraStrength:universeGrowth(state,today).strength,current:showUniverseOrigin()?UNIVERSE_ORIGIN:currentSpace().id,onSelect:id=>{if(!guideSession)openNode(id)},onZoom:value=>{const label=$('[data-zoom-label]');if(label)label.textContent=value+'%'}})}catch(error){if(showUniverseOrigin()){host.innerHTML=`<button class="universe-origin-fallback" style="--fallback-growth:${universeGrowth(state,today).strength}" data-space-enter="${esc(currentSpace().id)}" aria-label="宇宙に入る"></button>`;return}host.innerHTML=`<div class="universe-fallback"><p>この端末では、目標一覧で宇宙を探索できます。</p>${visibleChildren(state,currentSpace().id).map(n=>`<button data-space-enter="${esc(n.id)}">✧ ${esc(n.name)} →</button>`).join('')}</div>`}}
 function applyLabelVisibility(){}
 $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}});
-window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar')statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuidePreview();
-render();if(!onboardingPreview&&!guidePreviewReturn&&needsLegacyImport)offerLegacyImport();
+window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar')statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
+else if(!onboardingPreview&&!storageLocked&&!needsLegacyImport&&state.universe?.firstSteps)startGuide();
+render();if(!onboardingPreview&&!guideSession&&needsLegacyImport)offerLegacyImport();
 
 function offerLegacyImport(){modal(`<div class="dialog-title"><h2>以前の記録を引き継ぎますか？</h2></div><p>このブラウザでGoogleログイン前に使っていた記録が残っています。現在ログインしているあなたのアカウントへコピーできます。</p><p class="footnote">元の記録はそのまま残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">新しく始める</button><button id="copy-legacy" class="primary">記録を引き継ぐ</button></div>`);$('#copy-legacy').onclick=()=>{try{const old=localStorage.getItem('jiku-v1');localStorage.setItem(storageKey+':before-universe',old);state=migrateUniverse(validate(JSON.parse(old)));finishOnboardingReturn();onboardingScene?.dispose();onboardingScene=null;applyPending(state,today);save();close();render();toast('以前の記録を引き継ぎました')}catch{toast('以前の記録を読み込めませんでした。バックアップから読み込んでください。')}}}
