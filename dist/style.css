@@ -175,6 +175,15 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
  background:radial-gradient(ellipse at center,#25263f,#0a1025 72%,#070b18);
  opacity:var(--portal-cover,0);
 }
+.universe-portal-warp{
+ position:absolute;
+ inset:0;
+ width:100%;
+ height:100%;
+ z-index:2;
+ pointer-events:none;
+}
+.universe-portal-warp[hidden]{display:none}
 .universe-hud[hidden],.universe-labels[hidden],.space-vista[hidden]{display:none}
 .space-vista{
  position:absolute;

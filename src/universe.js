@@ -6,6 +6,7 @@ import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {UNIVERSE_ORIGIN,LEVELS} from '../dist/universe-model.js';
 import {ORIGIN_FOV, ORIGIN_RADIUS, originAura, originDistance, originSphere} from './origin-sphere.js';
 import {noiseGLSL} from './space-noise.js';
+import {createPortalWarp} from './portal-warp.js';
 export {mountOriginPreview} from './origin-preview.js';
 import {createSpaceLayout,spaceObservation,spaceRoute,STAR_RADIUS} from './space-layout.js';
 const palettes=['#a9bfff','#e8bb90','#a4ddd5','#c9a8ef','#e2a9bc','#a6c8ed'];
@@ -176,7 +177,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  function planet(seed,radius=1,withRings=true){const g=new T.Group(),r=random(seed),kind=seed%5,col=new T.Color(palettes[seed%palettes.length]);const body=new T.Mesh(new T.SphereGeometry(radius,56,40),new T.ShaderMaterial({uniforms:{uTime:{value:0},uColor:{value:col},uKind:{value:kind},uSeed:{value:r()*50}},vertexShader:`varying vec3 vNormal;varying vec3 vPos;void main(){vNormal=normalize(normalMatrix*normal);vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float uTime,uKind,uSeed;uniform vec3 uColor;varying vec3 vNormal;varying vec3 vPos;${noiseGLSL}void main(){vec3 p=vPos*2.3+vec3(uSeed,0.,uTime*.008);float n=fbm(p*2.);float bands=sin(p.y*17.+n*5.)*.5+.5;vec3 land=mix(vec3(.035,.13,.22),uColor*.72,smoothstep(.42,.6,n));if(uKind>2.5)land=mix(uColor*.23,uColor,bands*.65+n*.35);if(uKind<.5)land=mix(vec3(.16,.25,.28),vec3(.5,.7,.73),n);float light=max(.0,dot(normalize(vNormal),normalize(vec3(-.7,.7,1.))));float rim=pow(1.-max(vNormal.z,0.),3.);vec3 clouds=vec3(1.)*smoothstep(.63,.76,fbm(p*3.3));vec3 c=(land+clouds*.35)*(.12+light*.95)+uColor*rim*.36;gl_FragColor=vec4(c,1.);}`}));g.add(body);const atmosphere=new T.Mesh(new T.SphereGeometry(radius*1.045,40,24),new T.ShaderMaterial({transparent:true,blending:T.AdditiveBlending,depthWrite:false,uniforms:{uColor:{value:col}},vertexShader:`varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec3 vN;uniform vec3 uColor;void main(){float a=pow(1.-max(0.,vN.z),3.5);gl_FragColor=vec4(uColor*.7,a*.5);}`}));g.add(atmosphere);if(withRings&&seed%3===0){const ring=new T.Mesh(new T.RingGeometry(radius*1.4,radius*2,96),new T.MeshBasicMaterial({color:col,side:T.DoubleSide,transparent:true,opacity:.23,depthWrite:false}));ring.rotation.x=1.16;g.add(ring)}g.userData.spin=.025;animated.add(body);return g}
  function orbit(radius,color='#a0a9cf',opacity=.13){const pts=Array.from({length:129},(_,i)=>{const a=i/128*Math.PI*2;return new T.Vector3(Math.cos(a)*radius,Math.sin(a)*radius*.65,-.8)});return new T.LineLoop(new T.BufferGeometry().setFromPoints(pts),new T.LineBasicMaterial({color,transparent:true,opacity}))}
  let burstCloud=null,burstStart=0,burstVelocities=[];
- const warpVertices=[];for(let i=0;i<70;i++){const a=rand()*Math.PI*2,r=3+rand()*24;warpVertices.push(Math.cos(a)*r,Math.sin(a)*r,0,Math.cos(a)*r*1.2,Math.sin(a)*r*1.2,-7)}const warp=new T.LineSegments(new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(warpVertices,3)),new T.LineBasicMaterial({color:'#8caaff',transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false}));scene.add(warp);
+ let portalWarp;
  const active=new T.Group();
  scene.add(active);
  let width=1,height=1,baseDistance=30,disposed=false,raf=0,last=0;
@@ -385,8 +386,9 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  }
  function portalTravel(id,direction){
   const start=camera.position.clone(),entering=direction>0;
-  const duration=reduced?0:entering?3200:1100;
-  const crossing=entering?.72:.63;
+  const duration=reduced?0:entering?3400:2750;
+  const crossing=.68;
+  if(!reduced&&portalWarp===undefined)portalWarp=createPortalWarp(host,low);
   return animateTravel(duration,raw=>{
    if(raw<crossing){
     const destination=new T.Vector3(0,0,entering?3.24:baseDistance*1.65);
@@ -400,12 +402,9 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
     camera.position.z=center.z+T.MathUtils.lerp(entering?baseDistance*1.55:baseDistance*.6,baseDistance,ease);
     labels.style.opacity=String(progress);
    }
-   if(entering){
-    const cover=smooth((raw-.57)/.15)*(1-smooth((raw-.72)/.25));
-    host.style.setProperty('--portal-cover',String(cover));
-   }
-   warp.material.opacity=Math.sin(raw*Math.PI)*.25;
-   warp.position.set(camera.position.x,camera.position.y,camera.position.z-18);
+   const cover=smooth((raw-.53)/.15)*(1-smooth((raw-.73)/.24));
+   host.style.setProperty('--portal-cover',String(cover));
+   portalWarp?.draw(raw,width,height);
   });
  }
  async function approach(id,routeLength){
@@ -450,7 +449,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    return true;
   }finally{
    transitioning=false;labels.inert=false;labels.style.opacity='1';
-   warp.material.opacity=0;host.classList.remove('in-transit');host.style.removeProperty('--portal-cover');
+   portalWarp?.hide();host.classList.remove('in-transit');host.style.removeProperty('--portal-cover');
   }
  }
  function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix();if(scenery){scenery.eye.aspect=camera.aspect;scenery.eye.updateProjectionMatrix()}if(currentNode===UNIVERSE_ORIGIN&&!transitioning){baseDistance=originDistance(camera.aspect);camera.position.z=baseDistance}}
@@ -522,5 +521,5 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    entity.object.scale.setScalar(entity.scale*.01);
    animated.add(entity.object);
   },
-  burst(){if(reduced)return;const p=[],c=[],sizes=[],r=random(824);burstVelocities=[];for(let i=0;i<(low?350:750);i++){p.push(0,0,0);const a=r()*Math.PI*2,v=2+r()*13;burstVelocities.push(Math.cos(a)*v,Math.sin(a)*v,(r()-.5)*v);const col=new T.Color(palettes[i%palettes.length]);c.push(col.r,col.g,col.b);sizes.push(1+r()*2)}burstCloud=points(p,c,sizes);scene.add(burstCloud);burstStart=performance.now()},getView(){return null},dispose(){pendingResolve?.(false);pendingResolve=null;disposed=true;cancelAnimationFrame(raf);ro.disconnect();for(const [k,fn] of [['pointerdown',downEvent],['pointermove',moveEvent],['pointerup',upEvent],['pointercancel',upEvent],['wheel',wheel]])renderer.domElement.removeEventListener(k,fn);hideScenery();cleanup(active);cleanup(bg);cleanup(warp);if(burstCloud)cleanup(burstCloud);glow.dispose();composer.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();labels.remove()}};
+  burst(){if(reduced)return;const p=[],c=[],sizes=[],r=random(824);burstVelocities=[];for(let i=0;i<(low?350:750);i++){p.push(0,0,0);const a=r()*Math.PI*2,v=2+r()*13;burstVelocities.push(Math.cos(a)*v,Math.sin(a)*v,(r()-.5)*v);const col=new T.Color(palettes[i%palettes.length]);c.push(col.r,col.g,col.b);sizes.push(1+r()*2)}burstCloud=points(p,c,sizes);scene.add(burstCloud);burstStart=performance.now()},getView(){return null},dispose(){pendingResolve?.(false);pendingResolve=null;disposed=true;cancelAnimationFrame(raf);ro.disconnect();for(const [k,fn] of [['pointerdown',downEvent],['pointermove',moveEvent],['pointerup',upEvent],['pointercancel',upEvent],['wheel',wheel]])renderer.domElement.removeEventListener(k,fn);hideScenery();cleanup(active);cleanup(bg);portalWarp?.dispose();if(burstCloud)cleanup(burstCloud);glow.dispose();composer.dispose();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();labels.remove()}};
 }
