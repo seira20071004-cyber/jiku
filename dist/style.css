@@ -167,21 +167,14 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 }
 .celestial-label[data-role="current"]::after{display:none}
 .celestial-label[data-role="parent"]::after{content:'↩'}
-.universe-stage::after{
- content:'';
- position:absolute;
- inset:0;
- pointer-events:none;
- background:radial-gradient(ellipse at center,#25263f,#0a1025 72%,#070b18);
- opacity:var(--portal-cover,0);
-}
 .universe-portal-warp{
- position:absolute;
+ position:fixed;
  inset:0;
  width:100%;
  height:100%;
- z-index:2;
- pointer-events:none;
+ z-index:100;
+ background:#050819;
+ pointer-events:auto;
 }
 .universe-portal-warp[hidden]{display:none}
 .universe-hud[hidden],.universe-labels[hidden],.space-vista[hidden]{display:none}

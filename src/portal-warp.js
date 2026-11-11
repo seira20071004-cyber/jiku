@@ -5,14 +5,14 @@ const smooth = value => {
   return t * t * (3 - 2 * t);
 };
 
-export function createPortalWarp(host, lowQuality) {
+export function createPortalWarp(lowQuality) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   canvas.className = 'universe-portal-warp';
   canvas.setAttribute('aria-hidden', 'true');
   canvas.hidden = true;
-  host.append(canvas);
+  document.body.append(canvas);
 
   let seed = 9871;
   const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
@@ -29,10 +29,10 @@ export function createPortalWarp(host, lowQuality) {
   });
   let width, height, backdrop;
 
-  function draw(progress, nextWidth, nextHeight) {
-    const visibility = smooth((progress - .24) / .29) * (1 - smooth((progress - .74) / .23));
-    canvas.hidden = visibility === 0;
-    if (!visibility || !nextWidth || !nextHeight) return;
+  function draw(progress) {
+    canvas.hidden = false;
+    const nextWidth = canvas.clientWidth, nextHeight = canvas.clientHeight;
+    if (!nextWidth || !nextHeight) return;
     if (width !== nextWidth || height !== nextHeight) {
       width = nextWidth;
       height = nextHeight;
@@ -46,12 +46,10 @@ export function createPortalWarp(host, lowQuality) {
       backdrop.addColorStop(.68, '#070c20');
       backdrop.addColorStop(1, '#02030b');
     }
-    canvas.style.opacity = String(visibility);
-    ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = backdrop;
     ctx.fillRect(0, 0, width, height);
 
-    const phase = clamp((progress - .24) / .73);
+    const phase = clamp(progress);
     const speed = Math.sin(Math.PI * phase) ** 1.4;
     const travel = smooth(phase) * 2.6;
     const cx = width / 2, cy = height / 2;

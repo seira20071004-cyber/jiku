@@ -386,25 +386,36 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
  }
  function portalTravel(id,direction){
   const start=camera.position.clone(),entering=direction>0;
-  const duration=reduced?0:entering?3400:2750;
-  const crossing=.68;
-  if(!reduced&&portalWarp===undefined)portalWarp=createPortalWarp(host,low);
+  if(reduced)return animateTravel(0,()=>fill(id));
+  if(portalWarp===undefined)portalWarp=createPortalWarp(low);
+  const approachTime=entering?1850:800;
+  const warpTime=portalWarp?1450:0;
+  const arrivalTime=entering?700:1450;
+  const warpEnd=approachTime+warpTime;
+  const duration=warpEnd+arrivalTime;
+  // Approach until the camera is just above the sphere, where it fills the viewport.
+  const closeDistance=ORIGIN_RADIUS+.055;
+  const departure=entering?new T.Vector3(0,0,closeDistance)
+    :center.clone().add(new T.Vector3(0,0,baseDistance*1.65));
   return animateTravel(duration,raw=>{
-   if(raw<crossing){
-    const destination=new T.Vector3(0,0,entering?3.24:baseDistance*1.65);
-    const approach=entering?Math.pow(raw/crossing,1.6):Math.min(1,smooth(raw)/.7);
-    camera.position.lerpVectors(start,destination,approach);
-    labels.style.opacity=String(1-smooth(raw/.34));
-   }else{
-    if(currentNode!==id)fill(id);
-    const progress=(raw-crossing)/(1-crossing);
-    const ease=entering?smooth(progress):1-Math.pow(1-progress,3);
-    camera.position.z=center.z+T.MathUtils.lerp(entering?baseDistance*1.55:baseDistance*.6,baseDistance,ease);
-    labels.style.opacity=String(progress);
+   const elapsed=raw*duration;
+   if(elapsed<approachTime){
+    const progress=elapsed/approachTime;
+    camera.position.lerpVectors(start,departure,smooth(progress));
+    labels.style.opacity=String(1-smooth(progress/.34));
+    return;
    }
-   const cover=smooth((raw-.53)/.15)*(1-smooth((raw-.73)/.24));
-   host.style.setProperty('--portal-cover',String(cover));
-   portalWarp?.draw(raw,width,height);
+   if(elapsed<warpEnd){
+    portalWarp.draw((elapsed-approachTime)/warpTime);
+    if(currentNode!==id)fill(id);
+    return;
+   }
+   if(currentNode!==id)fill(id);
+   portalWarp?.hide();
+   const progress=(elapsed-warpEnd)/arrivalTime;
+   const startingDistance=entering?baseDistance*1.5:closeDistance;
+   camera.position.z=center.z+T.MathUtils.lerp(startingDistance,baseDistance,smooth(progress));
+   labels.style.opacity=String(smooth(progress));
   });
  }
  async function approach(id,routeLength){
@@ -449,7 +460,7 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
    return true;
   }finally{
    transitioning=false;labels.inert=false;labels.style.opacity='1';
-   portalWarp?.hide();host.classList.remove('in-transit');host.style.removeProperty('--portal-cover');
+   portalWarp?.hide();host.classList.remove('in-transit');
   }
  }
  function resize(){width=host.clientWidth;height=host.clientHeight;if(!width||!height)return;renderer.setSize(width,height,false);composer.setSize(width,height);camera.aspect=width/height;camera.updateProjectionMatrix();if(scenery){scenery.eye.aspect=camera.aspect;scenery.eye.updateProjectionMatrix()}if(currentNode===UNIVERSE_ORIGIN&&!transitioning){baseDistance=originDistance(camera.aspect);camera.position.z=baseDistance}}
