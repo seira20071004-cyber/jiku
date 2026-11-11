@@ -177,6 +177,27 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
  pointer-events:auto;
 }
 .universe-portal-warp[hidden]{display:none}
+.first-steps{
+ position:absolute;
+ z-index:2;
+ left:50%;
+ bottom:80px;
+ width:min(440px,calc(100% - 32px));
+ transform:translateX(-50%);
+ padding:16px;
+ border:1px solid #b8bfff40;
+ border-radius:17px;
+ background:#10152cf5;
+ box-shadow:0 12px 36px #02040a80;
+ pointer-events:auto;
+}
+.first-steps-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.first-steps h2{margin:0;font-size:clamp(16px,4vw,19px);line-height:1.35;color:#f4f0ff}
+.first-steps p{margin:6px 0 12px;color:#c7cce7;font-size:13px;line-height:1.55}
+.first-steps .text-button{flex:none;min-height:36px;padding:4px;color:#b6bedb}
+.first-steps .primary{width:100%;min-height:43px}
+.universe-hud:has(.first-steps) .space-empty{display:none}
+.universe-stage.in-transit~.universe-hud .first-steps{visibility:hidden}
 .universe-hud[hidden],.universe-labels[hidden],.space-vista[hidden]{display:none}
 .space-vista{
  position:absolute;
