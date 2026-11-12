@@ -227,7 +227,7 @@ export function mountOnboarding(host, {
       ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis']
     ] : [];
     turns.push(
-      ['目標達成に必要なことも、これと同じです。', 'birth-welcome'],
+      ['目標達成に関しても同じことが言えます。', 'birth-welcome'],
       ['大切なことに意識を向けるところから、最初の一歩が始まります。', 'birth-emphasis']
     );
     showSequence(turns, showChoices, focus);
