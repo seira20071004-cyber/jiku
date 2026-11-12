@@ -1,5 +1,5 @@
 import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse} from './onboarding.js';
-import {exampleMap} from './example-map.js';
+import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,presetPanel,modePickerContent,recordPanel,weeklyPanel,numberText,hoursText} from './quantity-view.js';
@@ -82,20 +82,9 @@ function guideHUD(){
 
 function startGuide(preview=false,draft=null){
  const sample=freshUniverse();
- const rootId=completeUniverse(sample,exampleMap.name);
- let galaxyId,goalId;
- for(const branch of exampleMap.branches){
-  const galaxy=writeGoal(sample,{name:branch.name,purpose:branch.purpose,parentId:rootId});
-  galaxyId??=galaxy;
-  for(const goal of branch.goals){
-   const objective=writeGoal(sample,{name:goal.name,purpose:branch.purpose,parentId:galaxy});
-   goalId??=objective;
-   for(const [name,dailyAmount,weeklyTarget,mode] of goal.tasks){
-    writeGoal(sample,{name,purpose:goal.name,parentId:objective,kind:'action',
-     measurement:{unit:'minutes',dailyAmount,weeklyTarget},mode});
-   }
-  }
- }
+ const rootId=populateMappedUniverse(sample,createExampleDraft());
+ const [{id:galaxyId}]=visibleChildren(sample,rootId);
+ const [{id:goalId}]=visibleChildren(sample,galaxyId);
  guideSession={preview,draft,state,view,focus,universeOutside,phase:'intro',galaxyId,goalId};
  state=sample;
  view='tree';focus=null;universeOutside=false;
@@ -256,13 +245,14 @@ function populateMappedUniverse(target,map){
  function addChildren(parent,parentId){
   for(const child of parent.children){
    const action=child.kind==='action';
-   const id=writeGoal(target,{name:child.name,purpose:parent.name+'につなげる',parentId,kind:child.kind,
-    ...(action?{measurement:{unit:'minutes',dailyAmount:child.daily,weeklyTarget:child.weekly},mode:'rest'}:{})});
+   const id=writeGoal(target,{name:child.name,purpose:child.purpose||parent.name+'につなげる',parentId,kind:child.kind,
+    ...(action?{measurement:{unit:'minutes',dailyAmount:child.daily,weeklyTarget:child.weekly},mode:child.mode||'rest'}:{})});
    if(!action)addChildren(child,id);
   }
  }
  addChildren(map,root.id);
  validate(target);
+ return root.id;
 }
 function commitUniverseBirth(map){
  const commit=()=>{

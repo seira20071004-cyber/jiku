@@ -59,3 +59,22 @@ export const exampleMap = {
 const health = exampleMap.branches[0];
 const [task, daily, weekly] = health.goals[0].tasks[0];
 export const starterMap = {name: exampleMap.name, galaxy: health.name, task, daily: String(daily), weekly: String(weekly)};
+
+export function createExampleDraft() {
+  return {
+    name: exampleMap.name,
+    children: exampleMap.branches.map(branch => ({
+      name: branch.name,
+      kind: 'goal',
+      purpose: branch.purpose,
+      children: branch.goals.map(goal => ({
+        name: goal.name,
+        kind: 'goal',
+        purpose: branch.purpose,
+        children: goal.tasks.map(([name, daily, weekly, mode]) => ({
+          name, kind: 'action', purpose: goal.name, daily, weekly, mode
+        }))
+      }))
+    }))
+  };
+}

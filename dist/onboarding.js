@@ -1,5 +1,5 @@
 import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
-import {exampleMap, starterMap} from './example-map.js';
+import {createExampleDraft, exampleMap, starterMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 
 const guestDraftKey = 'jiku:pending-universe';
@@ -19,20 +19,24 @@ function draftChildren(nodes, depth = 1) {
   return nodes.flatMap(node => {
     if (typeof node?.name !== 'string') return [];
     const name = node.name.slice(0, 80);
+    const purpose = typeof node.purpose === 'string' ? {purpose: node.purpose.slice(0, 1000)} : {};
     if (depth > 1 && node.kind === 'action') {
       const duration = value => Number.isInteger(value) && value >= 1 && value <= 1000000 ? value : 10;
-      return [{name, kind: 'action', daily: duration(node.daily), weekly: duration(node.weekly)}];
+      const mode = ['rest', 'busy', 'full'].includes(node.mode) ? {mode: node.mode} : {};
+      return [{name, kind: 'action', daily: duration(node.daily), weekly: duration(node.weekly), ...purpose, ...mode}];
     }
-    return depth < 3 ? [{name, kind: 'goal', children: draftChildren(node.children, depth + 1)}] : [];
+    return depth < 3 ? [{name, kind: 'goal', children: draftChildren(node.children, depth + 1), ...purpose}] : [];
   });
 }
 
-function initialPersonalMap(draft) {
+export function initialPersonalMap(draft) {
+  if (draft.map) return draft.map;
+  if (!draft.starter) return createExampleDraft();
   const defaultStarter = draft.name === exampleMap.name ? starterMap : {
     ...starterMap, galaxy: '目標に向けて始める', task: '今日できる一歩に10分取り組む'
   };
   const starter = {...defaultStarter, ...draft.starter};
-  return draft.map || {
+  return {
     name: starter.name?.trim() && draft.starter?.name ? starter.name : draft.name,
     children: [{name: starter.galaxy || defaultStarter.galaxy, kind: 'goal', children: [
       {name: starter.task || defaultStarter.task, kind: 'action',
