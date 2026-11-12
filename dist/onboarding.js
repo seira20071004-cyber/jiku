@@ -10,7 +10,6 @@ const opening = {
   still: {duration: 1050, next: 'bang'}
 };
 
-const suggestedGoal = exampleMap.name;
 const escapeMapText = text => text.replace(/[&<>"']/g, character =>
   ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'})[character]);
 
@@ -37,17 +36,13 @@ export function initialPersonalMap(draft) {
   };
   const starter = {...defaultStarter, ...draft.starter};
   return {
-    name: starter.name?.trim() && draft.starter?.name ? starter.name : draft.name,
+    name: draft.starter.name?.trim() || draft.name?.trim() || exampleMap.name,
     children: [{name: starter.galaxy || defaultStarter.galaxy, kind: 'goal', children: [
       {name: starter.task || defaultStarter.task, kind: 'action',
         daily: Number(starter.daily || defaultStarter.daily), weekly: Number(starter.weekly || defaultStarter.weekly)}
     ]}]
   };
 }
-const goalOptions = [
-  ['known', '明確に決まっている'],
-  ['unsure', 'まだ決まっていない']
-];
 const focusOptions = {
   motivation: {
     label: 'やる気が湧かないとき',
@@ -78,14 +73,10 @@ export function onboardingDraft(saved, legacy) {
   const name = ((typeof source.name === 'string' ? source.name : legacyName) ||
     (typeof priorAnswer === 'string' ? priorAnswer : '')).slice(0, 80);
   const focusBarrier = Object.hasOwn(focusOptions, source.focusBarrier) ? source.focusBarrier : null;
-  let step = 'goal';
-  if (name.trim() && source.step === 'map') step = 'map';
-  else if (name.trim() && ['ready', 'confirm'].includes(source.step)) step = 'confirm';
-  else if (name.trim() && ['gaze', 'focus'].includes(source.step)) step = source.step;
-  else if (name.trim() && source.step === 'explain') step = focusBarrier ? 'explain' : 'focus';
-  else if (source.step === 'suggest') step = 'suggest';
-  else if (source.step === 'goal') step = 'goal';
-  else if (name || source.step === 'name' || ['universe-name', 'galaxy', 'bang'].includes(legacy?.step)) step = 'name';
+  let step = 'gaze';
+  if (['map', 'focus'].includes(source.step)) step = source.step;
+  else if (['ready', 'confirm'].includes(source.step)) step = 'confirm';
+  else if (source.step === 'explain') step = focusBarrier ? 'explain' : 'focus';
   const starter = {};
   for (const key of Object.keys(starterMap)) {
     if (typeof source.starter?.[key] === 'string') starter[key] = source.starter[key].slice(0, 80);
@@ -213,26 +204,14 @@ export function mountOnboarding(host, {
     copy.focus({preventScroll: true});
   }
 
-  function choiceControls(options, label, canGoBack = false) {
+  function choiceControls(options, label) {
     controls.innerHTML = `<div class="birth-choices" role="group" aria-label="${label}">${options.map(([id, text]) =>
       `<button class="birth-choice" type="button" data-choice="${id}">${text}<span aria-hidden="true">→</span></button>`
-    ).join('')}</div>${canGoBack ? '<button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>' : ''}`;
+    ).join('')}</div>`;
   }
 
   function showQuestion(text, focus) {
     focusTurn(showTurn(text, 'birth-question', 'Jiku', 'h1'), focus);
-  }
-
-  function showComposer(focus) {
-    showQuestion('いちばん大きな目標を教えてください。', focus);
-    controls.innerHTML = `<form class="birth-form">
-      <label class="birth-visually-hidden" for="birth-input">いちばん大きな目標</label>
-      <input id="birth-input" maxlength="80" required enterkeyhint="done" autocomplete="off" placeholder="例：幸せな人生">
-      <button class="birth-primary" type="submit">この目標で始める <span aria-hidden="true">→</span></button>
-    </form><button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
-    const input = controls.querySelector('input');
-    input.value = draft.name;
-    controls.querySelector('button').disabled = !draft.name.trim();
   }
 
   function showFocusQuestion(focus, previous, witnessedBirth) {
@@ -248,7 +227,7 @@ export function mountOnboarding(host, {
       ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis']
     ] : [];
     turns.push(
-      ['目標に向かうときも、ひとつの光を見つめるときと同じです。', 'birth-welcome'],
+      ['目標達成に必要なことも、これと同じです。', 'birth-welcome'],
       ['大切なことに意識を向けるところから、最初の一歩が始まります。', 'birth-emphasis']
     );
     showSequence(turns, showChoices, focus);
@@ -261,8 +240,8 @@ export function mountOnboarding(host, {
       ['でも、いい知らせがあります。', 'birth-emphasis'],
       [option.benefit, 'birth-reply'],
       ['この宇宙では、大きな目標を日々のタスクまで分けられます。', 'birth-emphasis'],
-      ['欲しいものがはっきりしていると、そのために働いてお金を貯めようと思えますよね。', 'birth-welcome'],
-      ['目標も同じで、何のためかがわかると、今日やることを自分で選びやすくなります。', 'birth-reply']
+      ['目標と今日の一歩を線でつなぐと、何のために取り組むのかが見えてきます。', 'birth-welcome'],
+      ['まずは「幸せな人生」を例に、そのつながりをマインドマップで見てみましょう。', 'birth-reply']
     ], shouldFocus => enter('confirm', {focus: shouldFocus}), focus);
   }
 
@@ -476,12 +455,6 @@ export function mountOnboarding(host, {
     detail.scrollIntoView({block: 'nearest'});
   }
 
-  function chooseGoal(name) {
-    draft.name = name;
-    delete draft.focusBarrier;
-    enter('gaze');
-  }
-
   function prepareOrigin() {
     if (originRequested) return;
     originRequested = true;
@@ -495,7 +468,7 @@ export function mountOnboarding(host, {
     const previous = step;
     step = next;
     screen.dataset.stage = next;
-    const choosing = ['welcome', 'goal', 'name', 'suggest'].includes(next);
+    const choosing = next === 'welcome';
     screen.toggleAttribute('data-choosing', choosing);
     screen.toggleAttribute('data-chat', !choosing && !Object.hasOwn(opening, next) && next !== 'bang');
     screen.toggleAttribute('data-map', next === 'confirm' || next === 'map');
@@ -507,11 +480,9 @@ export function mountOnboarding(host, {
     controls.replaceChildren();
     showError('');
 
-    if (choosing || ['gaze', 'focus', 'explain', 'confirm', 'map'].includes(next)) {
-      if (next !== 'welcome') {
-        draft.step = next;
-        persist();
-      }
+    if (['gaze', 'focus', 'explain', 'confirm', 'map'].includes(next)) {
+      draft.step = next;
+      persist();
     }
     if (next === 'welcome') {
       showQuestion('Jikuへようこそ。', focus);
@@ -521,28 +492,6 @@ export function mountOnboarding(host, {
         <button class="birth-primary" type="button" data-birth="preview-login">ログイン後の画面へ <span aria-hidden="true">→</span></button>`;
       return;
     }
-    if (next === 'goal') {
-      const showGoal = shouldFocus => {
-        showQuestion('すでに大きな目標が明確に決まっていますか？', shouldFocus);
-        choiceControls(goalOptions, '目標について');
-      };
-      if (previous === undefined || previous === 'welcome') {
-        focusTurn(showTurn('最初にあなたに聞きたいことがあります！', 'birth-emphasis'), focus);
-        timer = setTimeout(() => showGoal(focus), 2200);
-      } else showGoal(focus);
-      return;
-    }
-    if (next === 'name') {
-      showComposer(focus);
-      return;
-    }
-    if (next === 'suggest') {
-      showQuestion('では、まず「幸せな人生」を目標にしてみましょう。', focus);
-      controls.innerHTML = `<button class="birth-primary" type="button" data-birth="suggested">「幸せな人生」で始める <span aria-hidden="true">→</span></button>
-        <button class="birth-quiet birth-edit" type="button" data-birth="back">前の質問に戻る</button>`;
-      return;
-    }
-
     if (next !== 'gaze') prepareOrigin();
     if (Object.hasOwn(opening, next)) {
       retireTurn();
@@ -611,32 +560,15 @@ export function mountOnboarding(host, {
         return;
       }
     }
-    if (step === 'goal' && choice === 'known') enter('name', {focus: true});
-    if (step === 'welcome' && action === 'preview-login') enter('goal', {focus: true});
-    if (step === 'goal' && choice === 'unsure') enter('suggest', {focus: true});
+    if (step === 'welcome' && action === 'preview-login') enter('gaze');
     if (step === 'focus' && Object.hasOwn(focusOptions, choice)) {
       draft.focusBarrier = choice;
       enter('explain', {focus: true});
     }
-    if (action === 'suggested') chooseGoal(suggestedGoal);
     if (action === 'skip') enter('focus', {focus: true});
-    if (action === 'back') enter('goal', {focus: true});
     if (action === 'close') onClose?.();
     if (action === 'settings') onSettings?.();
     if (step === 'confirm' && action === 'example') onExample({...draft, step: 'map'});
-  }, {signal});
-  screen.addEventListener('input', event => {
-    if (event.target.id !== 'birth-input') return;
-    draft.name = event.target.value;
-    controls.querySelector('button').disabled = !draft.name.trim();
-    persist();
-  }, {signal});
-  screen.addEventListener('submit', event => {
-    event.preventDefault();
-    event.stopPropagation();
-    const value = controls.querySelector('input').value.trim();
-    if (!value) return;
-    chooseGoal(value);
   }, {signal});
 
   function resizeViewport() {

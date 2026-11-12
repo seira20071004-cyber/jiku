@@ -5,29 +5,30 @@ import {exampleMap} from '../dist/example-map.js';
 import {completeUniverse,freshUniverse,writeGoal} from '../dist/universe-model.js';
 import {validate} from '../dist/model.js';
 
-test('旧版で銀河の入力まで進んだユーザーは宇宙名を引き継げる', () => {
-  assert.equal(onboardingDraft(null, {step:'bang'}).step, 'name');
+test('旧版の入力途中からは目標の質問を挟まず宇宙誕生へ進む', () => {
+  assert.equal(onboardingDraft(null, {step:'bang'}).step, 'gaze');
   const draft = onboardingDraft(null, {step:'galaxy',draftName:'ものづくりを続ける'});
-  assert.equal(draft.step, 'name');
+  assert.equal(draft.step, 'gaze');
   assert.equal(draft.name, 'ものづくりを続ける');
 });
 
-test('以前の回答を引き継ぎ、空の名前では確認画面へ進まない', () => {
+test('新規は光を見つめる画面から始まり、途中の画面は目標名なしで再開できる', () => {
   const saved = {step:'ready',name:'自分の時間を持つ'};
   assert.deepEqual(onboardingDraft(saved), {step:'confirm',name:saved.name});
-  assert.deepEqual(onboardingDraft({step:'custom',direction:'自分の時間を持ちたい'}), {step:'name',name:'自分の時間を持ちたい'});
-  assert.deepEqual(onboardingDraft({step:'confirm',name:' '}), {step:'name',name:' '});
-  assert.deepEqual(onboardingDraft(null), {step:'goal',name:''});
+  assert.deepEqual(onboardingDraft({step:'custom',direction:'自分の時間を持ちたい'}), {step:'gaze',name:'自分の時間を持ちたい'});
+  assert.deepEqual(onboardingDraft({step:'confirm',name:''}), {step:'confirm',name:''});
+  assert.deepEqual(onboardingDraft({step:'map',name:''}), {step:'map',name:''});
+  assert.deepEqual(onboardingDraft(null), {step:'gaze',name:''});
 });
 
 test('新しい会話では目標と集中の回答が残り、以前の入力とログイン直前の状態も引き継ぐ', () => {
   assert.deepEqual(onboardingDraft({step:'interest',name:'仮の目標',interest:'try'}),
-    {step:'name',name:'仮の目標'});
+    {step:'gaze',name:'仮の目標'});
   assert.deepEqual(onboardingDraft({step:'name',name:'学び直したい',interest:'continue'}),
-    {step:'name',name:'学び直したい'});
-  assert.deepEqual(onboardingDraft({step:'interest',interest:'invalid'}), {step:'goal',name:''});
+    {step:'gaze',name:'学び直したい'});
+  assert.deepEqual(onboardingDraft({step:'interest',interest:'invalid'}), {step:'gaze',name:''});
   assert.deepEqual(onboardingDraft({step:'practice',interest:'continue',friction:'time'}),
-    {step:'goal',name:''});
+    {step:'gaze',name:''});
   assert.deepEqual(onboardingDraft({step:'confirm',name:'学び直したい',interest:'continue',friction:'time'}),
     {step:'confirm',name:'学び直したい'});
   assert.deepEqual(onboardingDraft({step:'gaze',name:'幸せな人生'}),
