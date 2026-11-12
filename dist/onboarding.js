@@ -1,4 +1,5 @@
 import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
+import {exampleMap, starterMap} from './example-map.js';
 
 const guestDraftKey = 'jiku:pending-universe';
 const opening = {
@@ -8,10 +9,7 @@ const opening = {
   still: {duration: 1050, next: 'bang'}
 };
 
-const suggestedGoal = '幸せな人生';
-export const exampleMap = Object.freeze({
-  name: suggestedGoal, galaxy: '健康を大切にする', task: '10分歩く', daily: '10', weekly: '30'
-});
+const suggestedGoal = exampleMap.name;
 const goalOptions = [
   ['known', '明確に決まっている'],
   ['unsure', 'まだ決まっていない']
@@ -55,7 +53,7 @@ export function onboardingDraft(saved, legacy) {
   else if (source.step === 'goal') step = 'goal';
   else if (name || source.step === 'name' || ['universe-name', 'galaxy', 'bang'].includes(legacy?.step)) step = 'name';
   const starter = {};
-  for (const key of Object.keys(exampleMap)) {
+  for (const key of Object.keys(starterMap)) {
     if (typeof source.starter?.[key] === 'string') starter[key] = source.starter[key].slice(0, 80);
   }
   return {name, ...(focusBarrier ? {focusBarrier} : {}), ...(Object.keys(starter).length ? {starter} : {}), step};
@@ -232,13 +230,27 @@ export function mountOnboarding(host, {
 
   function showMap(focus, editable) {
     showQuestion(editable ? 'あなたのマインドマップをつくりましょう。' : 'マインドマップのお手本', focus);
-    const defaults = draft.name === exampleMap.name ? exampleMap : {
-      ...exampleMap, galaxy: '目標に向けて始める', task: '今日できる一歩に10分取り組む'
+    if (!editable) {
+      controls.innerHTML = `<div class="birth-example">
+        <p class="birth-example-root"><span aria-hidden="true">◎</span> ${exampleMap.name}</p>
+        <div class="birth-example-branches">${exampleMap.branches.map((branch, index) => `
+          <details class="birth-example-branch" data-branch-color="${index}">
+            <summary><span aria-hidden="true">◉</span> ${branch.name}</summary>
+            <ul>${branch.goals.map(goal => `<li><strong>${goal.name}</strong>
+              <ul>${goal.tasks.map(([task, minutes]) => `<li><span>${task}</span><small>${minutes}分</small></li>`).join('')}</ul>
+            </li>`).join('')}</ul>
+          </details>`).join('')}</div>
+        <button class="birth-primary" type="button" data-birth="example">宇宙船に乗る <span aria-hidden="true">→</span></button>
+      </div>`;
+      return;
+    }
+    const defaults = draft.name === exampleMap.name ? starterMap : {
+      ...starterMap, galaxy: '目標に向けて始める', task: '今日できる一歩に10分取り組む'
     };
-    const values = editable ? {...defaults, name: draft.name, ...draft.starter} : exampleMap;
+    const values = {...defaults, name: draft.name, ...draft.starter};
     const field = (name, label, mark) => `<label class="birth-map-node">
       <span><i aria-hidden="true">${mark}</i> ${label}</span>
-      <input name="${name}" maxlength="80" required ${editable ? '' : 'readonly'}>
+      <input name="${name}" maxlength="80" required>
     </label>`;
     controls.innerHTML = `<form class="birth-map-form">
       <div class="birth-map">
@@ -247,13 +259,12 @@ export function mountOnboarding(host, {
         <div class="birth-map-branch">
           ${field('task', 'タスク · 今日の一歩', '✦')}
           <div class="birth-map-time">
-            <label>1日（分）<input name="daily" type="number" min="1" max="1000000" required ${editable ? '' : 'readonly'}></label>
-            <label>週の目標（分）<input name="weekly" type="number" min="1" max="1000000" required ${editable ? '' : 'readonly'}></label>
+            <label>1日（分）<input name="daily" type="number" min="1" max="1000000" required></label>
+            <label>週の目標（分）<input name="weekly" type="number" min="1" max="1000000" required></label>
           </div>
         </div>
       </div>
-      ${editable ? '<button class="birth-primary" type="submit">宇宙をつくる <span aria-hidden="true">→</span></button>' :
-       '<button class="birth-primary" type="button" data-birth="example">宇宙船に乗る <span aria-hidden="true">→</span></button>'}
+      <button class="birth-primary" type="submit">宇宙をつくる <span aria-hidden="true">→</span></button>
     </form>`;
     const form = controls.querySelector('form');
     for (const [key, value] of Object.entries(values)) form.elements.namedItem(key).value = value;

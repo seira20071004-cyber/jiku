@@ -237,3 +237,76 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
  .universe-topline:has(.space-vista-trigger) .space-breadcrumb{flex:1;min-width:0}
  .universe-topline .space-vista-trigger{padding-inline:9px}
 }
+
+.mind-map {
+  display:flex;
+  flex-direction:column;
+  flex:1;
+  min-height:0;
+  width:min(100%,680px);
+  margin:0 auto;
+  padding:clamp(14px,3vw,26px) clamp(14px,4vw,32px) 10px;
+}
+.mind-map-header h1 {
+  margin:0 0 12px;
+  color:#f3ecff;
+  font-size:clamp(20px,4vw,27px);
+}
+.mind-map-mode { margin-bottom:16px; }
+.mind-map-mode h2 { color:#c9c1df; font-size:12px; margin:0 0 6px; }
+.mind-map-mode div { display:flex; gap:6px; }
+.mind-map-mode button {
+  flex:1;
+  min-height:42px;
+  padding:5px 3px;
+  border:1px solid #393655;
+  border-radius:9px;
+  background:#101321;
+  color:#ddd8ef;
+  font-size:clamp(10px,2.6vw,12px);
+  white-space:nowrap;
+}
+.mind-map-mode button[aria-pressed="true"] {
+  border-color:#b596ff;
+  background:#30224c;
+  color:#fff4ff;
+}
+.mind-map-scroll { flex:1; min-height:0; overflow:auto; padding:3px; scrollbar-width:thin; }
+.mind-map-footer {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin:0;
+  padding:6px 0 0;
+  border-top:1px solid #a49cd126;
+}
+.mind-map-tools { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+.mind-map-tools button { min-height:35px; padding-inline:8px; color:#c8bce6; font-size:12px; }
+.mind-map .mind-map-explore {
+  display:grid;
+  place-content:center;
+  justify-items:center;
+  gap:2px;
+  min-height:49px;
+  padding:7px 12px;
+  border:1px solid #c3aff085;
+  border-radius:12px;
+  background:linear-gradient(112deg,#43316f,#242f57);
+  color:#fff5ff;
+  font-size:14px;
+  text-align:center;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.mind-map-explore small { color:#d9caef; font-size:11px; }
+.space-map-back { display:none; }
+.at-origin .space-map-back {
+  display:block;
+  position:absolute;
+  z-index:4;
+  top:12px;
+  left:16px;
+  min-height:42px;
+  color:#d3c7ed;
+  font-size:12px;
+}
