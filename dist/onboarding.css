@@ -370,6 +370,46 @@ body.birth-page, body.birth-active {
 .birth-screen .birth-primary:hover:not(:disabled) { background: #66539b; }
 .birth-screen .birth-edit { display: block; margin: 1px auto 0; }
 .birth-controls { flex: none; margin-top: auto; }
+.birth-screen[data-map] .birth-content { top:clamp(65px,18%,145px); }
+.birth-screen[data-map] .birth-origin { top:10%; transform:translateY(-50%) scale(.34); opacity:.6; }
+.birth-screen[data-map] .birth-conversation { min-height:58px; margin-bottom:8px; }
+.birth-screen[data-map] .birth-controls { margin-top:0; }
+.birth-map-form,.birth-map { display:grid; gap:14px; }
+.birth-map-node,.birth-map-branch {
+  display:grid;
+  gap:4px;
+  position:relative;
+  padding:9px 13px;
+  border:1px solid #b6a5e349;
+  border-radius:12px;
+  background:#16132be8;
+}
+.birth-map-node span,.birth-map-time label { color:#c9bddf; font-size:12px; }
+.birth-map-node i { color:#c8a9ff; font-style:normal; }
+.birth-map > :not(:first-child)::before {
+  content:"";
+  position:absolute;
+  bottom:100%;
+  left:50%;
+  height:15px;
+  border-left:1px solid #c8a9ffad;
+}
+.birth-map-branch .birth-map-node { padding:0; border:0; background:none; }
+.birth-map-time { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.birth-screen .birth-map input {
+  display:block;
+  width:100%;
+  min-width:0;
+  min-height:34px;
+  padding:4px 8px;
+  border:1px solid #b6a5e349;
+  border-radius:7px;
+  background:#0c0a18;
+  color:#f6f0ff;
+  font-size:16px;
+}
+.birth-screen .birth-map input[readonly] { border-color:transparent; background:transparent; padding-inline:0; }
+.birth-screen.birth-keyboard[data-map] .birth-content { top:54px; }
 .birth-controls > * { animation: birth-rise .32s .13s ease both; }
 .birth-screen .birth-error { margin: 8px 0 0; color: #ffd6e5; font-size: 13px; }
 .birth-screen .birth-visually-hidden {

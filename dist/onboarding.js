@@ -9,6 +9,9 @@ const opening = {
 };
 
 const suggestedGoal = '幸せな人生';
+export const exampleMap = Object.freeze({
+  name: suggestedGoal, galaxy: '健康を大切にする', task: '10分歩く', daily: '10', weekly: '30'
+});
 const goalOptions = [
   ['known', '明確に決まっている'],
   ['unsure', 'まだ決まっていない']
@@ -44,13 +47,18 @@ export function onboardingDraft(saved, legacy) {
     (typeof priorAnswer === 'string' ? priorAnswer : '')).slice(0, 80);
   const focusBarrier = Object.hasOwn(focusOptions, source.focusBarrier) ? source.focusBarrier : null;
   let step = 'goal';
-  if (name.trim() && ['ready', 'confirm'].includes(source.step)) step = 'confirm';
+  if (name.trim() && source.step === 'map') step = 'map';
+  else if (name.trim() && ['ready', 'confirm'].includes(source.step)) step = 'confirm';
   else if (name.trim() && ['gaze', 'focus'].includes(source.step)) step = source.step;
   else if (name.trim() && source.step === 'explain') step = focusBarrier ? 'explain' : 'focus';
   else if (source.step === 'suggest') step = 'suggest';
   else if (source.step === 'goal') step = 'goal';
   else if (name || source.step === 'name' || ['universe-name', 'galaxy', 'bang'].includes(legacy?.step)) step = 'name';
-  return {name, ...(focusBarrier ? {focusBarrier} : {}), step};
+  const starter = {};
+  for (const key of Object.keys(exampleMap)) {
+    if (typeof source.starter?.[key] === 'string') starter[key] = source.starter[key].slice(0, 80);
+  }
+  return {name, ...(focusBarrier ? {focusBarrier} : {}), ...(Object.keys(starter).length ? {starter} : {}), step};
 }
 
 function guestDraft() {
@@ -68,8 +76,8 @@ export function clearPendingUniverse() {
 }
 
 export function mountOnboarding(host, {
-  initial, preview = false, autoSave = false,
-  onDraft, onSave, onClose, onSettings, renderOrigin
+  initial, preview = false, previewStart = 'welcome',
+  onDraft, onExample, onSave, onClose, onSettings, renderOrigin
 } = {}) {
   const draft = onboardingDraft(initial);
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -222,11 +230,33 @@ export function mountOnboarding(host, {
     ], shouldFocus => enter('confirm', {focus: shouldFocus}), focus);
   }
 
-  function showSave(focus) {
-    focusTurn(showTurn('さっそく、あなたの宇宙に入っていきましょう。', 'birth-emphasis'), focus);
-    controls.innerHTML = `<button class="birth-primary" type="button" data-birth="save">
-      宇宙に入る <span aria-hidden="true">→</span>
-    </button><button class="birth-quiet birth-edit" type="button" data-birth="edit">目標を書き直す</button>`;
+  function showMap(focus, editable) {
+    showQuestion(editable ? 'あなたのマインドマップをつくりましょう。' : 'マインドマップのお手本', focus);
+    const defaults = draft.name === exampleMap.name ? exampleMap : {
+      ...exampleMap, galaxy: '目標に向けて始める', task: '今日できる一歩に10分取り組む'
+    };
+    const values = editable ? {...defaults, name: draft.name, ...draft.starter} : exampleMap;
+    const field = (name, label, mark) => `<label class="birth-map-node">
+      <span><i aria-hidden="true">${mark}</i> ${label}</span>
+      <input name="${name}" maxlength="80" required ${editable ? '' : 'readonly'}>
+    </label>`;
+    controls.innerHTML = `<form class="birth-map-form">
+      <div class="birth-map">
+        ${field('name', '宇宙 · いちばん大きな目標', '◎')}
+        ${field('galaxy', '銀河 · 目標につながるテーマ', '◉')}
+        <div class="birth-map-branch">
+          ${field('task', 'タスク · 今日の一歩', '✦')}
+          <div class="birth-map-time">
+            <label>1日（分）<input name="daily" type="number" min="1" max="1000000" required ${editable ? '' : 'readonly'}></label>
+            <label>週の目標（分）<input name="weekly" type="number" min="1" max="1000000" required ${editable ? '' : 'readonly'}></label>
+          </div>
+        </div>
+      </div>
+      ${editable ? '<button class="birth-primary" type="submit">宇宙をつくる <span aria-hidden="true">→</span></button>' :
+       '<button class="birth-primary" type="button" data-birth="example">宇宙船に乗る <span aria-hidden="true">→</span></button>'}
+    </form>`;
+    const form = controls.querySelector('form');
+    for (const [key, value] of Object.entries(values)) form.elements.namedItem(key).value = value;
   }
 
   function chooseGoal(name) {
@@ -251,6 +281,7 @@ export function mountOnboarding(host, {
     const choosing = ['welcome', 'goal', 'name', 'suggest'].includes(next);
     screen.toggleAttribute('data-choosing', choosing);
     screen.toggleAttribute('data-chat', !choosing && !Object.hasOwn(opening, next) && next !== 'bang');
+    screen.toggleAttribute('data-map', next === 'confirm' || next === 'map');
     if (choosing || next === 'gaze') delete screen.dataset.forming;
     sky?.stage(next);
     skip.hidden = !Object.hasOwn(opening, next) && next !== 'bang';
@@ -259,7 +290,7 @@ export function mountOnboarding(host, {
     controls.replaceChildren();
     showError('');
 
-    if (choosing || ['gaze', 'focus', 'explain', 'confirm'].includes(next)) {
+    if (choosing || ['gaze', 'focus', 'explain', 'confirm', 'map'].includes(next)) {
       if (next !== 'welcome') {
         draft.step = next;
         persist();
@@ -313,16 +344,16 @@ export function mountOnboarding(host, {
     }
     if (next === 'focus') showFocusQuestion(focus, previous, witnessedBirth);
     else if (next === 'explain') explain(focus);
-    else showSave(focus);
+    else showMap(focus, next === 'map');
   }
 
-  async function saveName() {
-    if (step !== 'confirm' || saving) return;
+  async function saveMap(starter) {
+    if (step !== 'map' || saving) return;
     saving = true;
     controls.querySelectorAll('button').forEach(button => {button.disabled = true;});
     showError('');
     try {
-      await onSave(draft.name, {...draft});
+      await onSave(starter);
     } catch {
       showError('目標を保存できませんでした。もう一度お試しください。');
     } finally {
@@ -347,10 +378,14 @@ export function mountOnboarding(host, {
     if (action === 'back') enter('goal', {focus: true});
     if (action === 'close') onClose?.();
     if (action === 'settings') onSettings?.();
-    if (action === 'edit') enter('name', {focus: true});
-    if (action === 'save') saveName();
+    if (step === 'confirm' && action === 'example') onExample({...draft, step: 'map'});
   }, {signal});
   screen.addEventListener('input', event => {
+    if (step === 'map' && event.target.form?.classList.contains('birth-map-form')) {
+      draft.starter = Object.fromEntries(new FormData(event.target.form));
+      persist();
+      return;
+    }
     if (event.target.id !== 'birth-input') return;
     draft.name = event.target.value;
     controls.querySelector('button').disabled = !draft.name.trim();
@@ -359,6 +394,12 @@ export function mountOnboarding(host, {
   screen.addEventListener('submit', event => {
     event.preventDefault();
     event.stopPropagation();
+    if (event.target.classList.contains('birth-map-form')) {
+      const starter = Object.fromEntries([...new FormData(event.target)].map(([key, value]) => [key, value.trim()]));
+      if (step === 'map' && Object.values(starter).every(Boolean)) saveMap(starter);
+      else if (step === 'map') showError('目標・銀河・タスクの名前を入力してください。');
+      return;
+    }
     const value = controls.querySelector('input').value.trim();
     if (!value) return;
     chooseGoal(value);
@@ -374,8 +415,7 @@ export function mountOnboarding(host, {
   viewport?.addEventListener('scroll', resizeViewport, {signal});
   resizeViewport();
   sky = startBirthSky(screen.querySelector('.birth-stars'), origin, motion);
-  enter(preview ? 'welcome' : draft.step);
-  if (autoSave && step === 'confirm') queueMicrotask(() => {if (!signal.aborted) saveName();});
+  enter(preview ? previewStart : draft.step);
   return {dispose() {
     clearTimeout(timer); clearTimeout(formingTimer); events.abort();
     sky?.dispose(); disposeOrigin?.();

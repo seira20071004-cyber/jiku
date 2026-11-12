@@ -1,4 +1,4 @@
-import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse} from './onboarding.js';
+import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,exampleMap} from './onboarding.js';
 import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,presetPanel,modePickerContent,recordPanel,weeklyPanel,numberText,hoursText} from './quantity-view.js';
 import {createUniverse,mountOriginPreview} from './universe.js';
@@ -13,8 +13,8 @@ const storageKey=demoMode?personalStorageKey+':demo-v2':personalStorageKey;
 let needsLegacyImport=false,storageLocked=false;let state;try{const raw=localStorage.getItem(storageKey);needsLegacyImport=!demoMode&&!!account&&!raw&&!!localStorage.getItem('jiku-v1');state=raw?validate(JSON.parse(raw)):(demoMode?createDemoUniverse(dateKey()):freshUniverse());if(raw&&!state.universe){localStorage.setItem(storageKey+':before-universe',raw);state=migrateUniverse(state)}}catch{storageLocked=true;state=state||freshUniverse();setTimeout(()=>toast('保存データを保護しています。設定からバックアップを確認してください。'),300)}
 let treeScene=null,treeView=null,showGoalLabels=true,statsTab='quantity',quantityScope='all',statsWeek=weekStart(dateKey()),statsMonth=dateKey().slice(0,7),quantityDimension=null;
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
-let guideSession=null,guideTimer;
-function save(){if(guideSession)return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
+let guideSession=null,guideTimer,mapPreviewReturn=null,onboardingResume=null;
+function save(){if(guideSession||mapPreviewReturn)return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 applyPending(state,today);if(state.universe?.onboarded)save();
 const icon=(name)=>({home:'⌂',tree:'✧',calendar:'▦',stats:'◴',settings:'⚙'}[name]);
 const names={tree:'自分の宇宙',stats:'統計'};
@@ -26,11 +26,11 @@ function accountAvatar(){const picture=account?.picture;return `<span class="goo
 function render(){clearTimeout(guideTimer);const birthActive=onboardingScene||onboardingPreview||!storageLocked&&!state.universe?.onboarded;
  document.body.classList.toggle('birth-active',Boolean(birthActive));
  if(birthActive){if(treeScene){treeScene.dispose();treeScene=null}if(!onboardingScene)showOnboarding();return}
- if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){if(statsMonth===today.slice(0,7))statsMonth=latest.slice(0,7);if(statsWeek===weekStart(today))statsWeek=weekStart(latest);today=latest;selected=today;applyPending(state,today);save()}$('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" aria-label="Jiku 自分の宇宙">Jiku<span>●</span></a>${guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">プレビューを終了</button></div>':demoMode?'<div class="demo-toolbar"><span>検証用</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">戻る ↗</button></div>':''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></header><div class="content">${({tree:treePage,stats:statsPage}[view])()}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();scheduleGuide()}
+ if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){if(statsMonth===today.slice(0,7))statsMonth=latest.slice(0,7);if(statsWeek===weekStart(today))statsWeek=weekStart(latest);today=latest;selected=today;applyPending(state,today);save()}$('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" aria-label="Jiku 自分の宇宙">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>検証用</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">戻る ↗</button></div>':''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></header><div class="content">${({tree:treePage,stats:statsPage}[view])()}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();scheduleGuide()}
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
 function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n.id];return `<div class="action-row ${done?'done':''}"><button class="check ${done?'checked':''}" data-check="${esc(n.id)}" data-date="${key}" aria-label="${esc(n.name)}の実行記録" aria-pressed="${done}">${done?'✓':''}</button><div class="action-copy"><strong>${esc(n.name)}</strong><small>${esc(ancestry(state,n.id).slice(1,-1).join(' / ')||'自分の宇宙')}</small></div><span class="priority p${a.priority}">${['高','中','低'][a.priority]}</span><button class="edit-action" data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">⋯</button></div>`}
 let universeOutside=!state.universe?.firstSteps,navigating=false,onboardingScene=null;
-let onboardingPreview=new URLSearchParams(location.search).get('preview')==='welcome';
+let onboardingPreview=['welcome','map'].includes(new URLSearchParams(location.search).get('preview'));
 const onboardingKey=storageKey+':onboarding-draft';
 const authReturn=!!account&&!demoMode&&new URLSearchParams(location.search).get('onboarding')==='resume';
 let guestHandoff=authReturn?pendingUniverse():null;
@@ -61,7 +61,7 @@ const guideCopy={
  intro:['目標から、今日の一歩まで','「幸せな人生」という目標を、今日できることまで分けてみましょう。',2300],
  galaxy:['銀河「健康を大切にする」','大きな目標の中に、大切にしたいテーマを銀河として作りました。',2700],
  task:['タスク「10分歩く」','銀河の中に、今日からできる行動を置きました。これが日々のタスクです。',2800],
- finish:['自分の宇宙へ','あなたの宇宙でも、銀河から始めて、自分に合う一歩を作れます。']
+ finish:['マインドマップが宇宙になりました','このように、マインドマップを宇宙に反映できます。']
 };
 
 function guideHUD(){
@@ -69,18 +69,18 @@ function guideHUD(){
  const [title,detail]=guideCopy[guideSession.phase];
  const preview=guideSession.preview;
  return `<aside class="first-steps" aria-label="お手本チュートリアル">
-  <div class="first-steps-top"><span class="first-steps-label">お手本</span>${!preview&&guideSession.phase!=='finish'?'<button type="button" class="text-button" data-guide="dismiss">スキップ</button>':''}</div>
+  <div class="first-steps-top"><span class="first-steps-label">宇宙船で案内中</span>${!preview&&guideSession.phase!=='finish'?'<button type="button" class="text-button" data-guide="dismiss">スキップ</button>':''}</div>
   <div aria-live="polite"><h2>${title}</h2><p>${detail}</p></div>
-  ${guideSession.phase==='finish'?`<button type="button" class="primary" data-guide="dismiss">${preview?'元の宇宙へ戻る':'自分の宇宙へ'} <span aria-hidden="true">→</span></button>`:''}
+  ${guideSession.phase==='finish'?`<button type="button" class="primary" data-guide="dismiss">${guideSession.draft?'自分のマインドマップをつくる':preview?'元の宇宙へ戻る':'自分の宇宙へ'} <span aria-hidden="true">→</span></button>`:''}
  </aside>`;
 }
 
-function startGuide(preview=false){
- guideSession={preview,state,view,focus,universeOutside,phase:'intro',galaxyId:null};
+function startGuide(preview=false,draft=null){
+ guideSession={preview,draft,state,view,focus,universeOutside,phase:'intro',galaxyId:null};
  state=freshUniverse();
- completeUniverse(state,'幸せな人生');
+ completeUniverse(state,exampleMap.name);
  view='tree';focus=null;universeOutside=false;
- if(preview){
+ if(preview&&!draft){
   const url=new URL(location.href);url.searchParams.set('preview','guide');url.hash='tree';
   history.replaceState(null,'',url);
  }
@@ -93,7 +93,7 @@ function scheduleGuide(){
  guideTimer=setTimeout(async()=>{
   if(guide!==guideSession)return;
   if(guide.phase==='intro'){
-   guide.galaxyId=writeGoal(state,{name:'健康を大切にする',purpose:'元気に過ごせる日を増やす',parentId:currentSpace().id,kind:'goal'});
+   guide.galaxyId=writeGoal(state,{name:exampleMap.galaxy,purpose:'元気に過ごせる日を増やす',parentId:currentSpace().id,kind:'goal'});
    guide.phase='galaxy';
    render();
    treeScene?.birth(guide.galaxyId);
@@ -102,8 +102,8 @@ function scheduleGuide(){
   if(guide.phase==='galaxy'){
    await enterSpace(guide.galaxyId);
    if(guide!==guideSession||currentSpace().id!==guide.galaxyId)return;
-   const taskId=writeGoal(state,{name:'10分歩く',purpose:'日々の中で体を動かす',parentId:guide.galaxyId,
-    kind:'action',measurement:{unit:'minutes',dailyAmount:10,weeklyTarget:30},mode:'rest'});
+   const taskId=writeGoal(state,{name:exampleMap.task,purpose:'日々の中で体を動かす',parentId:guide.galaxyId,
+    kind:'action',measurement:{unit:'minutes',dailyAmount:Number(exampleMap.daily),weeklyTarget:Number(exampleMap.weekly)},mode:'rest'});
    guide.phase='task';
    render();
    treeScene?.birth(taskId);
@@ -118,6 +118,14 @@ function scheduleGuide(){
 function dismissGuide(){
  const guide=guideSession;
  if(!guide)return;
+ if(guide.draft){
+  ({state,view,focus,universeOutside}=guide);
+  guideSession=null;
+  onboardingResume=guide.draft;
+  onboardingPreview=guide.preview;
+  render();
+  return;
+ }
  if(!guide.preview){
   const example=state;
   state=guide.state;
@@ -139,6 +147,7 @@ function dismissGuide(){
 
 function treePage(){return `<section class="universe-scene full-panel ${showUniverseOrigin()?'at-origin':''}" id="goal-tree" aria-label="自分の宇宙">
  <div class="universe-stage"></div><div class="space-travel-veil"></div><div class="universe-hud">${spaceHUD()}${guideHUD()}</div>
+ ${guideSession?'<div class="guide-cockpit" aria-hidden="true"></div>':''}
  <section class="space-vista" aria-label="この場所の景色" hidden>
   <button class="space-back" data-do="close-scenery">← 景色を閉じる</button>
   <div class="space-vista-caption"><h2></h2><p></p></div>
@@ -189,38 +198,57 @@ function legacyDetail(id){const n=state.nodes.find(n=>n.id===id);if(!n)return;co
 function spaceList(){modal(`<div class="dialog-title"><h2>この場所の目標</h2><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><div class="space-detail-links">${visibleChildren(state,currentSpace().id).map(n=>`<div class="space-list-row"><button data-space-go="${esc(n.id)}">${esc(n.name)} <span>↗</span></button><button data-space-reorder="${esc(n.id)}" data-direction="-1" aria-label="${esc(n.name)}を前へ">↑</button><button data-space-reorder="${esc(n.id)}" data-direction="1" aria-label="${esc(n.name)}を後へ">↓</button><button data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">···</button></div>`).join('')||'<p class="muted">まだ下位目標はありません。</p>'}</div>`)}
 function showOnboarding(){
  const preview=onboardingPreview;
+ const mapPreview=preview&&new URLSearchParams(location.search).get('preview')==='map';
+ const resume=onboardingResume;
+ onboardingResume=null;
  let saved;
  try{if(!preview)saved=JSON.parse(localStorage.getItem(onboardingKey))}catch{}
+ const initial=resume||(preview?(mapPreview?{name:exampleMap.name,step:'confirm'}:null)
+  :onboardingDraft(saved||guestHandoff,state.universe));
  onboardingScene=mountOnboarding($('#app'),{
-  preview,renderOrigin:mountOriginPreview,initial:preview?null:guestHandoff||onboardingDraft(saved,state.universe),
-  autoSave:!preview&&!!guestHandoff&&!needsLegacyImport,
+  preview,previewStart:resume?.step||(mapPreview?'confirm':'welcome'),renderOrigin:mountOriginPreview,initial,
   onDraft:preview?null:draft=>{try{localStorage.setItem(onboardingKey,JSON.stringify(draft))}catch{}},
-  onSave:async name=>{
-   if(preview){endOnboardingPreview(name);return}
-   await commitUniverseBirth(name);
-   finishOnboardingReturn();
+  onExample:draft=>{
+   onboardingScene?.dispose();onboardingScene=null;onboardingPreview=false;
+   startGuide(preview,draft);
+   render();
+  },
+  onSave:async starter=>{
+   if(preview){
+    const generated=freshUniverse();
+    populateMappedUniverse(generated,starter);
+    mapPreviewReturn={state,view,focus,universeOutside};
+    state=generated;
+    onboardingPreview=false;
+   }else{
+    await commitUniverseBirth(starter);
+    finishOnboardingReturn();
+    history.replaceState(null,'','#tree');
+   }
    onboardingScene?.dispose();onboardingScene=null;
    view='tree';focus=null;universeOutside=false;
-   history.replaceState(null,'','#tree');
-   if(state.universe.firstSteps)startGuide();
    render();
   },
   onClose:preview?endOnboardingPreview:null,
   onSettings:preview?null:settings
  });
 }
-function commitUniverseBirth(name){
+function populateMappedUniverse(target,starter){
+ const rootId=completeUniverse(target,starter.name);
+ const galaxyId=writeGoal(target,{name:starter.galaxy,purpose:starter.name+'につなげる',parentId:rootId,kind:'goal'});
+ writeGoal(target,{name:starter.task,purpose:starter.galaxy+'のために取り組む',parentId:galaxyId,
+  kind:'action',measurement:{unit:'minutes',dailyAmount:Number(starter.daily),weeklyTarget:Number(starter.weekly)},mode:'rest'});
+}
+function commitUniverseBirth(starter){
  const commit=()=>{
   const raw=localStorage.getItem(storageKey);
   const latest=raw?migrateUniverse(validate(JSON.parse(raw))):structuredClone(state);
   if(!latest.universe.onboarded){
-   completeUniverse(latest,name);
-   latest.universe.firstSteps=true;
+   populateMappedUniverse(latest,starter);
    localStorage.setItem(storageKey,JSON.stringify(latest));
   }
   state=latest;
   try{localStorage.removeItem(onboardingKey)}catch{}
-  return latest.nodes.find(node=>node.parentId===null).name;
  };
  return navigator.locks?.request?navigator.locks.request(onboardingKey,commit):commit();
 }
@@ -229,12 +257,17 @@ function previewOnboarding(){
  const url=new URL(location.href);url.searchParams.set('preview','welcome');url.hash='tree';
  history.replaceState(null,'',url);render();
 }
-function endOnboardingPreview(goalName){
+function endOnboardingPreview(){
  onboardingScene?.dispose();onboardingScene=null;onboardingPreview=false;
- if(goalName)startGuide(true);
- else{
-  const url=new URL(location.href);url.searchParams.delete('preview');history.replaceState(null,'',url);
- }
+ const url=new URL(location.href);url.searchParams.delete('preview');history.replaceState(null,'',url);
+ render();
+}
+function endMapPreview(){
+ if(!mapPreviewReturn)return;
+ ({state,view,focus,universeOutside}=mapPreviewReturn);
+ mapPreviewReturn=null;
+ const url=new URL(location.href);url.searchParams.delete('preview');url.hash=view;
+ history.replaceState(null,'',url);
  render();
 }
 function calendarPage(){if(month>today.slice(0,7))month=today.slice(0,7);const [y,m]=month.split('-').map(Number),first=`${month}-01`,offset=(new Date(first+'T12:00:00+09:00').getUTCDay()+6)%7,num=new Date(Date.UTC(y,m,0)).getUTCDate(),weeks=Math.ceil((num+offset)/7);return `<section class="calendar-card cosmic-calendar" aria-label="活動カレンダー"><div class="month-heading"><div><span class="calendar-year">${y}</span><h1>${m}<small>月</small></h1></div><div><button class="round-button" data-month="-1" aria-label="前の月">‹</button><button class="text-button" data-do="today">今月に戻る</button></div></div><div class="calendar-grid" style="--weeks:${weeks}">${['月','火','水','木','金','土','日'].map(d=>`<span class="day-label">${d}</span>`).join('')}${'<div class="calendar-blank"></div>'.repeat(offset)}${Array.from({length:num},(_,i)=>{const k=`${month}-${String(i+1).padStart(2,'0')}`,mode=recordMode(state,k),activity=Object.values(state.logs[k]||{}).some(l=>l.quantity||l.eventCompleted),event=scheduledEvents(k).length>0;return `<button class="day-cell mode-${mode} ${selected===k?'selected':''} ${k===today?'today':''}" data-select-date="${k}" aria-label="${m}月${i+1}日 ${k>today?'これからの日':MODES[mode].label}${activity?'・タスクの記録あり':''}${event?'・イベントの予定あり':''}" ${k>today&&!event?'disabled':''}><span>${i+1}</span>${k<=today?`<i>${MODES[mode].icon}</i>`:''}${activity?'<b class="quantity-calendar-dot"></b>':''}${event?'<b class="event-calendar-dot"></b>':''}</button>`}).join('')}</div><div class="calendar-mode-legend">${['none','rest','busy','full'].map(k=>`<span class="mode-${k}"><i></i>${MODES[k].label}</span>`).join('')}</div><button class="text-button calendar-rhythm-link" data-do="show-rhythm">モードの割合を見る ↗</button></section>`}
@@ -363,6 +396,7 @@ function switchDemo(enabled){const url=new URL(location.href);if(enabled)url.sea
 function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">YOUR OWN UNIVERSE</div><h2>設定・バックアップ</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${account?`<div class="account-info"><div class="account-profile-photo">${accountAvatar()}</div><strong>${esc(account.name)}</strong><p>${esc(account.email)}</p>${!account.picture?'<a class="text-button" href="/api/auth/google">Googleのプロフィール画像を取得</a>':''}<form method="post" action="/api/auth/logout" data-native-submit><button class="text-button" type="submit">ログアウト</button></form></div>`:''}<p>データはこの端末・ブラウザ内に保存されます。端末間での同期はありません。ブラウザのデータを消す前にバックアップしてください。</p><button class="text-button" data-do="open-demo">検証用の宇宙を開く →</button><br><button class="text-button" data-do="preview-onboarding">初めて開いたときの画面を見る →</button><br><button class="text-button" data-do="review">今週を振り返る →</button><div class="settings-actions"><button class="primary" data-do="export">↓ バックアップを書き出す</button><label class="import-button">↑ バックアップを読み込む<input type="file" id="import" accept="application/json,.json"></label></div><p class="footnote">読み込み時は現在のデータを置き換えます。先に現在のバックアップを保存することをおすすめします。日付は日本時間、週の始まりは月曜日です。</p><hr><p class="muted">Jiku v1.0 · 自分の軸を、日々のタスクへ。</p>`)}
 document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do],[data-view],[data-day],[data-focus]');if(!b)return;const d=b.dataset;
  if(d.guide==='dismiss'){dismissGuide();return}
+ if(b.hasAttribute('data-map-exit')){endMapPreview();return}
  if(d.do==='open-scenery'){openScenery();return}
  if(d.do==='close-scenery'){closeScenery();return}
  if(b.hasAttribute('data-map-expand')){

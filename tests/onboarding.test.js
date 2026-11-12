@@ -35,6 +35,9 @@ test('新しい会話では目標と集中の回答が残り、以前の入力�
     {step:'explain',name:'幸せな人生',focusBarrier:'motivation'});
   assert.deepEqual(onboardingDraft({step:'explain',name:'幸せな人生',focusBarrier:'invalid'}),
     {step:'focus',name:'幸せな人生'});
+  const starter = {name:'', galaxy:'英語を学ぶ', task:'教材を読む', daily:'15', weekly:'45'};
+  assert.deepEqual(onboardingDraft({step:'map',name:'幸せな人生',starter}),
+    {step:'map',name:'幸せな人生',starter});
 });
 
 test('宇宙の誕生は根だけを保存し、再実行で名前や後から作った銀河を変更しない', () => {
