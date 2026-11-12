@@ -53,3 +53,14 @@ test('宇宙の誕生は根だけを保存し、再実行で名前や後から�
   assert.equal(state.nodes[0].name, '自分の宇宙');
   validate(state);
 });
+
+test('途中保存したマインドマップは目標の名前、枝の順序、タスクの時間を引き継ぐ', () => {
+  const map = {name:'自分らしく暮らす',children:[
+    {name:'健康',kind:'goal',children:[
+      {name:'体を動かす',kind:'goal',children:[{name:'歩く',kind:'action',daily:15,weekly:45}]}
+    ]},
+    {name:'英語',kind:'goal',children:[{name:'本を読む',kind:'action',daily:20,weekly:60}]}
+  ]};
+  const draft = {step:'map',name:'幸せな人生',map};
+  assert.deepEqual(onboardingDraft(JSON.parse(JSON.stringify(draft))), draft);
+});

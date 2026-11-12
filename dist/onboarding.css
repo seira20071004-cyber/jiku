@@ -374,40 +374,66 @@ body.birth-page, body.birth-active {
 .birth-screen[data-map] .birth-origin { top:10%; transform:translateY(-50%) scale(.34); opacity:.6; }
 .birth-screen[data-map] .birth-conversation { min-height:58px; margin-bottom:8px; }
 .birth-screen[data-map] .birth-controls { margin-top:0; }
-.birth-map-form,.birth-map { display:grid; gap:14px; }
-.birth-map-node,.birth-map-branch {
-  display:grid;
-  gap:4px;
-  position:relative;
-  padding:9px 13px;
-  border:1px solid #b6a5e349;
+.birth-map-add {
+  min-height:42px;
+  padding:7px 12px;
+  border:1px dashed #ab94d377;
   border-radius:12px;
-  background:#16132be8;
+  color:#ddd1f2;
+  background:#211832;
+  font-size:12px;
 }
-.birth-map-node span,.birth-map-time label { color:#c9bddf; font-size:12px; }
-.birth-map-node i { color:#c8a9ff; font-style:normal; }
-.birth-map > :not(:first-child)::before {
-  content:"";
-  position:absolute;
-  bottom:100%;
-  left:50%;
-  height:15px;
-  border-left:1px solid #c8a9ffad;
+.birth-map-add:hover { border-color:#d1b4f9; background:#302344; }
+.birth-map-add-actions {
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:8px;
+  padding:3px 10px 10px;
 }
-.birth-map-branch .birth-map-node { padding:0; border:0; background:none; }
+.birth-personal-map .map-point > .birth-map-add { width:100%; margin-top:6px; }
+.birth-personal-map .map-task-nodes button {
+  min-height:34px;
+  padding:3px 0;
+  text-align:left;
+  color:inherit;
+  font-size:inherit;
+}
+.birth-personal-map .map-node > .birth-map-edit-mark { font-size:12px; opacity:.72; }
+.birth-node-editor {
+  padding:14px;
+  border:1px solid #b79ae67d;
+  border-radius:15px;
+  background:#151126;
+}
+.birth-node-form { display:grid; gap:10px; }
+.birth-node-form h2 { color:#f1e6ff; margin:0; font-size:15px; }
+.birth-node-form label { display:block; color:#cfc1e7; margin:0; font-size:12px; }
 .birth-map-time { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.birth-screen .birth-map input {
+.birth-screen .birth-node-form input {
   display:block;
   width:100%;
   min-width:0;
-  min-height:34px;
-  padding:4px 8px;
-  border:1px solid #b6a5e349;
-  border-radius:7px;
+  min-height:40px;
+  margin:5px 0 0;
+  padding:6px 9px;
+  border:1px solid #b6a5e369;
+  border-radius:8px;
   background:#0c0a18;
   color:#f6f0ff;
   font-size:16px;
 }
+.birth-node-actions { display:flex; justify-content:flex-end; gap:8px; }
+.birth-node-actions button {
+  min-height:38px;
+  padding:5px 10px;
+  border:1px solid #b6a5e34d;
+  border-radius:9px;
+  color:#e8dff8;
+  font-size:12px;
+}
+.birth-node-actions [data-birth="remove-node"] { margin-right:auto; color:#f0b9cc; }
+.birth-node-actions [type="submit"] { background:#503875; }
 .birth-example { display:grid; gap:14px; }
 .birth-screen.birth-keyboard[data-map] .birth-content { top:54px; }
 .birth-controls > * { animation: birth-rise .32s .13s ease both; }

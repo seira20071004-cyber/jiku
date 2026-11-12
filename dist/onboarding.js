@@ -11,6 +11,35 @@ const opening = {
 };
 
 const suggestedGoal = exampleMap.name;
+const escapeMapText = text => text.replace(/[&<>"']/g, character =>
+  ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'})[character]);
+
+function draftChildren(nodes, depth = 1) {
+  if (!Array.isArray(nodes)) return [];
+  return nodes.flatMap(node => {
+    if (typeof node?.name !== 'string') return [];
+    const name = node.name.slice(0, 80);
+    if (depth > 1 && node.kind === 'action') {
+      const duration = value => Number.isInteger(value) && value >= 1 && value <= 1000000 ? value : 10;
+      return [{name, kind: 'action', daily: duration(node.daily), weekly: duration(node.weekly)}];
+    }
+    return depth < 3 ? [{name, kind: 'goal', children: draftChildren(node.children, depth + 1)}] : [];
+  });
+}
+
+function initialPersonalMap(draft) {
+  const defaultStarter = draft.name === exampleMap.name ? starterMap : {
+    ...starterMap, galaxy: '目標に向けて始める', task: '今日できる一歩に10分取り組む'
+  };
+  const starter = {...defaultStarter, ...draft.starter};
+  return draft.map || {
+    name: starter.name?.trim() && draft.starter?.name ? starter.name : draft.name,
+    children: [{name: starter.galaxy || defaultStarter.galaxy, kind: 'goal', children: [
+      {name: starter.task || defaultStarter.task, kind: 'action',
+        daily: Number(starter.daily || defaultStarter.daily), weekly: Number(starter.weekly || defaultStarter.weekly)}
+    ]}]
+  };
+}
 const goalOptions = [
   ['known', '明確に決まっている'],
   ['unsure', 'まだ決まっていない']
@@ -57,7 +86,10 @@ export function onboardingDraft(saved, legacy) {
   for (const key of Object.keys(starterMap)) {
     if (typeof source.starter?.[key] === 'string') starter[key] = source.starter[key].slice(0, 80);
   }
-  return {name, ...(focusBarrier ? {focusBarrier} : {}), ...(Object.keys(starter).length ? {starter} : {}), step};
+  const map = step === 'map' && typeof source.map?.name === 'string'
+    ? {name: source.map.name.slice(0, 80), children: draftChildren(source.map.children)} : null;
+  return {name, ...(focusBarrier ? {focusBarrier} : {}), ...(Object.keys(starter).length ? {starter} : {}),
+    ...(map ? {map} : {}), step};
 }
 
 function guestDraft() {
@@ -84,6 +116,7 @@ export function mountOnboarding(host, {
   const events = new AbortController();
   const {signal} = events;
   let step, timer, formingTimer, sky, disposeOrigin, originRequested = false, saving = false;
+  let openBranch = null;
 
   host.innerHTML = `
     <main class="birth-screen" aria-label="Jiku はじまりの宇宙">
@@ -246,30 +279,128 @@ export function mountOnboarding(host, {
       </div>`;
       return;
     }
-    const defaults = draft.name === exampleMap.name ? starterMap : {
-      ...starterMap, galaxy: '目標に向けて始める', task: '今日できる一歩に10分取り組む'
-    };
-    const values = {...defaults, name: draft.name, ...draft.starter};
-    const field = (name, label, mark) => `<label class="birth-map-node">
-      <span><i aria-hidden="true">${mark}</i> ${label}</span>
-      <input name="${name}" maxlength="80" required>
-    </label>`;
-    controls.innerHTML = `<form class="birth-map-form">
-      <div class="birth-map">
-        ${field('name', '宇宙 · いちばん大きな目標', '◎')}
-        ${field('galaxy', '銀河 · 目標につながるテーマ', '◉')}
-        <div class="birth-map-branch">
-          ${field('task', 'タスク · 今日の一歩', '✦')}
-          <div class="birth-map-time">
-            <label>1日（分）<input name="daily" type="number" min="1" max="1000000" required></label>
-            <label>週の目標（分）<input name="weekly" type="number" min="1" max="1000000" required></label>
-          </div>
-        </div>
+    draft.map = initialPersonalMap(draft);
+    delete draft.starter;
+    persist();
+    renderPersonalMap();
+  }
+
+  function mapNode(path) {
+    return path ? path.split('.').reduce((node, index) => node.children[Number(index)], draft.map) : draft.map;
+  }
+
+  function editNodeButton(node, path, mark, style = '') {
+    return `<button type="button" class="map-node ${style}" data-birth-edit-node="${path}">
+      <span aria-hidden="true">${mark}</span><strong>${escapeMapText(node.name)}</strong>
+      <span class="birth-map-edit-mark" aria-hidden="true">✎</span>
+    </button>`;
+  }
+
+  function renderPersonalMap() {
+    const map = draft.map;
+    const points = map.children.map((node, index) => ({
+      tone: index % 4,
+      card: `<button type="button" class="map-node" data-birth-map-branch="${index}" aria-controls="birth-personal-detail" aria-expanded="${openBranch === index}">
+        <span aria-hidden="true">◉</span><strong>${escapeMapText(node.name)}</strong>
+      </button>`
+    }));
+    controls.innerHTML = `<div class="birth-example birth-personal-map">
+      ${mapDiagram(editNodeButton(map, '', '◎', 'map-root'), points, {radial: true, label: '自分のマインドマップ'})}
+      <button type="button" class="birth-map-add" data-birth-add-node="" data-node-kind="goal">＋ 銀河を追加</button>
+      <div class="map-subview" id="birth-personal-detail" hidden></div>
+      <div class="birth-node-editor" hidden></div>
+      <button class="birth-primary" type="button" data-birth="generate">宇宙をつくる <span aria-hidden="true">→</span></button>
+    </div>`;
+    renderPersonalBranch();
+  }
+
+  function renderPersonalBranch() {
+    const detail = controls.querySelector('#birth-personal-detail');
+    const branch = draft.map.children[openBranch];
+    detail.hidden = !branch;
+    if (!branch) {
+      detail.replaceChildren();
+      return;
+    }
+    const points = branch.children.map((node, index) => {
+      const path = `${openBranch}.${index}`;
+      return {tone: openBranch % 4, card: node.kind === 'action'
+        ? editNodeButton(node, path, '✦')
+        : `${editNodeButton(node, path, '✦')}
+          <ul class="map-task-nodes">${node.children.map((task, taskIndex) => `<li>
+            <button type="button" data-birth-edit-node="${path}.${taskIndex}">${escapeMapText(task.name)}</button>
+            <small>${task.daily}分</small>
+          </li>`).join('')}</ul>
+          <button type="button" class="birth-map-add" data-birth-add-node="${path}" data-node-kind="action">＋ タスク</button>`};
+    });
+    detail.innerHTML = `${mapDiagram(editNodeButton(branch, String(openBranch), '◉', 'map-detail-root'), points, {label: '銀河の枝'})}
+      <div class="birth-map-add-actions">
+        <button type="button" class="birth-map-add" data-birth-add-node="${openBranch}" data-node-kind="goal">＋ 目標を追加</button>
+        <button type="button" class="birth-map-add" data-birth-add-node="${openBranch}" data-node-kind="action">＋ タスクを追加</button>
+      </div>`;
+  }
+
+  function openMapEditor(button) {
+    const adding = button.hasAttribute('data-birth-add-node');
+    const path = adding ? button.dataset.birthAddNode : button.dataset.birthEditNode;
+    const node = adding ? {kind: button.dataset.nodeKind, name: '', daily: 10, weekly: 30} : mapNode(path);
+    const galaxy = adding ? !path : Boolean(path) && !path.includes('.');
+    const title = node.kind === 'action' ? 'タスク' : galaxy ? '銀河' : path ? '目標' : 'いちばん大きな目標';
+    const editor = controls.querySelector('.birth-node-editor');
+    editor.innerHTML = `<form class="birth-node-form">
+      <h2>${title}を${adding ? '追加' : '編集'}</h2>
+      <label>${title}の名前<input name="name" maxlength="80" required></label>
+      ${node.kind === 'action' ? `<div class="birth-map-time">
+        <label>1日（分）<input name="daily" type="number" min="1" max="1000000" value="${node.daily}" required></label>
+        <label>週の目標（分）<input name="weekly" type="number" min="1" max="1000000" value="${node.weekly}" required></label>
+      </div>` : ''}
+      <div class="birth-node-actions">
+        ${!adding && path ? '<button type="button" data-birth="remove-node">外す</button>' : ''}
+        <button type="button" data-birth="cancel-node">キャンセル</button>
+        <button type="submit">保存</button>
       </div>
-      <button class="birth-primary" type="submit">宇宙をつくる <span aria-hidden="true">→</span></button>
     </form>`;
-    const form = controls.querySelector('form');
-    for (const [key, value] of Object.entries(values)) form.elements.namedItem(key).value = value;
+    const form = editor.querySelector('form');
+    form.elements.name.value = node.name;
+    editor.hidden = false;
+    controls.querySelector('[data-birth="generate"]').disabled = true;
+    showError('');
+    form.elements.name.focus();
+    editor.scrollIntoView({block: 'nearest'});
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const name = form.elements.name.value.trim();
+      if (!name) {
+        form.elements.name.setCustomValidity('名前を入力してください。');
+        form.elements.name.reportValidity();
+        return;
+      }
+      const values = node.kind === 'action'
+        ? {name, daily: Number(form.elements.daily.value), weekly: Number(form.elements.weekly.value)} : {name};
+      if (adding) {
+        const children = mapNode(path).children;
+        children.push({kind: node.kind, ...(node.kind === 'goal' ? {children: []} : {}), ...values});
+        if (!path) openBranch = children.length - 1;
+      } else Object.assign(node, values);
+      persist();
+      renderPersonalMap();
+      controls.querySelector('#birth-personal-detail:not([hidden])')?.scrollIntoView({block: 'nearest'});
+    });
+    form.elements.name.addEventListener('input', () => form.elements.name.setCustomValidity(''));
+    form.querySelector('[data-birth="cancel-node"]').addEventListener('click', () => {
+      editor.hidden = true;
+      controls.querySelector('[data-birth="generate"]').disabled = false;
+      button.focus({preventScroll: true});
+    });
+    form.querySelector('[data-birth="remove-node"]')?.addEventListener('click', () => {
+      const indices = path.split('.');
+      const index = Number(indices.pop());
+      mapNode(indices.join('.')).children.splice(index, 1);
+      if (!indices.length) openBranch = null;
+      persist();
+      renderPersonalMap();
+    });
   }
 
   function showExampleBranch(button) {
@@ -379,13 +510,13 @@ export function mountOnboarding(host, {
     else showMap(focus, next === 'map');
   }
 
-  async function saveMap(starter) {
+  async function saveMap(map) {
     if (step !== 'map' || saving) return;
     saving = true;
     controls.querySelectorAll('button').forEach(button => {button.disabled = true;});
     showError('');
     try {
-      await onSave(starter);
+      await onSave(map);
     } catch {
       showError('目標を保存できませんでした。もう一度お試しください。');
     } finally {
@@ -403,6 +534,25 @@ export function mountOnboarding(host, {
     const button = event.target.closest('button');
     const action = button?.dataset.birth;
     const choice = button?.dataset.choice;
+    if (step === 'map' && button && !saving) {
+      if (button.hasAttribute('data-birth-map-branch')) {
+        const index = Number(button.dataset.birthMapBranch);
+        openBranch = openBranch === index ? null : index;
+        controls.querySelector('[data-birth-map-branch][aria-expanded="true"]')?.setAttribute('aria-expanded', 'false');
+        button.setAttribute('aria-expanded', String(openBranch === index));
+        renderPersonalBranch();
+        controls.querySelector('#birth-personal-detail:not([hidden])')?.scrollIntoView({block: 'nearest'});
+        return;
+      }
+      if (button.hasAttribute('data-birth-edit-node') || button.hasAttribute('data-birth-add-node')) {
+        openMapEditor(button);
+        return;
+      }
+      if (action === 'generate') {
+        saveMap(draft.map);
+        return;
+      }
+    }
     if (step === 'goal' && choice === 'known') enter('name', {focus: true});
     if (step === 'welcome' && action === 'preview-login') enter('goal', {focus: true});
     if (step === 'goal' && choice === 'unsure') enter('suggest', {focus: true});
@@ -418,11 +568,6 @@ export function mountOnboarding(host, {
     if (step === 'confirm' && action === 'example') onExample({...draft, step: 'map'});
   }, {signal});
   screen.addEventListener('input', event => {
-    if (step === 'map' && event.target.form?.classList.contains('birth-map-form')) {
-      draft.starter = Object.fromEntries(new FormData(event.target.form));
-      persist();
-      return;
-    }
     if (event.target.id !== 'birth-input') return;
     draft.name = event.target.value;
     controls.querySelector('button').disabled = !draft.name.trim();
@@ -431,12 +576,6 @@ export function mountOnboarding(host, {
   screen.addEventListener('submit', event => {
     event.preventDefault();
     event.stopPropagation();
-    if (event.target.classList.contains('birth-map-form')) {
-      const starter = Object.fromEntries([...new FormData(event.target)].map(([key, value]) => [key, value.trim()]));
-      if (step === 'map' && Object.values(starter).every(Boolean)) saveMap(starter);
-      else if (step === 'map') showError('目標・銀河・タスクの名前を入力してください。');
-      return;
-    }
     const value = controls.querySelector('input').value.trim();
     if (!value) return;
     chooseGoal(value);

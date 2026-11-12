@@ -230,15 +230,15 @@ function showOnboarding(){
    startGuide(preview,draft);
    render();
   },
-  onSave:async starter=>{
+  onSave:async map=>{
    if(preview){
     const generated=freshUniverse();
-    populateMappedUniverse(generated,starter);
+    populateMappedUniverse(generated,map);
     mapPreviewReturn={state,view,focus,universeOutside,exploring,mapSelection};
     state=generated;
     onboardingPreview=false;
    }else{
-    await commitUniverseBirth(starter);
+    await commitUniverseBirth(map);
     finishOnboardingReturn();
     history.replaceState(null,'','#tree');
    }
@@ -250,18 +250,26 @@ function showOnboarding(){
   onSettings:preview?null:settings
  });
 }
-function populateMappedUniverse(target,starter){
- const rootId=completeUniverse(target,starter.name);
- const galaxyId=writeGoal(target,{name:starter.galaxy,purpose:starter.name+'につなげる',parentId:rootId,kind:'goal'});
- writeGoal(target,{name:starter.task,purpose:starter.galaxy+'のために取り組む',parentId:galaxyId,
-  kind:'action',measurement:{unit:'minutes',dailyAmount:Number(starter.daily),weeklyTarget:Number(starter.weekly)},mode:'rest'});
+function populateMappedUniverse(target,map){
+ completeUniverse(target,map.name);
+ const root=target.nodes.find(node=>node.parentId===null);
+ function addChildren(parent,parentId){
+  for(const child of parent.children){
+   const action=child.kind==='action';
+   const id=writeGoal(target,{name:child.name,purpose:parent.name+'につなげる',parentId,kind:child.kind,
+    ...(action?{measurement:{unit:'minutes',dailyAmount:child.daily,weeklyTarget:child.weekly},mode:'rest'}:{})});
+   if(!action)addChildren(child,id);
+  }
+ }
+ addChildren(map,root.id);
+ validate(target);
 }
-function commitUniverseBirth(starter){
+function commitUniverseBirth(map){
  const commit=()=>{
   const raw=localStorage.getItem(storageKey);
   const latest=raw?migrateUniverse(validate(JSON.parse(raw))):structuredClone(state);
   if(!latest.universe.onboarded){
-   populateMappedUniverse(latest,starter);
+   populateMappedUniverse(latest,map);
    localStorage.setItem(storageKey,JSON.stringify(latest));
   }
   state=latest;
