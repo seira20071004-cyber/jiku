@@ -409,66 +409,6 @@ body.birth-page, body.birth-active {
   font-size:16px;
 }
 .birth-example { display:grid; gap:14px; }
-.birth-example-root {
-  justify-self:center;
-  margin:0;
-  padding:8px 19px;
-  border:1px solid #b9a7f26b;
-  border-radius:24px;
-  background:#241d3d;
-  color:#fff1ff;
-  font-size:16px;
-  font-weight:600;
-}
-.birth-example-root span { color:#d7b6ff; margin-right:5px; }
-.birth-example-branches {
-  position:relative;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  align-items:start;
-  gap:8px;
-}
-.birth-example-branches::before {
-  position:absolute;
-  content:"";
-  inset:auto 50% 100% auto;
-  height:14px;
-  border-left:1px solid #baa7ff70;
-}
-.birth-example-branch {
-  --branch-color:#b6e0c2;
-  min-width:0;
-  border:1px solid #b6a5e349;
-  border-radius:12px;
-  background:#151227;
-}
-.birth-example-branch[data-branch-color="1"] { --branch-color:#c1caff; }
-.birth-example-branch[data-branch-color="2"] { --branch-color:#f1b9d4; }
-.birth-example-branch[data-branch-color="3"] { --branch-color:#efcfaa; }
-.birth-example-branch summary {
-  min-height:44px;
-  padding:12px 8px;
-  color:var(--branch-color);
-  font-size:clamp(11px,2.8vw,14px);
-  cursor:pointer;
-}
-.birth-example-branch summary span { font-size:.8em; }
-.birth-example-branch ul { margin:0; list-style:none; padding:0; }
-.birth-example-branch > ul { padding:0 8px 8px; }
-.birth-example-branch > ul > li { padding:7px 0; border-top:1px solid #b6a5e32e; }
-.birth-example-branch strong { display:block; color:#f1eaff; font-size:12px; }
-.birth-example-branch li li {
-  display:flex;
-  justify-content:space-between;
-  gap:5px;
-  margin-top:6px;
-  padding-left:6px;
-  border-left:1px solid var(--branch-color);
-  color:#dfd5ef;
-  font-size:12px;
-  line-height:1.45;
-}
-.birth-example-branch li small { flex:none; color:var(--branch-color); }
 .birth-screen.birth-keyboard[data-map] .birth-content { top:54px; }
 .birth-controls > * { animation: birth-rise .32s .13s ease both; }
 .birth-screen .birth-error { margin: 8px 0 0; color: #ffd6e5; font-size: 13px; }

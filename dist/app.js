@@ -1,5 +1,6 @@
 import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse} from './onboarding.js';
 import {exampleMap} from './example-map.js';
+import {mapDiagram} from './mind-map.js';
 import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,presetPanel,modePickerContent,recordPanel,weeklyPanel,numberText,hoursText} from './quantity-view.js';
 import {createUniverse,mountOriginPreview} from './universe.js';
@@ -15,7 +16,7 @@ let needsLegacyImport=false,storageLocked=false;let state;try{const raw=localSto
 let treeScene=null,treeView=null,showGoalLabels=true,statsTab='quantity',quantityScope='all',statsWeek=weekStart(dateKey()),statsMonth=dateKey().slice(0,7),quantityDimension=null;
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
 let guideSession=null,guideTimer,mapPreviewReturn=null,onboardingResume=null;
-let exploring=false,mapSelection=null,mapExpanded=new Set();
+let exploring=false,mapSelection=null;
 function save(){if(guideSession||mapPreviewReturn)return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 applyPending(state,today);if(state.universe?.onboarded)save();
 const icon=(name)=>({home:'⌂',tree:'✧',calendar:'▦',stats:'◴',settings:'⚙'}[name]);
@@ -233,7 +234,7 @@ function showOnboarding(){
    if(preview){
     const generated=freshUniverse();
     populateMappedUniverse(generated,starter);
-    mapPreviewReturn={state,view,focus,universeOutside,exploring,mapSelection,mapExpanded};
+    mapPreviewReturn={state,view,focus,universeOutside,exploring,mapSelection};
     state=generated;
     onboardingPreview=false;
    }else{
@@ -242,7 +243,7 @@ function showOnboarding(){
     history.replaceState(null,'','#tree');
    }
    onboardingScene?.dispose();onboardingScene=null;
-   view='tree';focus=null;universeOutside=false;exploring=false;mapSelection=null;mapExpanded=new Set();
+   view='tree';focus=null;universeOutside=false;exploring=false;mapSelection=null;
    render();
   },
   onClose:preview?endOnboardingPreview:null,
@@ -280,7 +281,7 @@ function endOnboardingPreview(){
 }
 function endMapPreview(){
  if(!mapPreviewReturn)return;
- ({state,view,focus,universeOutside,exploring,mapSelection,mapExpanded}=mapPreviewReturn);
+ ({state,view,focus,universeOutside,exploring,mapSelection}=mapPreviewReturn);
  mapPreviewReturn=null;
  const url=new URL(location.href);url.searchParams.delete('preview');url.hash=view;
  history.replaceState(null,'',url);
@@ -308,10 +309,9 @@ function dayEditor(key){selected=key;const summary=quantitySummary(state,key,key
 function rhythmPage(){const start=shiftDate(today,-29),s=modeDistribution(state,start,today,today),counts=s.counts;return `<section class="rhythm-panel full-panel" aria-label="日々のモードの割合"><h1>日々のモードの割合</h1><div class="distribution" role="img" aria-label="過去${s.days}日間のモードの割合">${s.days?Object.entries(counts).map(([k,c])=>`<div style="width:${c/s.days*100}%;background:${MODES[k].color}" title="${MODES[k].label}: ${c}日"></div>`).join(''):'<div style="width:100%;background:#eeede6"></div>'}</div><div class="rhythm-rows">${Object.entries(counts).map(([k,c])=>`<div class="distribution-row"><i style="background:${MODES[k].color}"></i><span>${MODES[k].label}</span><strong>${c}<small>日</small></strong><em>${s.days?Math.round(c/s.days*100):0}%</em></div>`).join('')}</div><p class="footnote">過去${s.days}日間。記録がない日は「何もしなかった日」に含めます。</p></section>`}
 function statsPage(){quantityScope=statisticsScope(state,quantityScope);return `<section class="statistics-workspace weekly-workspace"><div class="statistics-toolbar"><div class="statistics-tabs" role="tablist" aria-label="統計の表示"><button role="tab" aria-selected="${statsTab==='quantity'}" data-stat-tab="quantity">週の記録</button><button role="tab" aria-selected="${statsTab==='monthly'}" data-stat-tab="monthly">月の記録</button><button role="tab" aria-selected="${statsTab==='calendar'}" data-stat-tab="calendar">カレンダー</button></div></div><div class="statistics-content ${statsTab==='calendar'?'calendar-content':'quantity-content'}">${statsTab==='calendar'?calendarPage():weeklyPanel(state,{week:statsWeek,scope:quantityScope,today,month:statsTab==='monthly'?statsMonth:undefined})}</div></section>`}
 const hierarchyMarks=['◎','◉','✦','●','◌'];
-function hierarchyTree(forStatistics,home=false){
+function hierarchyTree(forStatistics){
  const root=state.nodes.find(n=>n.parentId===null);
- const activeId=home?(state.nodes.find(node=>node.id===mapSelection)?.id||root.id):
-  forStatistics?(quantityScope==='all'?root.id:quantityScope):currentSpace().id;
+ const activeId=forStatistics?(quantityScope==='all'?root.id:quantityScope):currentSpace().id;
  const activePath=new Set(nodePath(state,activeId).map(n=>n.id));
  const visible=forStatistics?[root,...statisticsGoals(state)]:state.nodes;
  const byId=new Map(state.nodes.map(n=>[n.id,n])),visibleIds=new Set(visible.map(n=>n.id));
@@ -326,8 +326,8 @@ function hierarchyTree(forStatistics,home=false){
  for(const siblings of children.values())siblings.sort((a,b)=>(a.order||0)-(b.order||0));
  function branch(node,depth){
   const level=Math.min(depth,LEVELS.length-1),nested=children.get(node.id)||[];
-  const expanded=depth===0||(home?mapExpanded.has(node.id):activePath.has(node.id)),current=node.id===activeId;
-  const action=home?'data-map-select':forStatistics?'data-stats-goal':'data-space-go';
+  const expanded=depth===0||activePath.has(node.id),current=node.id===activeId;
+  const action=forStatistics?'data-stats-goal':'data-space-go';
   const value=forStatistics&&depth===0?'all':node.id;
   const name=node.name;
   const task=nodeKind(state,node.id)==='action';
@@ -339,7 +339,7 @@ function hierarchyTree(forStatistics,home=false){
      <span class="hierarchy-name">${esc(name)}${task?`<small>${isEventTask(setting(state,node.id))?'イベント':'タスク'}</small>`:''}</span>
      ${current?'<span class="hierarchy-current" aria-hidden="true">✓</span>':''}
     </button>
-    ${nested.length&&(!home||depth>0)?`<button class="hierarchy-expand" data-map-expand="${esc(node.id)}" aria-expanded="${expanded}" aria-label="${esc(name)}の下位目標を表示"><span aria-hidden="true">${expanded?'⌄':'›'}</span><small aria-hidden="true">${nested.length}</small></button>`:''}
+    ${nested.length?`<button class="hierarchy-expand" data-map-expand aria-expanded="${expanded}" aria-label="${esc(name)}の下位目標を表示"><span aria-hidden="true">${expanded?'⌄':'›'}</span><small aria-hidden="true">${nested.length}</small></button>`:''}
    </div>
    ${nested.length?`<ul class="hierarchy-children" ${expanded?'':'hidden'}>${nested.map(child=>branch(child,depth+1)).join('')}</ul>`:''}
   </li>`;
@@ -368,6 +368,35 @@ function mapActions(){
   ${node.parentId?`<small>${esc(node.name)}へ</small>`:''}
  </button>`;
 }
+function personalMap(){
+ const selected=selectedMapNode(),path=nodePath(state,selected.id),root=path[0];
+ const galaxies=visibleChildren(state,root.id);
+ const tone=Math.max(0,galaxies.findIndex(node=>node.id===path[1]?.id))%4;
+ const card=(node,depth,style='',active=false)=>{
+  const task=nodeKind(state,node.id)==='action',level=Math.min(depth,LEVELS.length-1);
+  const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):LEVELS[level];
+  return `<button class="map-node ${style}" data-map-select="${esc(node.id)}" ${active?'data-map-active':''} ${node.id===selected.id?'aria-current="true"':''}>
+    <span aria-hidden="true">${hierarchyMarks[level]}</span>
+    <span><small>${label}</small><strong>${esc(node.name)}</strong></span>
+  </button>`;
+ };
+ const overview=mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
+  tone:index%4,card:card(node,1,'',path[1]?.id===node.id)
+ })),{radial:true,label:'宇宙全体の地図'});
+ if(path.length<2)return overview;
+ const children=visibleChildren(state,selected.id);
+ const detailPath=children.length?path:path.slice(0,-1);
+ if(detailPath.length<2)return overview;
+ const parent=detailPath.at(-1),depth=detailPath.length-1;
+ const detail=mapDiagram(card(parent,depth,'map-detail-root'),visibleChildren(state,parent.id).map(node=>({
+  tone,card:card(node,depth+1)
+ })),{label:'選んだ枝の地図'});
+ const trail=detailPath.slice(0,-1).map((node,index)=>`<button data-map-select="${esc(node.id)}">${index?esc(node.name):'全体'}</button>`).join('<span aria-hidden="true">›</span>');
+ return `${overview}<section class="map-subview" aria-label="選んだ枝">
+  <nav class="map-trail" aria-label="マップの階層">${trail}<span aria-hidden="true">›</span><span>${esc(parent.name)}</span></nav>
+  ${detail}
+ </section>`;
+}
 function mindMapPage(){
  const current=recordMode(state,today);
  return `<section class="mind-map" aria-labelledby="mind-map-title">
@@ -376,7 +405,7 @@ function mindMapPage(){
    <h2>今日のモード</h2>
    <div>${['full','busy','rest'].map(key=>`<button data-mode="${key}" data-date="${today}" aria-pressed="${current===key}"><span aria-hidden="true">${MODES[key].icon}</span> ${MODES[key].label}</button>`).join('')}</div>
   </section>
-  <div class="mind-map-scroll">${hierarchyTree(false,true)}</div>
+  <div class="mind-map-scroll">${personalMap()}</div>
   <footer class="mind-map-footer">${mapActions()}</footer>
  </section>`;
 }
@@ -389,13 +418,11 @@ function openMindMap(){
 }
 function selectMapNode(button){
  mapSelection=button.dataset.mapSelect;
- const previous=$('.mind-map [aria-current]');
- previous?.removeAttribute('aria-current');
- previous?.closest('.hierarchy-row').classList.remove('is-current');
- previous?.querySelector('.hierarchy-current')?.remove();
- button.setAttribute('aria-current','true');
- button.closest('.hierarchy-row').classList.add('is-current');
- button.insertAdjacentHTML('beforeend','<span class="hierarchy-current" aria-hidden="true">✓</span>');
+ $('.mind-map-scroll').innerHTML=personalMap();
+ const detail=$('.mind-map .map-subview'),overview=$('.mind-map .map-diagram-overview');
+ const selected=(detail||overview).querySelector('[aria-current="true"]')||overview.querySelector('[aria-current="true"]');
+ selected?.focus({preventScroll:true});
+ (detail||selected)?.scrollIntoView({block:'nearest'});
  $('.mind-map-footer').innerHTML=mapActions();
 }
 function exploreMap(){
@@ -478,10 +505,6 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(b.hasAttribute('data-map-expand')){
   const branches=b.closest('.hierarchy-branch').querySelector(':scope > .hierarchy-children');
   branches.hidden=!branches.hidden;
-  if(b.closest('.mind-map')){
-   if(branches.hidden)mapExpanded.delete(d.mapExpand);
-   else mapExpanded.add(d.mapExpand);
-  }
   b.setAttribute('aria-expanded',String(!branches.hidden));
   b.firstElementChild.textContent=branches.hidden?'›':'⌄';
   return;
@@ -524,7 +547,7 @@ document.addEventListener('dblclick',event=>{
  if(button&&!$('#dialog').open)editor(button.dataset.editTitle);
 });
 document.addEventListener('error',e=>{if(e.target.matches?.('[data-account-photo]'))e.target.remove()},true);
-document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-submit'))return;e.preventDefault();if(e.target.id==='node-form'){const f=new FormData(e.target),id=e.target.dataset.id,previous=structuredClone(state);try{const kind=f.get('node-kind')||'goal',newId=writeGoal(state,{id,name:f.get('name'),purpose:f.get('description'),parentId:id==='new'?(addParent||currentSpace().id):state.nodes.find(n=>n.id===id)?.parentId,kind,...(kind==='action'?readTaskSettings(e.target):{}),symbolName:f.has('symbol-name')?f.get('symbol-name'):undefined});refreshTodayMode();if(!save()){state=previous;return}if(id==='new'&&!exploring){mapSelection=newId;mapExpanded.add(addParent||currentSpace().id)}close();render();if(id==='new')treeScene?.birth(newId);toast(id==='new'?(universeGrowth(previous,today).level===0&&universeGrowth(state,today).level>0?'最初の銀河が誕生し、宇宙に光が灯りました':'新しい天体が誕生しました'):'目標を更新しました')}catch(err){state=previous;toast(err.message)}}if(e.target.id==='preset-form'){
+document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-submit'))return;e.preventDefault();if(e.target.id==='node-form'){const f=new FormData(e.target),id=e.target.dataset.id,previous=structuredClone(state);try{const kind=f.get('node-kind')||'goal',newId=writeGoal(state,{id,name:f.get('name'),purpose:f.get('description'),parentId:id==='new'?(addParent||currentSpace().id):state.nodes.find(n=>n.id===id)?.parentId,kind,...(kind==='action'?readTaskSettings(e.target):{}),symbolName:f.has('symbol-name')?f.get('symbol-name'):undefined});refreshTodayMode();if(!save()){state=previous;return}if(id==='new'&&!exploring)mapSelection=newId;close();render();if(id==='new')treeScene?.birth(newId);toast(id==='new'?(universeGrowth(previous,today).level===0&&universeGrowth(state,today).level>0?'最初の銀河が誕生し、宇宙に光が灯りました':'新しい天体が誕生しました'):'目標を更新しました')}catch(err){state=previous;toast(err.message)}}if(e.target.id==='preset-form'){
  const id=e.target.dataset.id,node=state.nodes.find(n=>n.id===id),previous=structuredClone(state);
  if(!node)return;
  try{

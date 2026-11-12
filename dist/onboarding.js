@@ -1,5 +1,6 @@
 import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
 import {exampleMap, starterMap} from './example-map.js';
+import {mapDiagram} from './mind-map.js';
 
 const guestDraftKey = 'jiku:pending-universe';
 const opening = {
@@ -231,15 +232,16 @@ export function mountOnboarding(host, {
   function showMap(focus, editable) {
     showQuestion(editable ? 'あなたのマインドマップをつくりましょう。' : 'マインドマップのお手本', focus);
     if (!editable) {
+      const hub = `<div class="map-node map-root"><span aria-hidden="true">◎</span><strong>${exampleMap.name}</strong></div>`;
+      const points = exampleMap.branches.map((branch, index) => ({
+        tone: index,
+        card: `<button type="button" class="map-node" data-example-branch="${index}" aria-expanded="false" aria-controls="birth-example-detail">
+          <span aria-hidden="true">◉</span><strong>${branch.name}</strong>
+        </button>`
+      }));
       controls.innerHTML = `<div class="birth-example">
-        <p class="birth-example-root"><span aria-hidden="true">◎</span> ${exampleMap.name}</p>
-        <div class="birth-example-branches">${exampleMap.branches.map((branch, index) => `
-          <details class="birth-example-branch" data-branch-color="${index}">
-            <summary><span aria-hidden="true">◉</span> ${branch.name}</summary>
-            <ul>${branch.goals.map(goal => `<li><strong>${goal.name}</strong>
-              <ul>${goal.tasks.map(([task, minutes]) => `<li><span>${task}</span><small>${minutes}分</small></li>`).join('')}</ul>
-            </li>`).join('')}</ul>
-          </details>`).join('')}</div>
+        ${mapDiagram(hub, points, {radial: true, label: '幸せな人生のマインドマップ'})}
+        <div class="map-subview" id="birth-example-detail" hidden></div>
         <button class="birth-primary" type="button" data-birth="example">宇宙船に乗る <span aria-hidden="true">→</span></button>
       </div>`;
       return;
@@ -268,6 +270,25 @@ export function mountOnboarding(host, {
     </form>`;
     const form = controls.querySelector('form');
     for (const [key, value] of Object.entries(values)) form.elements.namedItem(key).value = value;
+  }
+
+  function showExampleBranch(button) {
+    const index = Number(button.dataset.exampleBranch), branch = exampleMap.branches[index];
+    const detail = controls.querySelector('#birth-example-detail');
+    const alreadyOpen = button.getAttribute('aria-expanded') === 'true';
+    controls.querySelector('[data-example-branch][aria-expanded="true"]')?.setAttribute('aria-expanded', 'false');
+    detail.hidden = alreadyOpen;
+    if (alreadyOpen) return;
+    button.setAttribute('aria-expanded', 'true');
+    const hub = `<div class="map-node map-detail-root"><strong>${branch.name}</strong></div>`;
+    const points = branch.goals.map(goal => ({
+      tone: index,
+      card: `<div class="map-node"><span aria-hidden="true">✦</span><strong>${goal.name}</strong></div>
+        <ul class="map-task-nodes">${goal.tasks.map(([name, minutes]) =>
+          `<li><span>${name}</span><small>${minutes}分</small></li>`).join('')}</ul>`
+    }));
+    detail.innerHTML = mapDiagram(hub, points, {label: branch.name});
+    detail.scrollIntoView({block: 'nearest'});
   }
 
   function chooseGoal(name) {
@@ -374,6 +395,11 @@ export function mountOnboarding(host, {
   }
 
   screen.addEventListener('click', event => {
+    const exampleBranch = event.target.closest('[data-example-branch]');
+    if (exampleBranch) {
+      showExampleBranch(exampleBranch);
+      return;
+    }
     const button = event.target.closest('button');
     const action = button?.dataset.birth;
     const choice = button?.dataset.choice;

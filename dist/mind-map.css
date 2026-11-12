@@ -1,0 +1,138 @@
+.map-diagram {
+  --map-tone:#cbb2f5;
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  justify-items:center;
+  isolation:isolate;
+  gap:24px;
+  width:100%;
+  padding:12px 10px;
+}
+.map-diagram-overview {
+  gap:32px;
+  padding:18px 10px;
+  border:1px solid #b6a4ee26;
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 20% 16%,#b0bafe76 0 1px,transparent 1.6px),
+    radial-gradient(circle at 88% 65%,#bbc3fc75 0 1px,transparent 1.6px),
+    radial-gradient(circle at 73% 21%,#c4adff76 0 1px,transparent 1.5px),
+    radial-gradient(circle at 13% 78%,#9aa8ef70 0 1px,transparent 1.5px),
+    radial-gradient(ellipse at center,#272044 0%,#101226 57%,#090d1b 100%);
+}
+.map-diagram-overview:has(.map-hub:first-of-type:last-child) { padding-block:24px; }
+.map-connections {
+  position:absolute;
+  z-index:-1;
+  inset:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+}
+.map-connections path {
+  stroke:var(--map-tone);
+  stroke-width:1.5;
+  fill:none;
+  opacity:.78;
+}
+.map-diagram [data-map-tone="0"] { --map-tone:#8dd6b2; }
+.map-diagram [data-map-tone="1"] { --map-tone:#a6b6ff; }
+.map-diagram [data-map-tone="2"] { --map-tone:#ec9ec2; }
+.map-diagram [data-map-tone="3"] { --map-tone:#eec284; }
+.map-band {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:stretch;
+  width:min(100%,470px);
+  gap:9px clamp(10px,5vw,38px);
+}
+.map-band:has(> :only-child) { grid-template-columns:minmax(0,1fr); width:min(100%,230px); }
+.map-hub { width:min(100%,255px); }
+.map-point { min-width:0; }
+.map-node {
+  width:100%;
+  min-height:50px;
+  padding:7px clamp(7px,2vw,14px);
+  border:1px solid var(--map-tone);
+  border-color:color-mix(in srgb,var(--map-tone) 60%,#191a2d);
+  border-radius:15px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:7px;
+  background:#15182b;
+  color:#f6efff;
+  text-align:center;
+  line-height:1.4;
+}
+.map-node > [aria-hidden] { flex:none; color:var(--map-tone); font-size:16px; }
+.map-node strong { display:block; font-size:clamp(12px,2.9vw,15px); font-weight:600; overflow-wrap:anywhere; }
+.map-node small { display:block; margin-bottom:2px; color:#bdb8d6; font-size:10px; }
+.map-root {
+  min-height:63px;
+  border-radius:32px;
+  background:linear-gradient(120deg,#3c2b62,#242b50);
+  box-shadow:0 0 25px #a68ce835;
+}
+.map-root strong { font-size:clamp(15px,3.9vw,20px); }
+button.map-node:hover,button.map-node[aria-expanded="true"],button.map-node[data-map-active],button.map-node[aria-current="true"] {
+  border-color:var(--map-tone);
+  background:color-mix(in srgb,var(--map-tone) 19%,#131729);
+}
+button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px solid #e0ccff; outline-offset:2px; }
+.map-subview {
+  margin-top:10px;
+  padding:6px 0 2px;
+  border:1px solid #b6a4ee26;
+  border-radius:18px;
+  background:#0d1121;
+}
+.map-diagram-detail { gap:20px; }
+.map-diagram-detail .map-band { gap:12px; }
+.map-detail-root { min-height:42px; border-radius:24px; }
+.map-trail {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:0 5px;
+  padding:0 9px;
+  color:#d3caed;
+  font-size:11px;
+}
+.map-trail button { min-height:35px; padding-inline:4px; color:#d3c1f5; text-decoration:underline; text-underline-offset:3px; }
+.map-task-nodes { display:grid; gap:7px; margin:0; padding:0 0 0 9px; list-style:none; }
+.map-task-nodes li {
+  position:relative;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:4px;
+  padding:6px 5px;
+  margin-top:7px;
+  border:1px solid #9081ae4f;
+  border-radius:8px;
+  background:#14182a;
+  color:#eee8fa;
+  font-size:11px;
+  line-height:1.45;
+}
+.map-task-nodes li::before {
+  position:absolute;
+  content:"";
+  right:100%;
+  top:-8px;
+  width:5px;
+  height:calc(50% + 8px);
+  border-left:1px solid var(--map-tone);
+  border-bottom:1px solid var(--map-tone);
+  opacity:.75;
+}
+.map-task-nodes small { flex:none; color:var(--map-tone); }
+.birth-example .map-subview { margin-top:0; }
+@media (max-width:420px) {
+  .map-diagram-overview { gap:27px; }
+  .map-node { gap:4px; }
+  .map-node > [aria-hidden] { font-size:13px; }
+}

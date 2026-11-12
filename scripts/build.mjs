@@ -11,7 +11,7 @@ const types={
 const assets={};
 for(const name of [
   'index.html','style.css','app.js','onboarding.js','onboarding-sky.js','origin-framing.js','origin-preview.js','onboarding.css',
-  'model.js','quantity-view.js','tree3d.js','universe.js','universe-model.js','demo.js','example-map.js','three-LICENSE.txt',
+  'model.js','quantity-view.js','tree3d.js','universe.js','universe-model.js','demo.js','example-map.js','mind-map.js','mind-map.css','three-LICENSE.txt',
   'manifest.webmanifest','icons/jiku.svg','icons/jiku-180.png','icons/jiku-192.png','icons/jiku-512.png'
 ]){
   const extension=name.split('.').pop();
