@@ -294,10 +294,22 @@ export function mountOnboarding(host, {
   }
 
   function editNodeButton(node, path, mark, style = '') {
+    const kind = path.includes('.') ? node.kind : '';
     return `<button type="button" class="map-node ${style}" data-birth-edit-node="${path}">
-      <span aria-hidden="true">${mark}</span><strong>${escapeMapText(node.name)}</strong>
+      <span aria-hidden="true">${mark}</span>
+      <span>${kind ? mapKindLabel(kind) : ''}<strong>${escapeMapText(node.name)}</strong></span>
       <span class="birth-map-edit-mark" aria-hidden="true">✎</span>
     </button>`;
+  }
+
+  function mapKindLabel(kind) {
+    const task = kind === 'action';
+    return `<small class="birth-map-kind" data-map-kind="${kind}">${task ? 'タスク' : '目標'}</small>`;
+  }
+
+  function removeNodeButton(node, path) {
+    return `<button type="button" class="birth-map-delete" data-birth-remove-node="${path}"
+      aria-label="${escapeMapText(node.name)}を削除">削除</button>`;
   }
 
   function renderPersonalMap() {
@@ -328,14 +340,20 @@ export function mountOnboarding(host, {
     }
     const points = branch.children.map((node, index) => {
       const path = `${openBranch}.${index}`;
-      return {tone: openBranch % 4, card: node.kind === 'action'
-        ? editNodeButton(node, path, '✦')
-        : `${editNodeButton(node, path, '✦')}
+      const task = node.kind === 'action';
+      return {tone: openBranch % 4, card: `
+        ${editNodeButton(node, path, task ? '✓' : '✦')}
+        <div class="birth-map-point-actions">
+          ${task ? '' : `<button type="button" class="birth-map-add" data-birth-add-node="${path}" data-node-kind="action">＋ タスク</button>`}
+          ${removeNodeButton(node, path)}
+        </div>
+        ${task ? '' : `
           <ul class="map-task-nodes">${node.children.map((task, taskIndex) => `<li>
-            <button type="button" data-birth-edit-node="${path}.${taskIndex}">${escapeMapText(task.name)}</button>
-            <small>${task.daily}分</small>
-          </li>`).join('')}</ul>
-          <button type="button" class="birth-map-add" data-birth-add-node="${path}" data-node-kind="action">＋ タスク</button>`};
+            <button type="button" data-birth-edit-node="${path}.${taskIndex}">
+              ${mapKindLabel('action')}<span>${escapeMapText(task.name)}</span><small>${task.daily}分</small>
+            </button>
+            ${removeNodeButton(task, `${path}.${taskIndex}`)}
+          </li>`).join('')}</ul>`}`};
     });
     detail.innerHTML = `${mapDiagram(editNodeButton(branch, String(openBranch), '◉', 'map-detail-root'), points, {label: '銀河の枝'})}
       <div class="birth-map-add-actions">
@@ -344,14 +362,28 @@ export function mountOnboarding(host, {
       </div>`;
   }
 
+  function showMapPanel(html) {
+    const panel = controls.querySelector('.birth-node-editor');
+    panel.innerHTML = html;
+    panel.hidden = false;
+    controls.querySelector('[data-birth="generate"]').disabled = true;
+    showError('');
+    return panel;
+  }
+
+  function closeMapPanel(panel, button) {
+    panel.hidden = true;
+    controls.querySelector('[data-birth="generate"]').disabled = false;
+    button?.focus();
+  }
+
   function openMapEditor(button) {
     const adding = button.hasAttribute('data-birth-add-node');
     const path = adding ? button.dataset.birthAddNode : button.dataset.birthEditNode;
     const node = adding ? {kind: button.dataset.nodeKind, name: '', daily: 10, weekly: 30} : mapNode(path);
     const galaxy = adding ? !path : Boolean(path) && !path.includes('.');
     const title = node.kind === 'action' ? 'タスク' : galaxy ? '銀河' : path ? '目標' : 'いちばん大きな目標';
-    const editor = controls.querySelector('.birth-node-editor');
-    editor.innerHTML = `<form class="birth-node-form">
+    const editor = showMapPanel(`<form class="birth-node-form">
       <h2>${title}を${adding ? '追加' : '編集'}</h2>
       <label>${title}の名前<input name="name" maxlength="80" required></label>
       ${node.kind === 'action' ? `<div class="birth-map-time">
@@ -359,16 +391,13 @@ export function mountOnboarding(host, {
         <label>週の目標（分）<input name="weekly" type="number" min="1" max="1000000" value="${node.weekly}" required></label>
       </div>` : ''}
       <div class="birth-node-actions">
-        ${!adding && path ? '<button type="button" data-birth="remove-node">外す</button>' : ''}
+        ${!adding && path ? removeNodeButton(node, path) : ''}
         <button type="button" data-birth="cancel-node">キャンセル</button>
         <button type="submit">保存</button>
       </div>
-    </form>`;
+    </form>`);
     const form = editor.querySelector('form');
     form.elements.name.value = node.name;
-    editor.hidden = false;
-    controls.querySelector('[data-birth="generate"]').disabled = true;
-    showError('');
     form.elements.name.focus();
     editor.scrollIntoView({block: 'nearest'});
     form.addEventListener('submit', event => {
@@ -393,17 +422,38 @@ export function mountOnboarding(host, {
     });
     form.elements.name.addEventListener('input', () => form.elements.name.setCustomValidity(''));
     form.querySelector('[data-birth="cancel-node"]').addEventListener('click', () => {
-      editor.hidden = true;
-      controls.querySelector('[data-birth="generate"]').disabled = false;
-      button.focus({preventScroll: true});
+      closeMapPanel(editor, button);
     });
-    form.querySelector('[data-birth="remove-node"]')?.addEventListener('click', () => {
+  }
+
+  function confirmMapRemoval(button) {
+    const path = button.dataset.birthRemoveNode;
+    const node = mapNode(path);
+    const returnTarget = button.closest('.birth-node-editor')
+      ? Array.from(controls.querySelectorAll('[data-birth-edit-node]')).find(card => card.dataset.birthEditNode === path)
+      : button;
+    const panel = showMapPanel(`<div class="birth-node-form">
+      <h2>「${escapeMapText(node.name)}」を削除しますか？</h2>
+      ${node.children?.length ? '<p>この枝の下にある目標とタスクも削除します。</p>' : ''}
+      <div class="birth-node-actions">
+        <button type="button" data-birth-cancel-removal>キャンセル</button>
+        <button type="button" class="birth-map-delete" data-birth-confirm-removal>削除する</button>
+      </div>
+    </div>`);
+    const cancel = panel.querySelector('[data-birth-cancel-removal]');
+    cancel.addEventListener('click', () => closeMapPanel(panel, returnTarget));
+    cancel.focus();
+    panel.scrollIntoView({block: 'nearest'});
+    panel.querySelector('[data-birth-confirm-removal]').addEventListener('click', () => {
       const indices = path.split('.');
       const index = Number(indices.pop());
       mapNode(indices.join('.')).children.splice(index, 1);
       if (!indices.length) openBranch = null;
       persist();
       renderPersonalMap();
+      const destination = controls.querySelector('[data-birth-map-branch][aria-expanded="true"]')
+        || controls.querySelector('[data-birth-add-node]');
+      destination.focus();
     });
   }
 
@@ -418,9 +468,9 @@ export function mountOnboarding(host, {
     const hub = `<div class="map-node map-detail-root"><strong>${branch.name}</strong></div>`;
     const points = branch.goals.map(goal => ({
       tone: index,
-      card: `<div class="map-node"><span aria-hidden="true">✦</span><strong>${goal.name}</strong></div>
+      card: `<div class="map-node"><span aria-hidden="true">✦</span><span>${mapKindLabel('goal')}<strong>${goal.name}</strong></span></div>
         <ul class="map-task-nodes">${goal.tasks.map(([name, minutes]) =>
-          `<li><span>${name}</span><small>${minutes}分</small></li>`).join('')}</ul>`
+          `<li><span>${mapKindLabel('action')}${name}</span><small>${minutes}分</small></li>`).join('')}</ul>`
     }));
     detail.innerHTML = mapDiagram(hub, points, {label: branch.name});
     detail.scrollIntoView({block: 'nearest'});
@@ -550,6 +600,10 @@ export function mountOnboarding(host, {
       }
       if (button.hasAttribute('data-birth-edit-node') || button.hasAttribute('data-birth-add-node')) {
         openMapEditor(button);
+        return;
+      }
+      if (button.hasAttribute('data-birth-remove-node')) {
+        confirmMapRemoval(button);
         return;
       }
       if (action === 'generate') {

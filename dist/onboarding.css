@@ -391,7 +391,30 @@ body.birth-page, body.birth-active {
   gap:8px;
   padding:3px 10px 10px;
 }
-.birth-personal-map .map-point > .birth-map-add { width:100%; margin-top:6px; }
+.birth-screen .birth-map-kind {
+  display:block;
+  margin-bottom:3px;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.15;
+}
+.birth-screen .birth-map-kind[data-map-kind="goal"] { color:#c9b9ff; }
+.birth-screen .birth-map-kind[data-map-kind="action"] { color:#a5e9c9; }
+.birth-map-point-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:5px;
+  margin-top:4px;
+}
+.birth-map-point-actions .birth-map-add { flex:1; min-height:36px; padding:5px 6px; }
+.birth-screen .birth-map-delete {
+  flex:none;
+  min-height:36px;
+  padding:4px 6px;
+  color:#ffc0d1;
+  font-size:11px;
+}
+.birth-screen .birth-map-delete:hover { color:#ffdfeb; background:#512536; border-radius:7px; }
 .birth-personal-map .map-task-nodes button {
   min-height:34px;
   padding:3px 0;
@@ -399,6 +422,9 @@ body.birth-page, body.birth-active {
   color:inherit;
   font-size:inherit;
 }
+.birth-personal-map .map-task-nodes .birth-map-delete { min-height:40px; padding-inline:4px; }
+.birth-personal-map .map-task-nodes [data-birth-edit-node] { flex:1; min-width:0; overflow-wrap:anywhere; }
+.birth-personal-map .map-task-nodes [data-birth-edit-node] > small:last-child { display:block; }
 .birth-personal-map .map-node > .birth-map-edit-mark { font-size:12px; opacity:.72; }
 .birth-node-editor {
   padding:14px;
@@ -408,6 +434,7 @@ body.birth-page, body.birth-active {
 }
 .birth-node-form { display:grid; gap:10px; }
 .birth-node-form h2 { color:#f1e6ff; margin:0; font-size:15px; }
+.birth-node-form p { margin:0; color:#d7cae9; font-size:12px; }
 .birth-node-form label { display:block; color:#cfc1e7; margin:0; font-size:12px; }
 .birth-map-time { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .birth-screen .birth-node-form input {
@@ -432,7 +459,7 @@ body.birth-page, body.birth-active {
   color:#e8dff8;
   font-size:12px;
 }
-.birth-node-actions [data-birth="remove-node"] { margin-right:auto; color:#f0b9cc; }
+.birth-node-actions [data-birth-remove-node] { margin-right:auto; }
 .birth-node-actions [type="submit"] { background:#503875; }
 .birth-example { display:grid; gap:14px; }
 .birth-screen.birth-keyboard[data-map] .birth-content { top:54px; }
