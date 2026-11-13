@@ -726,10 +726,6 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 #dialog #node-form [data-purpose-label],#dialog #node-form [data-node-name-label] { color:#d7c9e7; }
 #dialog #node-form [hidden] { display:none; }
 #dialog #node-form :is([data-routine-schedule],.extra-metric fieldset) { border:0; margin:0; padding:0; min-width:0; }
-#dialog .task-format-picker { display:flex; gap:16px; border:0; margin:16px 0; padding:0; min-width:0; }
-#dialog .task-format-picker legend { margin-bottom:6px; color:#d7c9e7; }
-#dialog .task-format-picker label { display:flex; align-items:center; gap:6px; margin:0; }
-#dialog .task-format-picker input { width:auto; margin:0; accent-color:#b6a1dc; }
 #dialog .task-extra-config { margin:12px 0 0; padding:0; border:0; }
 #dialog [data-extra-list]:not(:empty) { margin-top:10px; }
 .mind-map-header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
@@ -747,3 +743,19 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 .journey-list button strong { overflow-wrap:anywhere; }
 .journey-list button span { flex:none; color:#c4b2d7; font-size:11px; }
 .journey-back { min-height:34px; margin:0 0 9px; }
+
+.task-amount-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.task-amount-heading button { color:#d8c4f5; min-height:36px; padding:3px 0 3px 6px; text-align:right; }
+#dialog .target-calculator:not(details) { padding:8px; border:1px solid #77649370; border-radius:9px; }
+.map-insertion {
+ --map-tone:#cbb6ff;
+ border:1px dashed #d4bbff; background:#26213b;
+ box-shadow:inset 0 0 0 1px #a287d547;
+ animation:map-insertion-pulse 1.35s ease-in-out 4;
+}
+@keyframes map-insertion-pulse {
+ 50% { border-color:#ffe9ff; background:#44315d; box-shadow:inset 0 0 12px #cba2ff62; }
+}
+@media (prefers-reduced-motion:reduce) {
+ .map-insertion { animation:none; }
+}

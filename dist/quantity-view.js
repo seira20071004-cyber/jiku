@@ -6,8 +6,7 @@ function minuteInput(label,name,value='',required=true){
  return `<label>${label}<span class="task-week-target-entry"><input type="number" inputmode="decimal" name="${name}" min="0.001" max="1000000" step="any" ${required?'required':''} value="${esc(value??'')}" aria-label="${label}"><span>分</span></span></label>`;
 }
 function targetCalculator({time=false,total=null}={}){
- return `<details class="target-calculator">
-  <summary>逆算して計算する</summary>
+ return `${time?'<div id="time-plan-calculator" class="target-calculator" hidden>':'<details class="target-calculator"><summary>逆算して計算する</summary>'}
   <p>今日から期限まで、毎日均等に取り組む場合の目安です。</p>
   <div class="task-target-grid">
    <label>${time?'上位目標に必要な時間（分）':'上位目標に必要な量'}<input data-calc-total type="number" inputmode="decimal" step="any" value="${esc(total??'')}"></label>
@@ -16,14 +15,16 @@ function targetCalculator({time=false,total=null}={}){
   <div class="target-calculator-actions"><button type="button" data-calculate-target>計算する</button>
    <button type="button" data-apply-target hidden>目標に反映</button></div>
   <output data-calc-result aria-live="polite"></output>
- </details>`;
+ ${time?'</div>':'</details>'}`;
 }
 function weeklyTargetForEdit(m){
  return m.weeklyTarget??(m.monthlyTarget!=null&&m.totalTarget==null?Number((m.monthlyTarget*12/52).toFixed(6)):null);
 }
 function quantitySettingsFields(m){
  return `<section class="task-amount-config" data-target-fields="time">
-  <h3>目標時間</h3>
+  <div class="task-amount-heading"><h3>目標時間</h3>
+   <button type="button" class="text-button" data-toggle-time-plan aria-expanded="false" aria-controls="time-plan-calculator">逆算して計画する</button>
+  </div>
   <div class="task-target-grid task-target-three">
    ${minuteInput('全体の目標時間','total-minutes',m.totalTarget,false)}
    ${minuteInput('1週間の目標時間','weekly-minutes',weeklyTargetForEdit(m),false)}
@@ -55,22 +56,16 @@ function extraRecordFields(metrics=[],amounts=[]){
 export function taskLevelFields(a,name='task-level'){const selected=taskLevel(a),options=[{value:'full',title:'余裕がある日だけ',days:['full']},{value:'busy',title:'忙しい日も',days:['full','busy']},{value:'rest',title:'毎日取り組む',days:['full','busy','rest']}];return `<fieldset class="task-schedule-config"><legend>どんな日に取り組みますか？</legend><p class="task-setting-caption">1つ選ぶと、対象の日が自動で決まります。</p><div class="task-schedule-options">${options.map(o=>`<label class="task-schedule-option"><input type="radio" required name="${esc(name)}" value="${o.value}" ${selected===o.value?'checked':''}><span class="task-schedule-copy"><strong>${o.title}</strong><span class="task-day-tags">${o.days.map(d=>`<span>${MODES[d].icon} ${MODES[d].label}</span>`).join('')}</span></span><span class="task-schedule-check" aria-hidden="true">✓</span></label>`).join('')}</div><p class="task-fixed-note">どの日も、設定した量は同じです。</p></fieldset>`}
 export function taskSettingsFields(s,id){
  const action=setting(s,id),event=isEventTask(action),m=timeMeasurement(action.measurement||{unit:'minutes'});
- const completed=Boolean(eventCompletionDate(s,id));
- const format=event?'event':'routine';
- return `<fieldset class="task-format-picker"><legend>取り組み方</legend>
-  <label><input type="radio" name="task-format" value="routine" ${event?'':'checked'} ${completed?'disabled':''}> 繰り返す</label>
-  <label><input type="radio" name="task-format" value="event" ${event?'checked':''}> 1回のイベント</label>
- </fieldset>
- <fieldset data-routine-fields ${event?'hidden disabled':''}>${quantitySettingsFields(m)}</fieldset>
- <fieldset data-event-fields ${event?'':'hidden disabled'}>
+ return `${event?`
+  <input type="hidden" name="task-format" value="event">
   <label>イベントの日付（任意）<input type="date" name="event-date" value="${esc(action.eventDate||'')}"></label>
   ${minuteInput('取り組む予定の時間','event-minutes',m.dailyAmount)}
- </fieldset>
+ `:quantitySettingsFields(m)}
  <section class="task-extra-config">
   <button type="button" class="text-button add-extra-unit" data-add-extra>＋ 別の単位でも記録する</button>
   <div data-extra-list>${(m.extras||[]).filter(metric=>metric.dailyAmount!=null).map(metric=>extraMetricFields(metric,event)).join('')}</div>
  </section>
- <fieldset data-routine-schedule ${format==='event'?'hidden disabled':''}>${taskLevelFields(action)}</fieldset>`;
+ ${event?'':taskLevelFields(action)}`;
 }
 export function eventPanel(s,id,date,today){
  const node=s.nodes.find(n=>n.id===id),action=setting(s,id),done=eventCompletionDate(s,id);

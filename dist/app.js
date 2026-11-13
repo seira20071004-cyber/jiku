@@ -45,17 +45,18 @@ async function toggleAppAudio(){
  }finally{appAudioChanging=false;}
 }
 function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3500)}
-function modal(html,{mapId=null}={}){
+function modal(html,{mapId=null,addition=null}={}){
  const dialog=$('#dialog');
  dialog.classList.toggle('map-editor-dialog',Boolean(mapId));
  dialog.innerHTML=mapId?`<div class="map-editor-layout">
-  <section class="map-editor-preview" aria-label="編集中のマインドマップ">${personalMap({selection:mapId,preview:true})}</section>
+  <section class="map-editor-preview" aria-label="編集中のマインドマップ"
+   ${addition?`data-add-parent="${esc(mapId)}" data-add-kind="${esc(addition)}"`:''}>${personalMap({selection:mapId,preview:true,addition:addition&&{parent:mapId,kind:addition}})}</section>
   <section class="map-editor-fields">${html}</section>
  </div>`:html;
  if(!dialog.open)dialog.showModal();
  if(mapId){
   const preview=dialog.querySelector('.map-editor-preview');
-  const card=preview.querySelector('[aria-current="true"]');
+  const card=preview.querySelector('.map-insertion')||preview.querySelector('[aria-current="true"]');
   if(card)preview.scrollTop=Math.max(0,card.getBoundingClientRect().top-preview.getBoundingClientRect().top-16);
  }else dialog.querySelector('[autofocus]')?.focus();
 }
@@ -517,14 +518,28 @@ function mapActions(){
   <button data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
  </div>`;
 }
-function personalMap({selection=mapSelection,preview=false}={}){
+function personalMap({selection=mapSelection,preview=false,addition=null}={}){
  const selected=state.nodes.find(node=>node.id===selection)||state.nodes.find(node=>node.parentId===null);
  const branchId=preview?'editor-map-branch':'home-map-branch';
  const path=nodePath(state,selected.id),root=path[0];
- const galaxies=visibleChildren(state,root.id);
+ const childrenFor=id=>{
+  const children=visibleChildren(state,id);
+  if(addition?.parent===id){
+   // A new node has the default order of zero until it is reordered.
+   const firstLater=children.findIndex(child=>child.order>0);
+   children.splice(firstLater<0?children.length:firstLater,0,{insertion:true});
+  }
+  return children;
+ };
+ const galaxies=childrenFor(root.id);
  const branchRoot=path[1];
  const tone=galaxies.findIndex(node=>node.id===branchRoot?.id)%4;
  const card=(node,depth,style='',overview=false)=>{
+  if(node.insertion){
+   const label=addition.kind==='action'?'新しいタスク':'新しい目標';
+   return `<div class="map-node map-insertion ${style}" role="status"><span aria-hidden="true">＋</span>
+    <span><small>ここに追加</small><strong>${label}</strong></span></div>`;
+  }
   const task=nodeKind(state,node.id)==='action',level=Math.min(depth,LEVELS.length-1);
   const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):'';
   return `<button class="map-node ${style}" data-map-select="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''}
@@ -542,14 +557,15 @@ function personalMap({selection=mapSelection,preview=false}={}){
  })),{radial:true,label:'マインドマップ全体'});
  if(!branchRoot)return overview+`<div id="${branchId}" hidden></div>`;
  function branch(node,depth){
-  const children=visibleChildren(state,node.id);
+  if(node.insertion)return `<li>${card(node,depth,'map-branch-row')}</li>`;
+  const children=childrenFor(node.id);
   const kind=nodeKind(state,node.id)==='action'?'task':'goal';
   return `<li class="map-branch-${kind}">
    ${card(node,depth,'map-branch-row')}
    ${children.length?`<ul>${children.map(child=>branch(child,depth+1)).join('')}</ul>`:''}
   </li>`;
  }
- const children=visibleChildren(state,branchRoot.id);
+ const children=childrenFor(branchRoot.id);
  const lanes=children.length>1?[children.filter((_,i)=>i%2===0),children.filter((_,i)=>i%2===1)]:[children];
  return `${overview}<section id="${branchId}" class="map-subview map-galaxy-view" aria-labelledby="${branchId}-name" data-map-tone="${tone}">
   <header class="map-branch-header"><span aria-hidden="true">◉</span><h2 id="${branchId}-name">${esc(branchRoot.name)}</h2></header>
@@ -777,7 +793,7 @@ function openNode(id){enterSpace(id)}
 function openPreset(id){editor(id)}
 function modePicker(){modal(modePickerContent(state,today))}
 function readExtraSettings(form){
- const event=form.querySelector('[name=task-format]:checked')?.value==='event';
+ const event=form.elements.namedItem('task-format')?.value==='event';
  return [...form.querySelectorAll('[data-extra-metric]')].map(card=>{
   const value=name=>card.querySelector(`[name="${name}"]`)?.value||'';
   const amount=name=>value(name)?Number(value(name)):null;
@@ -806,18 +822,17 @@ function chooseLeaf(key){const available=leaves(state).filter(n=>nodeKind(state,
 let addParent=null,creationDraft=null;
 function chooseCreationType(parent){addParent=parent;const depth=nodeDepth(state,parent)+1;if(depth>4){toast('目標は宇宙から衛星までの5階層です');return}const label=LEVELS[depth];modal(`<div class="dialog-title"><h2>${label}を追加</h2><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><div class="creation-type-options"><button data-create-kind="goal"><span class="creation-type-icon">✧</span><strong>目標</strong><small>達成したいこと。<br>あとから細かく分解できます。</small><span class="creation-type-arrow">→</span></button><button data-create-kind="action"><span class="creation-type-icon">✓</span><strong>タスク</strong><small>目標に向けて取り組む行動。</small><span class="creation-type-arrow">→</span></button></div>`,{mapId:view==='tree'&&!guideSession?parent:null})}
 
-function editor(id,creationKind=null){const isNew=id==='new',parent=addParent||currentSpace().id,n=isNew?{name:'',description:'',parentId:parent}:state.nodes.find(n=>n.id===id);if(!n)return;if(isNew&&!['goal','action'].includes(creationKind)){chooseCreationType(parent);return}const isRoot=!isNew&&!n.parentId,hasChildren=!isNew&&visibleChildren(state,id).length>0,kind=isNew?creationKind:nodeKind(state,id),depth=isNew?nodeDepth(state,parent)+1:nodeDepth(state,id);if(isNew&&depth>4){toast('目標は宇宙から衛星までの5階層です');return}modal(`<form id="node-form" data-id="${esc(id)}"><div class="dialog-title"><div><div class="eyebrow">${LEVELS[Math.min(depth,4)]}</div><h2>${isNew?(kind==='action'?'タスクを設定':'目標を設定'):isRoot?'宇宙を編集':'目標・タスクを編集'}</h2></div><button type="button" data-do="close" class="round-button" aria-label="閉じる">×</button></div><label><span data-node-name-label>${kind==='action'?'タスク名':'目標名'}</span><input required maxlength="80" name="name" value="${esc(n.name)}" placeholder="目指したいことを、自分の言葉で"></label><label><span data-purpose-label>${kind==='action'?'上位目標につながる理由':'この目標にした目的'}</span><textarea name="description" required maxlength="1000" rows="2" placeholder="取り組む理由を、自分の言葉で">${esc(n.description||'')}</textarea></label>${!isRoot?`<input type="hidden" name="parent" value="${esc(n.parentId)}"><div class="goal-parent-context"><span>繋がっている上位目標</span><strong>${esc(state.nodes.find(p=>p.id===n.parentId)?.name||'')}</strong></div>`:''}${isNew?`<input type="hidden" name="node-kind" value="${kind}"><button type="button" class="creation-type-back" data-create-back>← タイプを選び直す</button>`:!isRoot?`<fieldset class="goal-kind-picker"><legend>目標／タスク</legend><label><input type="radio" name="node-kind" value="goal" ${kind==='goal'?'checked':''} required><span><strong>目標</strong><small>さらに分解していくもの</small></span></label><label><input type="radio" name="node-kind" value="action" ${kind==='action'?'checked':''} ${hasChildren?'disabled':''} required><span><strong>タスク</strong><small>実際に取り組むタスク</small></span></label></fieldset>`:''}<fieldset class="goal-action-fields" ${kind==='action'?'':'hidden disabled'}>${taskSettingsFields(state,id)}</fieldset>${depth===1?`<details class="cosmic-advanced-settings"><summary>詳細設定</summary><label>ブラックホールの名前<input name="symbol-name" maxlength="80" value="${esc(n.symbolName||n.name)}" placeholder="省略すると銀河名になります"></label></details>`:''}${hasChildren?'<p class="footnote">下位目標があるため、目標として扱います。</p>':''}<div class="dialog-actions">${!isNew&&!isRoot?`<button type="button" class="danger text-button" data-delete="${esc(id)}">削除</button>`:''}${!isNew?`<button type="button" class="text-button" data-space-stats="${esc(id)}">統計を見る</button>`:''}<button class="primary" type="submit">${isNew?'誕生させる':'保存する'}</button></div>${!isNew&&kind==='action'?`<button type="button" class="text-button record-adjust-button" data-record-leaf="${esc(id)}">${isEventTask(setting(state,id))?'イベントの完了を記録':'今日の記録を調整'}</button>`: ''}</form>`,{mapId:view==='tree'&&!guideSession?(isNew?parent:id):null});if(isNew&&creationDraft){
+function editor(id,creationKind=null){const isNew=id==='new',parent=addParent||currentSpace().id,n=isNew?{name:'',description:'',parentId:parent}:state.nodes.find(n=>n.id===id);if(!n)return;if(isNew&&!['goal','action'].includes(creationKind)){chooseCreationType(parent);return}const isRoot=!isNew&&!n.parentId,hasChildren=!isNew&&visibleChildren(state,id).length>0,kind=isNew?creationKind:nodeKind(state,id),depth=isNew?nodeDepth(state,parent)+1:nodeDepth(state,id);if(isNew&&depth>4){toast('目標は宇宙から衛星までの5階層です');return}modal(`<form id="node-form" data-id="${esc(id)}"><div class="dialog-title"><div><div class="eyebrow">${LEVELS[Math.min(depth,4)]}</div><h2>${isNew?(kind==='action'?'タスクを設定':'目標を設定'):isRoot?'宇宙を編集':'目標・タスクを編集'}</h2></div><button type="button" data-do="close" class="round-button" aria-label="閉じる">×</button></div><label><span data-node-name-label>${kind==='action'?'タスク名':'目標名'}</span><input required maxlength="80" name="name" value="${esc(n.name)}" placeholder="目指したいことを、自分の言葉で"></label><label><span data-purpose-label>${kind==='action'?'上位目標につながる理由':'この目標にした目的'}</span><textarea name="description" required maxlength="1000" rows="2" placeholder="取り組む理由を、自分の言葉で">${esc(n.description||'')}</textarea></label>${!isRoot?`<input type="hidden" name="parent" value="${esc(n.parentId)}"><div class="goal-parent-context"><span>繋がっている上位目標</span><strong>${esc(state.nodes.find(p=>p.id===n.parentId)?.name||'')}</strong></div>`:''}${isNew?`<input type="hidden" name="node-kind" value="${kind}"><button type="button" class="creation-type-back" data-create-back>← タイプを選び直す</button>`:!isRoot?`<fieldset class="goal-kind-picker"><legend>目標／タスク</legend><label><input type="radio" name="node-kind" value="goal" ${kind==='goal'?'checked':''} required><span><strong>目標</strong><small>さらに分解していくもの</small></span></label><label><input type="radio" name="node-kind" value="action" ${kind==='action'?'checked':''} ${hasChildren?'disabled':''} required><span><strong>タスク</strong><small>実際に取り組むタスク</small></span></label></fieldset>`:''}<fieldset class="goal-action-fields" ${kind==='action'?'':'hidden disabled'}>${taskSettingsFields(state,id)}</fieldset>${depth===1?`<details class="cosmic-advanced-settings"><summary>詳細設定</summary><label>ブラックホールの名前<input name="symbol-name" maxlength="80" value="${esc(n.symbolName||n.name)}" placeholder="省略すると銀河名になります"></label></details>`:''}${hasChildren?'<p class="footnote">下位目標があるため、目標として扱います。</p>':''}<div class="dialog-actions">${!isNew&&!isRoot?`<button type="button" class="danger text-button" data-delete="${esc(id)}">削除</button>`:''}${!isNew?`<button type="button" class="text-button" data-space-stats="${esc(id)}">統計を見る</button>`:''}<button class="primary" type="submit">${isNew?'誕生させる':'保存する'}</button></div>${!isNew&&kind==='action'?`<button type="button" class="text-button record-adjust-button" data-record-leaf="${esc(id)}">${isEventTask(setting(state,id))?'イベントの完了を記録':'今日の記録を調整'}</button>`: ''}</form>`,{mapId:view==='tree'&&!guideSession?(isNew?parent:id):null,addition:isNew?kind:null});if(isNew&&creationDraft){
  const form=$('#node-form');
  for(const [key,value] of Object.entries(creationDraft)){
-  if(key==='node-kind'||key==='extras')continue;
+  if(['node-kind','extras','task-format'].includes(key))continue;
   const input=form.elements.namedItem(key);
   if(input instanceof RadioNodeList){input.value=value;}
   else if(input&&input.type!=='radio')input.value=value;
  }
  const list=form.querySelector('[data-extra-list]');
- const event=form.querySelector('[name=task-format]:checked')?.value==='event';
+ const event=form.elements.namedItem('task-format')?.value==='event';
  if(list)list.innerHTML=(creationDraft.extras||[]).map(metric=>extraMetricFields(metric,event)).join('');
- syncTaskFormat(form);
 }}
 function review(){const ws=weekStart(today),end=shiftDate(ws,6),s=stats(state,ws,end),r=state.reviews[ws]||{},effective=shiftDate(ws,7);modal(`<form id="review-form"><div class="dialog-title"><div><div class="eyebrow">WEEKLY REFLECTION</div><h2>今週の自分と、話そう。</h2></div><button type="button" data-do="close" class="round-button" aria-label="閉じる">×</button></div><p class="muted">${ws.replaceAll('-','/')} — ${end.replaceAll('-','/')}</p><div class="review-summary">${Object.entries(s.counts).map(([k,c])=>`<div><span style="color:${MODES[k].color}">${MODES[k].icon}</span><strong>${c}日</strong><small>${MODES[k].label}</small></div>`).join('')}</div><h3>今週、取り組んだタスク</h3><p class="muted">${s.logs.length} 回の実行記録</p>${Object.entries(s.logs.reduce((o,l)=>(o[l.name]=(o[l.name]||0)+1,o),{})).map(([n,c])=>`<p class="review-log">♧ ${esc(n)} <b>${c}回</b></p>`).join('')}<label>無理があったこと・気づいたこと<textarea name="note" rows="3" placeholder="今週の自分に、どんな言葉をかけたい？">${esc(r.note||'')}</textarea></label><label>来週、大切にしたいこと<textarea name="next" rows="2" placeholder="小さく、具体的な一歩を書いてみよう。">${esc(r.next||'')}</textarea></label><h3>来週のタスクプラン</h3><p class="footnote">${effective.replaceAll('-','/')}（月）から反映。過去の記録はそのまま残ります。</p>${leaves(state).filter(n=>nodeKind(state,n.id)==='action').map(n=>{const a=state.pending.find(p=>p.id===n.id&&p.effective===effective)?.setting||setting(state,n.id);return `<fieldset class="review-setting" data-review-node="${esc(n.id)}"><legend>${esc(n.name)}</legend>${taskLevelFields(a,'review-level-'+n.id)}</fieldset>`}).join('')}<div class="dialog-actions"><button class="primary">レビューを保存</button></div></form>`)}
 function switchDemo(enabled){const url=new URL(location.href);if(enabled)url.searchParams.set('demo','1');else url.searchParams.delete('demo');url.searchParams.delete('preview');location.assign(url)}
@@ -827,6 +842,12 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(b.hasAttribute('data-map-exit')){endMapPreview();return}
  if(b.hasAttribute('data-map-back')||d.view==='tree'){e.preventDefault();appAudio?.cue?.('navigate');openMindMap();return}
  if(d.do==='analysis-conditions'){appAudio?.cue?.('navigate');analysisConditions();return}
+ if(b.hasAttribute('data-toggle-time-plan')){
+  const calculator=b.closest('[data-target-fields]').querySelector('.target-calculator');
+  calculator.hidden=!calculator.hidden;
+  b.setAttribute('aria-expanded',String(!calculator.hidden));
+  return;
+ }
  if(b.hasAttribute('data-calculate-target')||b.hasAttribute('data-apply-target')){
   const box=b.closest('.target-calculator'),fields=box.closest('[data-target-fields]'),time=fields.dataset.targetFields==='time';
   const output=box.querySelector('output'),apply=box.querySelector('[data-apply-target]');
@@ -876,7 +897,8 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
    const expanded=b.getAttribute('aria-expanded')==='true';
    const selection=expanded?null:d.mapSelect;
    const top=preview.scrollTop;
-   preview.innerHTML=personalMap({selection,preview:true});
+   const {addParent,addKind}=preview.dataset;
+   preview.innerHTML=personalMap({selection,preview:true,addition:addParent?{parent:addParent,kind:addKind}:null});
    const current=preview.querySelector('[aria-current="true"]');
    preview.scrollTop=top;
    current?.focus({preventScroll:true});
@@ -914,7 +936,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(b.hasAttribute('data-add-extra')){
   const form=b.closest('form'),list=form.querySelector('[data-extra-list]');
   if(list.children.length>=12){toast('追加できる単位は12種類までです');return}
-  list.insertAdjacentHTML('beforeend',extraMetricFields({},form.querySelector('[name=task-format]:checked')?.value==='event'));
+  list.insertAdjacentHTML('beforeend',extraMetricFields({},form.elements.namedItem('task-format')?.value==='event'));
   list.lastElementChild.querySelector('select').focus();
   return;
  }
@@ -995,25 +1017,7 @@ document.addEventListener('input',e=>{
  box.querySelector('[data-apply-target]').hidden=true;
  box.querySelector('output').textContent='';
 });
-function syncTaskFormat(form){
- const event=form.querySelector('[name=task-format]:checked')?.value==='event';
- for(const fieldset of form.querySelectorAll('[data-routine-fields],[data-routine-schedule],[data-event-fields]')){
-  fieldset.disabled=fieldset.hidden=fieldset.hasAttribute('data-event-fields')?!event:event;
- }
- for(const element of form.querySelectorAll('[data-repeat-metric]')){
-  element.hidden=event;
-  const input=element.querySelector('input');
-  if(element.tagName==='FIELDSET')element.disabled=event;
-  else if(input)input.disabled=event;
- }
-}
-document.addEventListener('change',async e=>{if(e.target.name==='task-format'){
- const form=e.target.form,event=e.target.value==='event';
- const next=form.elements.namedItem(event?'event-minutes':'daily-minutes');
- const previous=form.elements.namedItem(event?'daily-minutes':'event-minutes');
- if(!next.value)next.value=previous.value;
- syncTaskFormat(form);
- }if(e.target.name==='node-kind'){
+document.addEventListener('change',async e=>{if(e.target.name==='node-kind'){
  const form=e.target.closest('form'),box=form.querySelector('.goal-action-fields'),active=e.target.value==='action';
  box.hidden=box.disabled=!active;
  form.querySelector('[data-node-name-label]').textContent=active?'タスク名':'目標名';
