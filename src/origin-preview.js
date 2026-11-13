@@ -40,7 +40,7 @@ export function mountOriginPreview(host, motion, {strength=1}={}) {
  }
  function animate(time){
   frame=requestAnimationFrame(animate);
-  if(!document.hidden&&!motion.matches&&(!screen||screen.matches('[data-forming], [data-chat]'))&&time-last>=32){
+  if(!document.hidden&&!motion.matches&&(!screen||screen.matches('[data-stage="bang"], [data-chat]'))&&time-last>=32){
    last=time;
    draw(time);
   }

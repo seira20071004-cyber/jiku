@@ -1,4 +1,4 @@
-import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
+import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, startBirthSky} from './onboarding-sky.js';
 import {exampleMap, starterMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 import {createPortalWarp, mountOriginPreview} from './origin-preview.js';
@@ -56,22 +56,22 @@ const legacyFocusBarriers = ['motivation', 'unclear', 'distractions', 'busy'];
 const focusOptions = {
   unclear: {
     label: '最初の一歩が決まらず、計画を練り直してしまう',
-    reply: 'いつ、何をするかまで決めると、行動に移りやすくなることが研究されています。',
+    reply: 'いつ、何をするかまで決めると、\n行動に移りやすくなることが研究されています。',
     study: ['Webb & Sheeran（2007）', 'https://www.sciencedirect.com/science/article/pii/S002210310600028X']
   },
   notifications: {
     label: 'スマホの通知で気がそれる',
-    reply: 'スマホに触らなくても、通知を受け取るだけで、注意が必要な作業に影響が出た実験があります。',
+    reply: 'スマホに触らなくても、通知を受け取るだけで、\n注意が必要な作業に影響が出た実験があります。',
     study: ['Stothart ほか（2015）', 'https://pubmed.ncbi.nlm.nih.gov/26121498/']
   },
   switching: {
     label: '別の用事に切り替えると、前の作業が気になる',
-    reply: '作業を切り替えたあとも、前の作業に注意が残ることが実験で示されています。',
+    reply: '作業を切り替えたあとも、\n前の作業に注意が残ることが実験で示されています。',
     study: ['Leroy（2009）', 'https://www.sciencedirect.com/science/article/pii/S0749597809000399']
   },
   sleep: {
     label: '寝不足の日は注意が途切れやすい',
-    reply: '睡眠をとらない時間が続くと、注意が途切れやすくなることが、複数の実験で報告されています。',
+    reply: '睡眠をとらない時間が続くと、\n注意が途切れやすくなることが、複数の実験で報告されています。',
     study: ['Lim & Dinges（2010）', 'https://pubmed.ncbi.nlm.nih.gov/20438143/']
   }
 };
@@ -170,7 +170,7 @@ export function mountOnboarding(host, {
   const viewport = window.visualViewport;
   const events = new AbortController();
   const {signal} = events;
-  let step, timer, formingTimer, sky, saving = false;
+  let step, timer, sky, saving = false;
   let openBranch = null;
   let disposeOrigin, warp, flightFrame, demoMode = draft.recordedMode;
   let reportPeriod = 'quantity';
@@ -289,27 +289,27 @@ export function mountOnboarding(host, {
       ['あなたの宇宙が、今、誕生しました。', 'birth-emphasis'],
       ['この宇宙は、あなたの人生を映す場所です。', 'birth-reply'],
       ['これから、この宇宙を少しずつ育てていきましょう。', 'birth-reply'],
-      ['目の前のことに集中することが、目標達成への近道になります。', 'birth-emphasis'],
-      ['例えば、英語を話せるようになりたい2人に、今夜30分ずつ時間があります。', 'birth-reply'],
-      ['Aさんは、教材を探したり勉強の予定を組み直したりしているうちに、30分が過ぎました。', 'birth-reply'],
-      ['Bさんは、短い会話を1つ選び、残りの時間は声に出して練習しました。', 'birth-reply']
+      ['目の前のことに集中することが、\n目標達成への近道になります。', 'birth-emphasis'],
+      ['例えば、英語を話せるようになりたい2人に、\n今夜30分ずつ時間があります。', 'birth-reply'],
+      ['Aさんは、教材を探したり\n勉強の予定を組み直したりしているうちに、\n30分が過ぎました。', 'birth-reply'],
+      ['Bさんは、短い会話を1つ選び、\n残りの時間は声に出して練習しました。', 'birth-reply']
     ], shouldFocus => {
-      showQuestion('今夜、英語を話す練習を進められたのはどちらでしょう？', shouldFocus);
+      showQuestion('今夜、英語を話す練習を\n進められたのはどちらでしょう？', shouldFocus);
       choiceControls([['a', 'Aさん · 教材と予定を見直した'], ['b', 'Bさん · 会話を声に出して練習した']], '今夜の練習を進められた人');
     }, focus);
   }
 
   function showFocusQuestion(focus, answer) {
     const ask = shouldFocus => {
-      showQuestion('やりたいことがあるのに、集中が途切れたり、手が止まったりするのはどんなときですか？', shouldFocus);
+      showQuestion('やりたいことがあるのに、\n集中が途切れたり、手が止まったりするのは\nどんなときですか？', shouldFocus);
       choiceControls([...Object.entries(focusOptions).map(([id, option]) => [id, option.label]), ['own', '自分の言葉で答える']], '自分に近い場面');
       controls.insertAdjacentHTML('beforeend', '<button type="button" class="birth-quiet birth-edit" data-birth="skip-answer">まだわからない</button>');
     };
     if (!answer) return ask(focus);
     showSequence([
-      [answer === 'a' ? 'Aさんは教材と予定を整えました。実際に声を出すところまで進んだのはBさんです。' : 'Bさんは、短い会話を実際に声に出すところまで進めましたね。', 'birth-reply'],
-      ['計画で最初の一歩を決めたら、その一歩に集中する時間を取りましょう。', 'birth-emphasis'],
-      ['やることが決まっていても、手が止まったり、集中が途切れたりすることがあります。', 'birth-reply']
+      [answer === 'a' ? 'Aさんは教材と予定を整えました。\n実際に声を出すところまで進んだのはBさんです。' : 'Bさんは、短い会話を実際に\n声に出すところまで進めましたね。', 'birth-reply'],
+      ['計画で最初の一歩を決めたら、\nその一歩に集中する時間を取りましょう。', 'birth-emphasis'],
+      ['やることが決まっていても、\n手が止まったり、集中が途切れたりすることがあります。', 'birth-reply']
     ], ask, focus);
   }
 
@@ -325,16 +325,16 @@ export function mountOnboarding(host, {
       </div>`;
       return;
     }
-    showMotivation(focus, draft.concentration ? `「${draft.concentration}」。そういうときは、手が止まることもありますよね。` : '');
+    showMotivation(focus, draft.concentration ? `「${draft.concentration}」。\nそういうときは、手が止まることもありますよね。` : '');
   }
 
   function showMotivation(focus, reply = '') {
     showSequence([
       ...(reply ? [[reply, 'birth-reply']] : []),
       ['行動を続ける支えの一つが、モチベーションです。', 'birth-emphasis'],
-      ['例えば、どうしても合格したい試験があれば、SNSを見る時間を決めて、勉強の時間をつくる人もいます。', 'birth-reply'],
-      ['達成したいという気持ちがあると、目の前の時間の使い方も変わります。', 'birth-reply'],
-      ['目標に向けて集中を続けるために、自分が取り組む理由を大切にしましょう。', 'birth-emphasis']
+      ['例えば、どうしても合格したい試験があれば、\nSNSを見る時間を決めて、\n勉強の時間をつくる人もいます。', 'birth-reply'],
+      ['達成したいという気持ちがあると、\n目の前の時間の使い方も変わります。', 'birth-reply'],
+      ['目標に向けて集中を続けるために、\n自分が取り組む理由を大切にしましょう。', 'birth-emphasis']
     ], shouldFocus => enter('goal', {focus: shouldFocus}), focus);
   }
 
@@ -342,10 +342,10 @@ export function mountOnboarding(host, {
     const prompts = {
       concentration: ['なぜ集中が続かないと思いますか？', '例　スマホが気になってしまう', 'explain'],
       goal: ['あなたが達成したい目標は何ですか？', '例　無理なく運動を続けたい', 'reason'],
-      reason: [`「${draft.goal}」を、何のために達成したいですか？`, '例　休日に元気に出かけたい', 'reason-two'],
-      'reason-two': [`「${draft.reason}」。では、それは何のためでしょうか？`, '例　家族と出かける時間を増やしたい', 'reason-three'],
-      'reason-three': [`「${draft.reasonTwo}」を実現できたら、どんなことを得たいですか？`, '例　家族と楽しい思い出をつくりたい', 'meaning'],
-      values: [`「${draft.reason}」の先に、どんな日々が増えたら幸せだと思いますか？`, '例　大切な人と元気に過ごしたい', 'meaning']
+      reason: [`「${draft.goal}」を、\n何のために達成したいですか？`, '例　休日に元気に出かけたい', 'reason-two'],
+      'reason-two': [`「${draft.reason}」。\nでは、それは何のためでしょうか？`, '例　家族と出かける時間を増やしたい', 'reason-three'],
+      'reason-three': [`「${draft.reasonTwo}」を実現できたら、\nどんなことを得たいですか？`, '例　家族と楽しい思い出をつくりたい', 'meaning'],
+      values: [`「${draft.reason}」の先に、\nどんな日々が増えたら幸せだと思いますか？`, '例　大切な人と元気に過ごしたい', 'meaning']
     };
     const [question, placeholder, next] = prompts[key];
     showQuestion(question, focus);
@@ -363,7 +363,7 @@ export function mountOnboarding(host, {
     </form>${key === 'goal' ? '<p class="birth-map-caption">大きな目標でも、小さな目標でも構いません。</p>' : ''}
     <button type="button" class="birth-quiet birth-edit" data-birth="skip-answer">まだ思いつかない</button>`;
     const form = controls.querySelector('form');
-    form.elements.answer.setAttribute('aria-label', question);
+    form.elements.answer.setAttribute('aria-label', question.replaceAll('\n', ''));
     for (const button of controls.querySelectorAll('[data-answer-example]')) {
       button.addEventListener('click', () => {
         form.elements.answer.value = examples[Number(button.dataset.answerExample)];
@@ -390,13 +390,13 @@ export function mountOnboarding(host, {
     const value = draft.values || draft.reasonTwo || draft.reason;
     showSequence([
       [value ? `「${value}」。聞かせてくれて、ありがとうございます。` : '答えは、自分のペースで見つけていきましょう。', 'birth-reply'],
-      ['「何のため？」と考えていくと、自分が本当に大切にしているものが少しずつ見えてきます。', 'birth-reply'],
-      ['その先には、自分らしく幸せに暮らしたいという願いがあるかもしれません。', 'birth-reply'],
-      ['例えば、お金を稼ぎたい理由には、家族と安心して暮らしたいという願いがあるかもしれません。', 'birth-reply'],
-      ['目の前の目標は、自分が望む人生に近づくための手段でもあります。', 'birth-emphasis'],
-      ['自分の行動が大切なものにつながっていると感じることが、やる気を支えてくれます。', 'birth-reply'],
-      ['英単語を覚えることも、海外の人と自由に話したいという願いにつながると、取り組む意味が見えてきます。', 'birth-reply'],
-      ['今日の行動と、自分が本当に大切にしていることをつなげてみましょう。', 'birth-emphasis']
+      ['「何のため？」と考えていくと、\n自分が本当に大切にしているものが\n少しずつ見えてきます。', 'birth-reply'],
+      ['その先には、\n自分らしく幸せに暮らしたいという願いがあるかもしれません。', 'birth-reply'],
+      ['例えば、お金を稼ぎたい理由には、\n家族と安心して暮らしたいという願いがあるかもしれません。', 'birth-reply'],
+      ['目の前の目標は、\n自分が望む人生に近づくための手段でもあります。', 'birth-emphasis'],
+      ['自分の行動が大切なものにつながっていると感じることが、\nやる気を支えてくれます。', 'birth-reply'],
+      ['英単語を覚えることも、\n海外の人と自由に話したいという願いにつながると、\n取り組む意味が見えてきます。', 'birth-reply'],
+      ['今日の行動と、\n自分が本当に大切にしていることをつなげてみましょう。', 'birth-emphasis']
     ], shouldFocus => {
       showQuestion('ところで、マインドマップを知っていますか？', shouldFocus);
       choiceControls([['know-map', '知っている'], ['new-map', '知らない']], 'マインドマップ');
@@ -652,8 +652,8 @@ export function mountOnboarding(host, {
     showSequence([
       ['あなたの星にたどり着きました。', 'birth-emphasis'],
       ['ここには、目標に向かって進んだ記録を残せます。', 'birth-emphasis'],
-      ['JIKUには、休む日・忙しい日・余裕がある日の3つのモードがあります。', 'birth-reply'],
-      ['タスクごとに量とモードを設定しておけば、その日のペースを選ぶだけで、取り組んだ量を記録できます。', 'birth-reply']
+      ['JIKUには、\n休む日・忙しい日・余裕がある日の3つのモードがあります。', 'birth-reply'],
+      ['タスクごとに量とモードを設定しておけば、\nその日のペースを選ぶだけで、\n取り組んだ量を記録できます。', 'birth-reply']
     ], offerMode, focus);
   }
 
@@ -713,10 +713,10 @@ export function mountOnboarding(host, {
     showSequence([
       ['ここまで、ありがとうございました。', 'birth-reply'],
       ['あなたが今日つくった宇宙は、まだ始まったばかりです。', 'birth-emphasis'],
-      ['これから、あなたの行動が記録として積み重なり、星を育てていきます。', 'birth-reply'],
+      ['これから、あなたの行動が記録として積み重なり、\n星を育てていきます。', 'birth-reply'],
       ['振り返りを重ねると、次に何をするかが少しずつ見えてきます。', 'birth-reply'],
       ['休む日があっても、目標が変わっても大丈夫です。', 'birth-reply'],
-      ['迷ったときは、この宇宙で、何を目指しているのか、何のために続けるのか、今日できることは何かを思い出してください。', 'birth-reply'],
+      ['迷ったときは、この宇宙で、\n何を目指しているのか、\n何のために続けるのか、\n今日できることは何かを思い出してください。', 'birth-reply'],
       ['今日の一歩に、人生の意味を。', 'birth-emphasis']
     ], shouldFocus => {
       showQuestion('さあ、あなたの目標に向かって進んでいきましょう。', shouldFocus);
@@ -726,7 +726,6 @@ export function mountOnboarding(host, {
 
   function enter(next, {focus = false, answer} = {}) {
     clearTimeout(timer);
-    clearTimeout(formingTimer);
     step = next;
     screen.dataset.stage = next;
     const choosing = next === 'login';
@@ -735,7 +734,6 @@ export function mountOnboarding(host, {
     screen.toggleAttribute('data-map', ['confirm', 'map', 'statistics'].includes(next));
     screen.toggleAttribute('data-landing', ['travel', 'arrival', 'closing', 'login'].includes(next));
     if (next === 'travel') delete screen.dataset.approaching;
-    if (choosing || next === 'gaze' || next === 'arrival') delete screen.dataset.forming;
     screen.toggleAttribute('data-demo-recorded', Boolean(draft.recordedMode));
     sky?.stage(next);
     skip.hidden = !Object.hasOwn(opening, next) && next !== 'bang';
@@ -770,13 +768,12 @@ export function mountOnboarding(host, {
     if (next === 'bang') {
       retireTurn();
       music?.accent();
-      formingTimer = setTimeout(() => {screen.dataset.forming = '';}, SPHERE_FORMATION_AT);
       timer = setTimeout(() => enter('example-choice'), BANG_DURATION);
       return;
     }
     if (next === 'departure') {
       showSequence([
-        ['ありがとうございます。あなた自身の目標が、少しずつ形になりましたね。', 'birth-reply'],
+        ['ありがとうございます。\nあなた自身の目標が、少しずつ形になりましたね。', 'birth-reply'],
         ['では、あなたの星へ向かいましょう。', 'birth-emphasis']
       ], shouldFocus => enter('travel', {focus: shouldFocus}), focus);
     } else if (next === 'travel') {
@@ -914,9 +911,9 @@ export function mountOnboarding(host, {
     if (step === 'meaning' && ['know-map', 'new-map'].includes(choice)) {
       controls.replaceChildren();
       const turns = choice === 'new-map' ? [
-        ['マインドマップは、中心に一つのテーマを書き、関連する考えや目標を枝のように広げて整理する方法です。', 'birth-reply']
+        ['マインドマップは、中心に一つのテーマを書き、\n関連する考えや目標を枝のように広げて\n整理する方法です。', 'birth-reply']
       ] : [];
-      turns.push(['今回は、中心に人生の大きな目標を置き、そのために必要なことを整理していきます。', 'birth-reply']);
+      turns.push(['今回は、中心に人生の大きな目標を置き、\nそのために必要なことを整理していきます。', 'birth-reply']);
       showSequence(turns, focus => enter('confirm', {focus}), true);
     }
     if (action === 'skip') enter('example-choice', {focus: true});
@@ -939,7 +936,7 @@ export function mountOnboarding(host, {
   catch {} // Keep the CSS sphere on devices without WebGL.
   enter(preview ? previewStart : draft.step);
   return {dispose() {
-    clearTimeout(timer); clearTimeout(formingTimer); events.abort();
+    clearTimeout(timer); events.abort();
     cancelAnimationFrame(flightFrame); warp?.dispose();
     sky?.dispose(); disposeOrigin?.(); music?.dispose();
   }};
