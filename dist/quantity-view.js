@@ -147,7 +147,37 @@ function recentActivity(summary, events, start, end, today) {
  </section>`;
 }
 
-export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=false}){
+function activityChart(summary,start,end,today,monthly){
+ const timeByDay=summary.groups.find(group=>group.dimension==='time')?.byDate||{};
+ const peak=Math.max(0,...Object.values(timeByDay));
+ const step=peak>0?10**Math.floor(Math.log10(peak/4)):1;
+ const interval=Math.max(step,Math.ceil(peak/(4*step))*step);
+ const ceiling=interval*4;
+ const days=[];
+ for(let date=start;date<=end;date=shiftDate(date,1)){
+  const day=Number(date.slice(8));
+  const future=date>today;
+  const time=timeByDay[date]||0;
+  const label=`${Number(date.slice(5,7))}月${day}日 · ${future?'これから':hoursText(time)}`;
+  const tick=monthly?(day===1||day%5===0?String(day):''):String(day);
+  days.push({date,label,time,tick,future});
+ }
+ const initial=days.filter(day=>!day.future&&day.time>0).at(-1)||days.find(day=>day.date===today)||days.at(-1);
+ return `<section class="activity-chart" aria-labelledby="activity-chart-title">
+  <header><h2 id="activity-chart-title">日ごとの活動時間</h2><output aria-live="polite">${peak?initial.label:'この期間は時間の記録がありません'}</output></header>
+  <div class="activity-chart-grid">
+   <div class="activity-chart-axis" aria-hidden="true">${[4,3,2,1,0].map(value=>`<span>${numberText(interval*value)}</span>`).join('')}</div>
+   <div class="activity-chart-plot" role="group" aria-label="日別の活動時間（時間）" style="--days:${days.length}">
+    ${days.map(day=>`<button type="button" class="activity-chart-day" data-chart-date="${day.date}"
+     aria-label="${day.label}" aria-pressed="${peak>0&&day===initial}" ${day.future?'disabled':''}>
+     <i aria-hidden="true" style="--bar-height:${day.time/ceiling*100}%"></i><span aria-hidden="true">${day.tick}</span>
+    </button>`).join('')}
+   </div>
+  </div>
+ </section>`;
+}
+
+export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=false,chart=false}){
  const monthly=Boolean(month),period=quarter?'3か月':monthly?'月':'週';
  const targetLabel=quarter?'月間目標の合計':monthly?'月間目標':'週間目標';
  const firstMonth=quarter?monthOffset(month,-2):month;
@@ -191,6 +221,7 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=fal
  return `<section class="weekly-record" aria-label="${period}の記録">
   <header class="weekly-period">${readOnly?'':'<button class="week-arrow" data-quantity-period="-1" aria-label="前の期間">‹</button>'}<div><span>${start.slice(0,4)}年 · ${quarter?'3か月':'期間'}</span><h1>${monthly&&!quarter?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div>${readOnly?'':`<button class="week-arrow" data-quantity-period="1" aria-label="次の期間" ${isCurrent?'disabled':''}>›</button>`}</header>
   ${readOnly?'':`<div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する範囲</span><strong>${esc(goal?.name||'宇宙')}</strong><i>⌄</i></button>${!isCurrent?'<button class="text-button" data-reset-period>現在の期間へ</button>':''}</div>`}
+  ${chart?activityChart(summary,start,end,today,monthly):''}
   <section class="weekly-total-block period-overview" aria-label="目標の達成率">
    <h2>取り組んだ時間</h2>
    <div class="weekly-total-values"><div><strong>${hoursNumber(time)}</strong><span>時間</span></div></div>
@@ -202,7 +233,7 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=fal
     ${quarter?'<p>月ごとの記録から確認できる月間目標を合算しています。</p>':''}
    </div>
   </section>
-  ${recentActivity(summary,events,start,end,today)}
+  ${chart?'':recentActivity(summary,events,start,end,today)}
   <p class="weekly-source-note">期間中の記録をもとに自動で更新されます。</p>
   <details class="period-details" ${sections.length||events.length?'':'open'}>
    <summary>タスク別の内訳</summary>

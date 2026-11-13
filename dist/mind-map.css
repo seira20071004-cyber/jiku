@@ -170,3 +170,42 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
 .map-galaxy-tree .map-node { justify-content: flex-start; text-align: left; }
 .map-galaxy-tree .map-node strong { font-size: clamp(13px, 3.6vw, 16px); }
 .map-galaxy-empty { text-align: center; color: #d4c8e5; }
+
+.map-galaxy-view {
+  padding: 14px clamp(10px, 3vw, 22px) 18px;
+  background: radial-gradient(ellipse at top left, color-mix(in srgb, var(--map-tone) 11%, #121427), #101322 64%);
+}
+.map-branch-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 0 11px;
+  border-bottom: 1px solid #b6a4ee2b;
+}
+.map-branch-header > span { color: var(--map-tone); font-size: 18px; }
+.map-branch-header h2 { margin: 0; }
+.map-galaxy-tree,
+.map-galaxy-tree ul { padding-inline-start: clamp(9px, 3vw, 18px); }
+.map-galaxy-tree li::before { width: clamp(9px, 3vw, 18px); top: 21px; }
+.map-galaxy-tree .map-branch-row {
+  justify-content: flex-start;
+  min-height: 43px;
+  text-align: left;
+  border-radius: 10px;
+  border-color: #b6a4ee27;
+}
+.map-branch-goal > .map-branch-row { background: #232540; }
+.map-branch-task > .map-branch-row { background: #13182b; }
+.map-branch-task > .map-branch-row > span:last-child {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row-reverse;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.map-branch-task > .map-branch-row small { margin: 0; color: #d4c7eb; }
+.map-branch-task > .map-branch-row strong { margin-right: auto; font-weight: 500; }
+.map-galaxy-tree .map-inline-tools { justify-content: flex-end; }

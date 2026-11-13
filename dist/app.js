@@ -21,7 +21,7 @@ const demoMode=new URLSearchParams(location.search).get('demo')==='1';
 const personalStorageKey=guest?'jiku-guest':account?'jiku-v1:'+account.id:'jiku-v1';
 const storageKey=demoMode?personalStorageKey+':demo-v2':personalStorageKey;
 let needsLegacyImport=false,storageLocked=false;let state;try{const raw=guest?null:localStorage.getItem(storageKey);needsLegacyImport=!demoMode&&!!account&&!raw&&!!localStorage.getItem('jiku-v1');state=raw?validate(JSON.parse(raw)):(demoMode?createDemoUniverse(dateKey()):freshUniverse());if(raw&&!state.universe){localStorage.setItem(storageKey+':before-universe',raw);state=migrateUniverse(state)}}catch{storageLocked=true;state=state||freshUniverse();setTimeout(()=>toast('保存データを保護しています。設定からバックアップを確認してください。'),300)}
-let treeScene=null,treeView=null,showGoalLabels=true,statsTab='quantity',quantityScope='all',statsWeek=weekStart(dateKey()),statsMonth=dateKey().slice(0,7),quantityDimension=null;
+let treeScene=null,treeView=null,showGoalLabels=true,statsTab='calendar',statsPeriod='week',quantityScope='all',statsWeek=weekStart(dateKey()),statsMonth=dateKey().slice(0,7),quantityDimension=null;
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
 let guideSession=null,guideTimer,mapPreviewReturn=null,onboardingResume=null;
 let mapSelection=null,mapEditing=false;
@@ -329,8 +329,7 @@ function calendarPage(options){
   <div class="calendar-grid" style="--weeks:${weeks}">${['月','火','水','木','金','土','日'].map(day=>`<span class="day-label">${day}</span>`).join('')}
    ${'<div class="calendar-blank"></div>'.repeat(offset)}${days}
   </div>
-  <div class="calendar-mode-legend">${['none','rest','busy','full'].map(key=>`<span class="mode-${key}"><i></i>${MODES[key].label}</span>`).join('')}</div>
-  ${readOnly?'':'<button class="text-button calendar-rhythm-link" data-do="show-rhythm">モードの割合を見る ↗</button>'}
+  ${readOnly?`<div class="calendar-mode-legend">${['none','rest','busy','full'].map(key=>`<span class="mode-${key}"><i></i>${MODES[key].label}</span>`).join('')}</div>`:''}
  </section>`;
 }
 function scheduledEvents(date){
@@ -351,21 +350,46 @@ function dayEditor(key){selected=key;const summary=quantitySummary(state,key,key
   const task=metrics[0],values=[...metrics].sort((a,b)=>Number(b.dimension==='time')-Number(a.dimension==='time'));
   return `<div class="day-quantity-row"><span>${esc(task.name)}</span><strong>${values.map(metric=>metric.dimension==='time'?hoursText(metric.value):numberText(metric.amount)+esc(metric.unit)).join(' · ')}</strong>${state.nodes.some(n=>n.id===task.id)?`<button class="text-button" data-record-leaf="${esc(task.id)}" data-log-date="${key}">編集</button>`:''}</div>`;
  }).join('')||'<p class="muted">量の記録はありません。</p>'}</section><details class="daily-mode-details"><summary>この日のモード</summary><div class="day-modes">${Object.entries(MODES).map(([k,m])=>`<button class="${recordMode(state,key)===k?'chosen':''}" data-mode="${k}" data-date="${key}"><span style="color:${m.color}">${m.icon}</span>${m.label}<i>${recordMode(state,key)===k?'✓':''}</i></button>`).join('')}</div></details>`}`)}
-function rhythmPage(){const start=shiftDate(today,-29),s=modeDistribution(state,start,today,today),counts=s.counts;return `<section class="rhythm-panel full-panel" aria-label="日々のモードの割合"><h1>日々のモードの割合</h1><div class="distribution" role="img" aria-label="過去${s.days}日間のモードの割合">${s.days?Object.entries(counts).map(([k,c])=>`<div style="width:${c/s.days*100}%;background:${MODES[k].color}" title="${MODES[k].label}: ${c}日"></div>`).join(''):'<div style="width:100%;background:#eeede6"></div>'}</div><div class="rhythm-rows">${Object.entries(counts).map(([k,c])=>`<div class="distribution-row"><i style="background:${MODES[k].color}"></i><span>${MODES[k].label}</span><strong>${c}<small>日</small></strong><em>${s.days?Math.round(c/s.days*100):0}%</em></div>`).join('')}</div><p class="footnote">過去${s.days}日間。記録がない日は「何もしなかった日」に含めます。</p></section>`}
+function calendarModeChart(){
+ const [year,monthNumber]=month.split('-').map(Number);
+ const lastDay=new Date(Date.UTC(year,monthNumber,0)).getUTCDate();
+ const {counts,days}=modeDistribution(state,month+'-01',month+'-'+lastDay,today);
+ let angle=0;
+ const modes=['full','busy','rest','none'].map(key=>{
+  const count=counts[key];
+  const from=angle;
+  if(days)angle+=count/days*100;
+  return {key,count,from,to:angle};
+ });
+ const stops=modes.filter(mode=>mode.count).map(({key,from,to})=>`${MODES[key].color} ${from}% ${to}%`).join(',');
+ return `<section class="calendar-mode-card" aria-labelledby="calendar-mode-heading">
+  <header><h2 id="calendar-mode-heading">モードの割合</h2><span>${monthNumber}月${month===today.slice(0,7)?' · 今日まで':''}</span></header>
+  <div class="calendar-mode-content">
+   <div class="calendar-mode-ring" style="--mode-stops:${stops||'#293043 0% 100%'}" aria-hidden="true">
+    <strong>${days}<small>日</small></strong>
+   </div>
+   <ul>${modes.map(({key,count})=>`<li>
+    <i class="mode-${key}" aria-hidden="true"></i><span>${MODES[key].label}</span>
+    <span class="calendar-mode-count">${count}日</span><strong>${days?numberText(Math.round(count/days*1000)/10):0}%</strong>
+   </li>`).join('')}</ul>
+  </div>
+ </section>`;
+}
 function reportScope(id){return state.nodes.some(node=>node.id===id&&node.parentId)?id:'all'}
 function statsPage(){
  quantityScope=reportScope(quantityScope);
- const tabs=[['quantity','週間'],['monthly','1か月'],['quarter','3か月'],['calendar','カレンダー']];
+ const tabs=[['calendar','カレンダー'],['graph','グラフ']];
  const calendar=statsTab==='calendar';
- const content=calendar?calendarPage():weeklyPanel(state,{
-  week:statsWeek,scope:quantityScope,today,
-  month:['monthly','quarter'].includes(statsTab)?statsMonth:undefined,quarter:statsTab==='quarter'
- });
- return `<section class="statistics-workspace weekly-workspace">
-  <div class="statistics-toolbar"><div class="statistics-tabs" role="tablist" aria-label="統計の表示">
-   ${tabs.map(([id,label])=>`<button role="tab" aria-selected="${statsTab===id}" data-stat-tab="${id}">${label}</button>`).join('')}
+ const panel=calendar ? calendarPage()+calendarModeChart() : `
+  <div class="stats-period-switch" role="group" aria-label="グラフの期間">
+   ${[['week','1週間'],['month','1か月']].map(([id,label])=>`<button type="button" aria-pressed="${statsPeriod===id}" data-stats-period="${id}">${label}</button>`).join('')}
+  </div>
+  ${weeklyPanel(state,{week:statsWeek,scope:quantityScope,today,month:statsPeriod==='month'?statsMonth:undefined,chart:true})}`;
+ return `<section class="statistics-workspace weekly-workspace stats-dashboard">
+  <div class="statistics-toolbar"><div class="statistics-tabs" role="group" aria-label="統計の表示">
+   ${tabs.map(([id,label])=>`<button type="button" aria-pressed="${statsTab===id}" data-stat-tab="${id}">${label}</button>`).join('')}
   </div></div>
-  <div class="statistics-content ${calendar?'calendar-content':'quantity-content'}">${content}</div>
+  <div class="statistics-content ${calendar?'calendar-content':'quantity-content'}">${panel}</div>
  </section>`;
 }
 const hierarchyMarks=['◎','◉','✦','●','◌'];
@@ -446,11 +470,15 @@ function personalMap(){
  if(!branchRoot)return overview+'<div id="home-map-branch" hidden></div>';
  function branch(node,depth){
   const children=visibleChildren(state,node.id);
-  return `<li>${card(node,depth)}${children.length?`<ul>${children.map(child=>branch(child,depth+1)).join('')}</ul>`:''}</li>`;
+  const kind=nodeKind(state,node.id)==='action'?'task':'goal';
+  return `<li class="map-branch-${kind}">
+   ${card(node,depth,'map-branch-row')}
+   ${children.length?`<ul>${children.map(child=>branch(child,depth+1)).join('')}</ul>`:''}
+  </li>`;
  }
  const children=visibleChildren(state,branchRoot.id);
  return `${overview}<section id="home-map-branch" class="map-subview map-galaxy-view" aria-labelledby="home-map-branch-name" data-map-tone="${tone}">
-  <h2 id="home-map-branch-name">${esc(branchRoot.name)}</h2>
+  <header class="map-branch-header"><span aria-hidden="true">◉</span><h2 id="home-map-branch-name">${esc(branchRoot.name)}</h2></header>
   ${children.length?`<ul class="map-galaxy-tree">${children.map(node=>branch(node,2)).join('')}</ul>`:
    '<p class="map-galaxy-empty">まだ下位の目標やタスクはありません。</p>'}
  </section>`;
@@ -637,12 +665,28 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   return;
  }
  if(b.hasAttribute('data-remove-extra')){b.closest('[data-extra-metric]').remove();return}
- if(d.spaceEnter){enterSpace(d.spaceEnter);return}if(d.spaceGo){close();enterSpace(d.spaceGo);return}if(d.legacyDetail){legacyDetail(d.legacyDetail);return}if(d.spaceAdd){creationDraft=null;chooseCreationType(d.spaceAdd);return}if(d.createKind){editor('new',d.createKind);return}if(b.hasAttribute('data-create-back')){const form=b.closest('form');creationDraft={...creationDraft,...Object.fromEntries(new FormData(form)),extras:readExtraSettings(form)};chooseCreationType(addParent||currentSpace().id);return}if(d.spaceDetail){spaceDetail(d.spaceDetail);return}if(d.spaceStats){quantityScope=d.spaceStats;statsTab='quantity';view='stats';location.hash='stats';close();render();return}if(d.spaceReorder){reorderNode(state,d.spaceReorder,Number(d.direction));save();render();spaceList();return}if(d.openPreset)openPreset(d.openPreset);if(b.hasAttribute('data-configure-leaves')){close();view='tree';location.hash='tree';render();toast('タスクを押して、タスクの固定量を設定してください')}if(d.recordLeaf)leafPanel(d.recordLeaf,d.logDate||today);if(d.pickLeaf)chooseLeaf(d.pickLeaf);if(d.quantityDay)dayEditor(d.quantityDay);if(d.quantityPeriod){
+ if(d.spaceEnter){enterSpace(d.spaceEnter);return}if(d.spaceGo){close();enterSpace(d.spaceGo);return}if(d.legacyDetail){legacyDetail(d.legacyDetail);return}if(d.spaceAdd){creationDraft=null;chooseCreationType(d.spaceAdd);return}if(d.createKind){editor('new',d.createKind);return}if(b.hasAttribute('data-create-back')){const form=b.closest('form');creationDraft={...creationDraft,...Object.fromEntries(new FormData(form)),extras:readExtraSettings(form)};chooseCreationType(addParent||currentSpace().id);return}if(d.spaceDetail){spaceDetail(d.spaceDetail);return}if(d.spaceStats){quantityScope=d.spaceStats;statsTab='graph';view='stats';location.hash='stats';close();render();return}if(d.spaceReorder){reorderNode(state,d.spaceReorder,Number(d.direction));save();render();spaceList();return}if(d.openPreset)openPreset(d.openPreset);if(b.hasAttribute('data-configure-leaves')){close();view='tree';location.hash='tree';render();toast('タスクを押して、タスクの固定量を設定してください')}if(d.recordLeaf)leafPanel(d.recordLeaf,d.logDate||today);if(d.pickLeaf)chooseLeaf(d.pickLeaf);if(d.quantityDay)dayEditor(d.quantityDay);if(d.quantityPeriod){
   const offset=Number(d.quantityPeriod);
-  if(['monthly','quarter'].includes(statsTab))statsMonth=boundedMonth(statsMonth,statsTab==='quarter'?offset*3:offset,today);
+  if(statsPeriod==='month')statsMonth=boundedMonth(statsMonth,offset,today);
   else{const next=shiftDate(statsWeek,offset*7);if(next<=weekStart(today))statsWeek=next}
   render();
- }if(d.statsGoal){quantityScope=reportScope(d.statsGoal);close();render()}if(b.hasAttribute('data-reset-period')){if(['monthly','quarter'].includes(statsTab))statsMonth=today.slice(0,7);else statsWeek=weekStart(today);render()}if(d.quantityDimension){quantityDimension=d.quantityDimension;render()}if(d.addQuantity){const input=$('#quantity-form [name=record-minutes]');if(input)input.value=String(Math.round(((Number(input.value)||0)+Number(d.addQuantity))*1000000)/1000000)}if(d.removeQuantity){modal(`<h2>この日の量の記録を削除しますか？</h2><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-remove-quantity="${esc(d.removeQuantity)}" data-log-date="${d.logDate}">削除する</button></div>`)}if(d.confirmRemoveQuantity){removeQuantity(state,d.logDate,d.confirmRemoveQuantity);save();close();render();toast('この日の記録を削除しました')}if(b.hasAttribute('data-scroll-tree')){$('#goal-tree')?.scrollIntoView({behavior:'smooth',block:'start'})}if(d.statTab){statsTab=d.statTab;render()}if(d.view){view=d.view;location.hash=view;render();window.scrollTo(0,0)}if(d.mode){void recordModeChoice(b);return}if(d.check){const n=state.nodes.find(n=>n.id===d.check);if(n){toggleLog(state,d.date,n);save();render()}}if(d.edit){addParent=null;editor(d.edit);if(b.hasAttribute('data-quantity-settings'))$('#node-form [name=quantity-unit]')?.focus()}if(d.selectDate){selected=d.selectDate;render();dayEditor(selected)}if(d.day){selected=d.day;month=selected.slice(0,7);view='stats';statsTab='calendar';render()}if(d.month){month=boundedMonth(month,Number(d.month),today);render()}if(d.focus){focus=d.focus;treeView=null;treeScene?.dispose();treeScene=null;zoom=1;pan={x:0,y:0};close();render()}if(d.delete){const id=d.delete,n=state.nodes.find(n=>n.id===id),count=descendants(state,id).size;modal(`<h2>「${esc(n.name)}」を削除しますか？</h2><p>子孫を含め ${count} 個の目標を削除します。過去の実行記録は残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-delete="${esc(id)}">削除する</button></div>`)}if(d.confirmDelete){deleteNode(state,d.confirmDelete);focus=null;treeScene?.dispose();treeScene=null;treeView=null;save();close();render();toast('目標を削除しました')}if(d.do)({close,settings,review,'open-demo':()=>switchDemo(true),'exit-demo':()=>switchDemo(false),'test-demo-mode':modePicker,'choose-stats-goal':()=>showHierarchy(true),'space-map':()=>showHierarchy(false),'preview-onboarding':previewOnboarding,'space-list':spaceList,'quick-actions':()=>chooseLeaf(today),'show-rhythm':()=>modal(`<div class="dialog-title"><h2>モードの割合</h2><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${rhythmPage()}`),'today-mode':modePicker,'labels':()=>{showGoalLabels=!showGoalLabels;applyLabelVisibility();b.setAttribute('aria-pressed',String(showGoalLabels))},'zoom-in':()=>{if(treeScene)treeScene.zoom(1.25);else{zoom=Math.min(2.5,zoom+.2);render()}},'zoom-out':()=>{if(treeScene)treeScene.zoom(.8);else{zoom=Math.max(.4,zoom-.2);render()}},'reset-tree':()=>{if(focus){focus=null;treeScene?.dispose();treeScene=null;treeView=null;render()}else if(treeScene)treeScene.reset();else{zoom=1;pan={x:0,y:0};render()}},today:()=>{month=today.slice(0,7);selected=today;render()},'clear-record':()=>{clearMode(state,selected);save();render();close();toast('モードを未記録に戻しました')},export:()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`jiku-${demoMode?'demo':'backup'}-${today}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}}[d.do])?.()});
+ }if(d.statsGoal){quantityScope=reportScope(d.statsGoal);close();render()}if(b.hasAttribute('data-reset-period')){if(statsPeriod==='month')statsMonth=today.slice(0,7);else statsWeek=weekStart(today);render()}if(d.quantityDimension){quantityDimension=d.quantityDimension;render()}if(d.addQuantity){const input=$('#quantity-form [name=record-minutes]');if(input)input.value=String(Math.round(((Number(input.value)||0)+Number(d.addQuantity))*1000000)/1000000)}if(d.removeQuantity){modal(`<h2>この日の量の記録を削除しますか？</h2><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-remove-quantity="${esc(d.removeQuantity)}" data-log-date="${d.logDate}">削除する</button></div>`)}if(d.confirmRemoveQuantity){removeQuantity(state,d.logDate,d.confirmRemoveQuantity);save();close();render();toast('この日の記録を削除しました')}if(b.hasAttribute('data-scroll-tree')){$('#goal-tree')?.scrollIntoView({behavior:'smooth',block:'start'})}if(d.statTab){
+  statsTab=d.statTab;
+  render();
+  $(`[data-stat-tab="${statsTab}"]`)?.focus({preventScroll:true});
+  return;
+ }if(d.statsPeriod){
+  statsPeriod=d.statsPeriod;
+  render();
+  $(`[data-stats-period="${statsPeriod}"]`)?.focus({preventScroll:true});
+  return;
+ }if(d.chartDate){
+  const chart=b.closest('.activity-chart');
+  chart.querySelector('[aria-pressed="true"]')?.setAttribute('aria-pressed','false');
+  b.setAttribute('aria-pressed','true');
+  chart.querySelector('output').textContent=b.getAttribute('aria-label');
+  return;
+ }if(d.view){if(d.view==='stats')statsTab='calendar';view=d.view;location.hash=view;render();window.scrollTo(0,0)}if(d.mode){void recordModeChoice(b);return}if(d.check){const n=state.nodes.find(n=>n.id===d.check);if(n){toggleLog(state,d.date,n);save();render()}}if(d.edit){addParent=null;editor(d.edit);if(b.hasAttribute('data-quantity-settings'))$('#node-form [name=quantity-unit]')?.focus()}if(d.selectDate){selected=d.selectDate;render();dayEditor(selected)}if(d.day){selected=d.day;month=selected.slice(0,7);view='stats';statsTab='calendar';render()}if(d.month){month=boundedMonth(month,Number(d.month),today);render()}if(d.focus){focus=d.focus;treeView=null;treeScene?.dispose();treeScene=null;zoom=1;pan={x:0,y:0};close();render()}if(d.delete){const id=d.delete,n=state.nodes.find(n=>n.id===id),count=descendants(state,id).size;modal(`<h2>「${esc(n.name)}」を削除しますか？</h2><p>子孫を含め ${count} 個の目標を削除します。過去の実行記録は残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-delete="${esc(id)}">削除する</button></div>`)}if(d.confirmDelete){deleteNode(state,d.confirmDelete);focus=null;treeScene?.dispose();treeScene=null;treeView=null;save();close();render();toast('目標を削除しました')}if(d.do)({close,settings,review,'open-demo':()=>switchDemo(true),'exit-demo':()=>switchDemo(false),'test-demo-mode':modePicker,'choose-stats-goal':()=>showHierarchy(true),'space-map':()=>showHierarchy(false),'preview-onboarding':previewOnboarding,'space-list':spaceList,'quick-actions':()=>chooseLeaf(today),'today-mode':modePicker,'labels':()=>{showGoalLabels=!showGoalLabels;applyLabelVisibility();b.setAttribute('aria-pressed',String(showGoalLabels))},'zoom-in':()=>{if(treeScene)treeScene.zoom(1.25);else{zoom=Math.min(2.5,zoom+.2);render()}},'zoom-out':()=>{if(treeScene)treeScene.zoom(.8);else{zoom=Math.max(.4,zoom-.2);render()}},'reset-tree':()=>{if(focus){focus=null;treeScene?.dispose();treeScene=null;treeView=null;render()}else if(treeScene)treeScene.reset();else{zoom=1;pan={x:0,y:0};render()}},today:()=>{month=today.slice(0,7);selected=today;render()},'clear-record':()=>{clearMode(state,selected);save();render();close();toast('モードを未記録に戻しました')},export:()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`jiku-${demoMode?'demo':'backup'}-${today}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}}[d.do])?.()});
 let lastTitleTap;
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&!$('.space-vista')?.hidden)closeScenery();
@@ -698,7 +742,7 @@ document.addEventListener('change',async e=>{if(e.target.name==='node-kind'){
 function bindTree(){const host=$('.universe-stage');if(!host)return;try{treeScene=createUniverse(host,{nodes:state.nodes,auraStrength:universeGrowth(state,today).strength,current:showUniverseOrigin()?UNIVERSE_ORIGIN:currentSpace().id,onSelect:id=>{if(!guideSession)openNode(id)},onZoom:value=>{const label=$('[data-zoom-label]');if(label)label.textContent=value+'%'}})}catch(error){if(showUniverseOrigin()){host.innerHTML=`<button class="universe-origin-fallback" style="--fallback-growth:${universeGrowth(state,today).strength}" data-space-enter="${esc(currentSpace().id)}" aria-label="宇宙に入る"></button>`;return}host.innerHTML=`<div class="universe-fallback"><p>この端末では、目標一覧で宇宙を探索できます。</p>${visibleChildren(state,currentSpace().id).map(n=>`<button data-space-enter="${esc(n.id)}">✧ ${esc(n.name)} →</button>`).join('')}</div>`}}
 function applyLabelVisibility(){}
 $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}});
-window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar')statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
+window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar'||(h==='stats'&&view!=='stats'))statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
 else if(!onboardingPreview&&!storageLocked&&!needsLegacyImport&&state.universe?.firstSteps)startGuide();
 if(authReturn&&guestHandoff?.step==='login'&&guestHandoff.map&&!storageLocked){
  try{
