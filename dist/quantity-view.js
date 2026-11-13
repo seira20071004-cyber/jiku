@@ -147,7 +147,7 @@ function recentActivity(summary, events, start, end, today) {
  </section>`;
 }
 
-export function weeklyPanel(s,{week,scope,today,month,quarter=false}){
+export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=false}){
  const monthly=Boolean(month),period=quarter?'3か月':monthly?'月':'週';
  const targetLabel=quarter?'月間目標の合計':monthly?'月間目標':'週間目標';
  const firstMonth=quarter?monthOffset(month,-2):month;
@@ -182,15 +182,15 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false}){
  const additional=summary.groups.filter(group=>group.dimension!=='time'&&group.total>0);
  const sections=weeklyTaskSections(s,summary,scope).filter(section=>section.rows.length);
  const progress=timeGoalProgress(progressRows);
- const editableIds=new Set(leaves(s).map(n=>n.id));
+ const editableIds=new Set(readOnly?[]:leaves(s).map(n=>n.id));
  const goal=s.nodes.find(n=>n.id===scope)||s.nodes.find(n=>n.parentId===null);
  const short=date=>`${Number(date.slice(5,7))}/${Number(date.slice(8))}`;
  const events=Object.entries(s.logs).filter(([date])=>date>=start&&date<=through).sort(([a],[b])=>b.localeCompare(a)).flatMap(([date,logs])=>Object.entries(logs)
   .filter(([id,log])=>log.eventCompleted&&(scope==='all'||(log.goalIds||goalIds(s,id)).includes(scope)))
   .map(([id,log])=>({date,name:log.name,minutes:log.eventMinutes,quantities:log.eventQuantities||[]})));
  return `<section class="weekly-record" aria-label="${period}の記録">
-  <header class="weekly-period"><button class="week-arrow" data-quantity-period="-1" aria-label="前の期間">‹</button><div><span>${start.slice(0,4)}年 · ${quarter?'3か月':'期間'}</span><h1>${monthly&&!quarter?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div><button class="week-arrow" data-quantity-period="1" aria-label="次の期間" ${isCurrent?'disabled':''}>›</button></header>
-  <div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する範囲</span><strong>${esc(goal?.name||'宇宙')}</strong><i>⌄</i></button>${!isCurrent?'<button class="text-button" data-reset-period>現在の期間へ</button>':''}</div>
+  <header class="weekly-period">${readOnly?'':'<button class="week-arrow" data-quantity-period="-1" aria-label="前の期間">‹</button>'}<div><span>${start.slice(0,4)}年 · ${quarter?'3か月':'期間'}</span><h1>${monthly&&!quarter?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div>${readOnly?'':`<button class="week-arrow" data-quantity-period="1" aria-label="次の期間" ${isCurrent?'disabled':''}>›</button>`}</header>
+  ${readOnly?'':`<div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する範囲</span><strong>${esc(goal?.name||'宇宙')}</strong><i>⌄</i></button>${!isCurrent?'<button class="text-button" data-reset-period>現在の期間へ</button>':''}</div>`}
   <section class="weekly-total-block period-overview" aria-label="目標の達成率">
    <h2>取り組んだ時間</h2>
    <div class="weekly-total-values"><div><strong>${hoursNumber(time)}</strong><span>時間</span></div></div>

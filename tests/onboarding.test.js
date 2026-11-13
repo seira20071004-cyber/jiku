@@ -101,3 +101,23 @@ test('会話の回答を本人の枝に反映し、着陸とログインを再�
     assert.deepEqual(onboardingDraft(JSON.parse(JSON.stringify(saved))), saved);
   }
 });
+
+test('理由を3回答えた枝では、本人のタスクを衛星の深さまで保存できる', () => {
+  const answers = {
+    goal:'運動を続けたい', reason:'休日に元気に出かけたい',
+    reasonTwo:'家族と過ごす時間を増やしたい', values:'家族と楽しい思い出をつくりたい'
+  };
+  const map = initialPersonalMap(onboardingDraft({step:'meaning', ...answers}));
+  const branch = map.children[0];
+  assert.equal(branch.name, answers.values);
+  assert.equal(branch.purpose, answers.reasonTwo);
+  assert.equal(branch.children[0].name, answers.reason);
+  const goal = branch.children[0].children[0];
+  assert.equal(goal.name, answers.goal);
+  goal.children.push({name:'夕食後に歩く', kind:'action', daily:10, weekly:30, mode:'busy'});
+  const saved = onboardingDraft({step:'statistics', recordedMode:'busy', map, ...answers});
+  assert.equal(saved.recordedMode, 'busy');
+  assert.equal(saved.step, 'statistics');
+  assert.equal(firstPersonalTask(saved.map).name, '夕食後に歩く');
+  assert.deepEqual(saved.map, map);
+});

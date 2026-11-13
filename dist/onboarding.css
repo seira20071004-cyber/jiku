@@ -507,3 +507,19 @@ body.birth-page, body.birth-active {
 .birth-demo-result progress { width: 100%; accent-color: #b7a3e9; }
 .birth-demo-result .birth-primary { min-height: 42px; }
 .birth-node-form select { display: block; margin-top: 5px; width: 100%; padding: 8px; background: #0c0a18; color: inherit; border: 1px solid #b6a5e369; border-radius: 8px; font: inherit; font-size: 16px; }
+
+.birth-screen .birth-map-nested > li {
+  display: grid;
+  align-items: start;
+  min-width: 0;
+}
+.birth-map-nested .map-node { min-width: 0; width: 100%; }
+.birth-map-nested .map-node strong { overflow-wrap: anywhere; }
+.birth-example-next:empty { display: none; }
+.birth-example-next { display: grid; gap: 10px; }
+.birth-statistics .statistics-tabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
+.birth-statistics .statistics-tabs button { padding-inline: 4px; white-space: nowrap; font-size: 12px; }
+.birth-statistics .statistics-tabs button[aria-pressed="true"] { color: #fff; background: #443363; }
+.birth-statistics .weekly-period { display: flex; justify-content: center; }
+.birth-statistics .weekly-record, .birth-statistics .calendar-content .cosmic-calendar { min-height: 0; height: auto; }
+.birth-statistics .statistics-content { min-height: 0; height: auto; padding: 0; overflow: visible; }

@@ -246,6 +246,7 @@ function showOnboarding(){
    view='tree';focus=null;universeOutside=false;mapSelection=null;
    render();
   },
+  renderStatistics:renderOnboardingStatistics,
   onClose:preview?endOnboardingPreview:null,
   onSettings:preview||guest?null:settings
  });
@@ -264,6 +265,16 @@ function populateMappedUniverse(target,map){
  addChildren(map,root.id);
  validate(target);
  return root.id;
+}
+function renderOnboardingStatistics(map,mode,period){
+ const sample=freshUniverse(),date=dateKey();
+ populateMappedUniverse(sample,map);
+ if(mode)applyMode(sample,date,mode,date);
+ if(period==='calendar')return calendarPage({source:sample,calendarMonth:date.slice(0,7),selectedDay:date,todayKey:date,readOnly:true});
+ return weeklyPanel(sample,{
+  week:weekStart(date),scope:'all',today:date,
+  month:period==='quantity'?undefined:date.slice(0,7),quarter:period==='quarter',readOnly:true
+ });
 }
 function commitUniverseBirth(map){
  const commit=()=>{
@@ -296,7 +307,32 @@ function endMapPreview(){
  history.replaceState(null,'',url);
  render();
 }
-function calendarPage(){if(month>today.slice(0,7))month=today.slice(0,7);const [y,m]=month.split('-').map(Number),first=`${month}-01`,offset=(new Date(first+'T12:00:00+09:00').getUTCDay()+6)%7,num=new Date(Date.UTC(y,m,0)).getUTCDate(),weeks=Math.ceil((num+offset)/7);return `<section class="calendar-card cosmic-calendar" aria-label="活動カレンダー"><div class="month-heading"><div><span class="calendar-year">${y}</span><h1>${m}<small>月</small></h1></div><div><button class="round-button" data-month="-1" aria-label="前の月">‹</button><button class="text-button" data-do="today">今月に戻る</button></div></div><div class="calendar-grid" style="--weeks:${weeks}">${['月','火','水','木','金','土','日'].map(d=>`<span class="day-label">${d}</span>`).join('')}${'<div class="calendar-blank"></div>'.repeat(offset)}${Array.from({length:num},(_,i)=>{const k=`${month}-${String(i+1).padStart(2,'0')}`,mode=recordMode(state,k),activity=Object.values(state.logs[k]||{}).some(l=>l.quantity||l.eventCompleted),event=scheduledEvents(k).length>0;return `<button class="day-cell mode-${mode} ${selected===k?'selected':''} ${k===today?'today':''}" data-select-date="${k}" aria-label="${m}月${i+1}日 ${k>today?'これからの日':MODES[mode].label}${activity?'・タスクの記録あり':''}${event?'・イベントの予定あり':''}" ${k>today&&!event?'disabled':''}><span>${i+1}</span>${k<=today?`<i>${MODES[mode].icon}</i>`:''}${activity?'<b class="quantity-calendar-dot"></b>':''}${event?'<b class="event-calendar-dot"></b>':''}</button>`}).join('')}</div><div class="calendar-mode-legend">${['none','rest','busy','full'].map(k=>`<span class="mode-${k}"><i></i>${MODES[k].label}</span>`).join('')}</div><button class="text-button calendar-rhythm-link" data-do="show-rhythm">モードの割合を見る ↗</button></section>`}
+function calendarPage(options){
+ if(!options&&month>today.slice(0,7))month=today.slice(0,7);
+ const {source=state,calendarMonth=month,selectedDay=selected,todayKey=today,readOnly=false}=options||{};
+ const [year,monthNumber]=calendarMonth.split('-').map(Number);
+ const first=`${calendarMonth}-01`,offset=(new Date(first+'T12:00:00+09:00').getUTCDay()+6)%7;
+ const count=new Date(Date.UTC(year,monthNumber,0)).getUTCDate(),weeks=Math.ceil((count+offset)/7);
+ const days=Array.from({length:count},(_,i)=>{
+  const day=i+1,key=`${calendarMonth}-${String(day).padStart(2,'0')}`,mode=recordMode(source,key);
+  const activity=Object.values(source.logs[key]||{}).some(log=>log.quantity||log.eventCompleted);
+  const event=!readOnly&&scheduledEvents(key).length>0;
+  const label=`${monthNumber}月${day}日 ${key>todayKey?'これからの日':MODES[mode].label}${activity?'・タスクの記録あり':''}${event?'・イベントの予定あり':''}`;
+  const classes=`day-cell mode-${mode} ${selectedDay===key?'selected':''} ${key===todayKey?'today':''}`;
+  const contents=`<span>${day}</span>${key<=todayKey?`<i>${MODES[mode].icon}</i>`:''}${activity?'<b class="quantity-calendar-dot"></b>':''}${event?'<b class="event-calendar-dot"></b>':''}`;
+  return readOnly?`<div class="${classes}" role="img" aria-label="${label}">${contents}</div>`:
+   `<button class="${classes}" data-select-date="${key}" aria-label="${label}" ${key>todayKey&&!event?'disabled':''}>${contents}</button>`;
+ }).join('');
+ return `<section class="calendar-card cosmic-calendar" aria-label="活動カレンダー">
+  <div class="month-heading"><div><span class="calendar-year">${year}</span><h1>${monthNumber}<small>月</small></h1></div>
+  ${readOnly?'':'<div><button class="round-button" data-month="-1" aria-label="前の月">‹</button><button class="text-button" data-do="today">今月に戻る</button></div>'}</div>
+  <div class="calendar-grid" style="--weeks:${weeks}">${['月','火','水','木','金','土','日'].map(day=>`<span class="day-label">${day}</span>`).join('')}
+   ${'<div class="calendar-blank"></div>'.repeat(offset)}${days}
+  </div>
+  <div class="calendar-mode-legend">${['none','rest','busy','full'].map(key=>`<span class="mode-${key}"><i></i>${MODES[key].label}</span>`).join('')}</div>
+  ${readOnly?'':'<button class="text-button calendar-rhythm-link" data-do="show-rhythm">モードの割合を見る ↗</button>'}
+ </section>`;
+}
 function scheduledEvents(date){
  return state.nodes.filter(n=>setting(state,n.id).eventDate===date&&nodeKind(state,n.id)==='action'&&!eventCompletionDate(state,n.id));
 }

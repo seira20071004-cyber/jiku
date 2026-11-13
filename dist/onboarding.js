@@ -31,7 +31,7 @@ function draftChildren(nodes, depth = 1) {
       const mode = ['rest', 'busy', 'full'].includes(node.mode) ? {mode: node.mode} : {};
       return [{name, kind: 'action', daily: duration(node.daily), weekly: duration(node.weekly), ...purpose, ...mode}];
     }
-    return depth < 3 ? [{name, kind: 'goal', children: draftChildren(node.children, depth + 1), ...purpose}] : [];
+    return depth < 4 ? [{name, kind: 'goal', children: draftChildren(node.children, depth + 1), ...purpose}] : [];
   });
 }
 
@@ -39,11 +39,15 @@ export function initialPersonalMap(draft) {
   if (draft.map) return draft.map;
   if (draft.goal) {
     const map = createExampleDraft();
+    const purpose = draft.reason || draft.values || map.name;
+    const goal = {name: draft.goal, purpose, kind: 'goal', children: []};
     map.children.unshift({
-      name: draft.values || draft.reason || '大切にしたいこと',
-      purpose: draft.reason || draft.goal,
+      name: draft.values || draft.reasonTwo || draft.reason || '大切にしたいこと',
+      purpose: draft.reasonTwo || draft.reason || draft.goal,
       kind: 'goal',
-      children: [{name: draft.goal, purpose: draft.reason || draft.values || map.name, kind: 'goal', children: []}]
+      children: draft.reasonTwo
+        ? [{name: draft.reason, purpose: draft.reasonTwo, kind: 'goal', children: [goal]}]
+        : [goal]
     });
     return map;
   }
@@ -60,33 +64,11 @@ export function initialPersonalMap(draft) {
     ]}]
   };
 }
-const focusOptions = {
-  motivation: {
-    label: 'やる気が湧かないとき',
-    reply: 'やる気が湧かない日は、最初の一歩が重く感じますよね。',
-    benefit: '自分にとって大切な理由を思い出すと、もう一度取り組むきっかけになります。'
-  },
-  unclear: {
-    label: '何から手をつけるか迷うとき',
-    reply: 'やることが大きすぎると、どこから始めればいいか迷いますよね。',
-    benefit: '今日できることを一つ決めておくと、最初の一歩が見えてきます。'
-  },
-  distractions: {
-    label: 'ほかのことに気を取られるとき',
-    reply: '目の前にいろいろあると、大切にしたいことに戻るのは難しいですよね。',
-    benefit: '次にやることを決めておくと、気がそれたあとも戻りやすくなります。'
-  },
-  busy: {
-    label: '忙しい、または疲れているとき',
-    reply: '忙しい日は、やりたいことに手が回らないこともありますよね。',
-    benefit: 'Jikuでは、忙しい日にもできる小さな行動をあらかじめ用意できます。'
-  }
-};
+const legacyFocusBarriers = ['motivation', 'unclear', 'distractions', 'busy'];
 
-const dialogueSteps = ['example-choice', 'focus', 'explain', 'goal', 'reason', 'values', 'meaning', 'confirm', 'map', 'arrival', 'login'];
+const dialogueSteps = ['example-choice', 'focus', 'explain', 'goal', 'reason', 'reason-two', 'reason-three', 'values', 'meaning', 'confirm', 'map', 'arrival', 'statistics', 'closing', 'login'];
 const research = {
-  motivation: ['理由が続ける支えになる', '価値観や関心に合う目標を追う人ほど、努力を続けやすい傾向がありました。', 'Sheldon & Elliot（1999）', 'https://pubmed.ncbi.nlm.nih.gov/10101878/'],
-  values: ['人が望む気持ちには違いがある', '穏やかさや高揚感など、どんな気持ちを理想とするかに文化による違いが見られました。', 'Tsai ほか（2006）', 'https://web.stanford.edu/group/spanlab/Publications/jt06jpsp.pdf'],
+  motivation: ['理由が続ける支えになる', '自己決定理論をもとにした研究では、自分の価値観や関心に合う目標ほど努力が続きやすく、その達成はより高い幸福感にもつながりました。', 'Sheldon & Elliot（1999）', 'https://pubmed.ncbi.nlm.nih.gov/10101878/'],
   recording: ['進捗を確かめると、目標達成を後押しできる', '138件の実験をまとめた分析で、進捗の確認を促すと目標達成が改善しました。進捗を記録した場合に、効果がより大きく見られました。', 'Harkin ほか（2016）', 'https://pubmed.ncbi.nlm.nih.gov/26479070/']
 };
 
@@ -98,11 +80,17 @@ function researchNote(key) {
 }
 
 export function firstPersonalTask(map) {
-  for (const branch of map.children) {
-    for (const node of branch.children) {
-      const task = node.kind === 'action' ? node : node.children.find(child => child.kind === 'action');
-      if (task) return {...task, branch: branch.name};
+  const findTask = nodes => {
+    for (const node of nodes) {
+      if (node.kind === 'action') return node;
+      const task = findTask(node.children);
+      if (task) return task;
     }
+    return null;
+  };
+  for (const branch of map.children) {
+    const task = findTask(branch.children);
+    if (task) return {...task, branch: branch.name};
   }
   return null;
 }
@@ -113,25 +101,30 @@ export function onboardingDraft(saved, legacy) {
   const priorAnswer = source.direction || source.custom;
   const name = ((typeof source.name === 'string' ? source.name : legacyName) ||
     (typeof priorAnswer === 'string' ? priorAnswer : '')).slice(0, 80);
-  const focusBarrier = Object.hasOwn(focusOptions, source.focusBarrier) ? source.focusBarrier : null;
+  const focusBarrier = legacyFocusBarriers.includes(source.focusBarrier) ? source.focusBarrier : null;
+  const concentration = typeof source.concentration === 'string' ? source.concentration.trim().slice(0, 80) : '';
   let step = 'gaze';
   if (dialogueSteps.includes(source.step) && source.step !== 'explain') step = source.step;
   else if (['ready', 'confirm'].includes(source.step)) step = 'confirm';
-  else if (source.step === 'explain') step = focusBarrier ? 'explain' : 'focus';
+  else if (source.step === 'explain') step = concentration || focusBarrier ? 'explain' : 'focus';
   const starter = {};
   for (const key of Object.keys(starterMap)) {
     if (typeof source.starter?.[key] === 'string') starter[key] = source.starter[key].slice(0, 80);
   }
-  const map = ['map', 'arrival', 'login'].includes(step) && typeof source.map?.name === 'string'
+  const map = ['map', 'arrival', 'statistics', 'closing', 'login'].includes(step) && typeof source.map?.name === 'string'
     ? {name: source.map.name.slice(0, 80), children: draftChildren(source.map.children)} : null;
-  if (['arrival', 'login'].includes(step) && !map) step = 'map';
+  if (['arrival', 'statistics', 'closing', 'login'].includes(step) && !map) step = 'map';
   const answers = {};
-  for (const key of ['goal', 'reason', 'values']) {
+  for (const key of ['goal', 'reason', 'reasonTwo', 'values']) {
     if (typeof source[key] === 'string' && source[key].trim()) answers[key] = source[key].trim().slice(0, 80);
   }
   if (['reason', 'values'].includes(step) && !answers.goal) step = 'goal';
   if (step === 'values' && !answers.reason) step = 'reason';
-  return {name, ...answers, ...(focusBarrier ? {focusBarrier} : {}), ...(Object.keys(starter).length ? {starter} : {}),
+  if (['reason-two', 'reason-three'].includes(step) && !answers.goal) step = 'goal';
+  if (['reason-two', 'reason-three'].includes(step) && !answers.reason) step = 'reason';
+  if (step === 'reason-three' && !answers.reasonTwo) step = 'reason-two';
+  const recordedMode = ['rest', 'busy', 'full'].includes(source.recordedMode) ? source.recordedMode : null;
+  return {name, ...answers, ...(concentration ? {concentration} : {}), ...(recordedMode ? {recordedMode} : {}), ...(focusBarrier ? {focusBarrier} : {}), ...(Object.keys(starter).length ? {starter} : {}),
     ...(map ? {map} : {}), step};
 }
 
@@ -159,7 +152,7 @@ export function clearPendingUniverse() {
 
 export function mountOnboarding(host, {
   initial, preview = false, previewStart = 'gaze',
-  onDraft, onSave, onClose, onSettings, loginAtEnd = false, loginError
+  onDraft, onSave, renderStatistics, onClose, onSettings, loginAtEnd = false, loginError
 } = {}) {
   const draft = onboardingDraft(initial);
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -168,7 +161,8 @@ export function mountOnboarding(host, {
   const {signal} = events;
   let step, timer, formingTimer, sky, saving = false;
   let openBranch = null;
-  let disposeOrigin, warp, flightFrame, demoMode, demoRecorded = false;
+  let disposeOrigin, warp, flightFrame, demoMode = draft.recordedMode;
+  let reportPeriod = 'quantity';
 
   host.innerHTML = `
     <main class="birth-screen" aria-label="Jiku はじまりの宇宙">
@@ -276,52 +270,57 @@ export function mountOnboarding(host, {
 
   function showBirthLesson(focus) {
     showSequence([
-      ['あなたの宇宙が、誕生しました。', 'birth-emphasis'],
-      ['さっきは、目の前の小さな光に意識を向けました。', 'birth-reply'],
-      ['目標達成に関しても、同じことが言えます。', 'birth-emphasis'],
-      ['目の前の一歩がはっきりすると、何をするか迷わずに始められるからです。', 'birth-reply']
+      ['JIKUへようこそ。', 'birth-emphasis'],
+      ['あなたの宇宙が、今、誕生しました。', 'birth-emphasis'],
+      ['この宇宙は、あなたの人生を映す場所です。', 'birth-reply'],
+      ['これから、この宇宙を少しずつ育てていきましょう。', 'birth-reply'],
+      ['目の前のことに集中することが、目標達成への近道になります。', 'birth-emphasis'],
+      ['例えば、英語を話せるようになりたい2人がいるとします。', 'birth-reply'],
+      ['Aさんは、毎日30分、英語の勉強に集中しました。', 'birth-reply'],
+      ['Bさんは、毎日1時間、スマホでSNSを見ながら英語を勉強しました。', 'birth-reply']
     ], shouldFocus => {
-      showQuestion('今夜、健康のために10分だけ使えます。どちらならすぐに始められそうですか？', shouldFocus);
-      choiceControls([['broad', '健康のために何かする'], ['walk', '夕食後に10分歩く']], 'どちらから始めやすい？');
+      showQuestion('あなたは、どちらの方が英語力を伸ばせたと思いますか？', shouldFocus);
+      choiceControls([['a', 'Aさん'], ['b', 'Bさん']], '英語力を伸ばせたと思う人');
     }, focus);
   }
 
   function showFocusQuestion(focus, answer) {
-    const showChoices = shouldFocus => {
-      showQuestion('あなたは、どんなときに集中が続かないと感じますか？', shouldFocus);
-      choiceControls(Object.entries(focusOptions).map(([id, option]) => [id, option.label]), '集中しづらい場面');
-    };
-    if (!answer) return showChoices(focus);
+    const ask = shouldFocus => askForAnswer('concentration', shouldFocus);
+    if (!answer) return ask(focus);
     showSequence([
-      [answer === 'walk' ? '何をするか、すぐに思い浮かびますよね。' : '「何かする」を「夕食後に10分歩く」にすると、やることが見えてきます。', 'birth-reply'],
-      ['大きな目標があるときこそ、今日の一歩に意識を向けてみましょう。', 'birth-emphasis']
-    ], showChoices, focus);
+      [answer === 'a' ? 'Aさんは、30分を英語に集中して使えましたね。' : 'Bさんには、長く勉強できる時間がありましたね。', 'birth-reply'],
+      ['勉強の成果には、使った時間に加えて、その時間にどれだけ集中できたかも関わります。', 'birth-reply'],
+      ['目標を達成するために、まず目の前のことに集中する時間をつくりましょう。', 'birth-emphasis'],
+      ['それでも、集中しようと思っても、なかなか続かないことがあります。', 'birth-reply']
+    ], ask, focus);
   }
 
   function explain(focus) {
-    const option = focusOptions[draft.focusBarrier];
     showSequence([
-      [option.reply, 'birth-reply'],
-      [option.benefit, 'birth-reply'],
-      ['集中が続かない理由のなかから、ここではやる気に注目してみましょう。', 'birth-reply'],
-      ['やる気を保つには、「何のためにやるのか」を思い出すことが助けになります。', 'birth-emphasis'],
-      ['たとえば、海外に住む友人ともっと話したいなら、SNSを見ていた10分を英語の練習に使う理由が見えてきます。', 'birth-reply'],
-      ['目の前の一歩を続ける支えになるのは、自分にとって大切な理由です。', 'birth-emphasis']
+      [draft.concentration ? `「${draft.concentration}」。そんなときは集中を続けるのが難しいですよね。` : '集中が続かない理由は、人によってさまざまです。', 'birth-reply'],
+      ['その中で、JIKUはモチベーションに着目しました。', 'birth-emphasis'],
+      ['モチベーションは、行動を始めたり続けたりする支えになるからです。', 'birth-reply'],
+      ['例えば、どうしても合格したい試験があれば、SNSを見る時間を決めて、勉強の時間をつくる人もいます。', 'birth-reply'],
+      ['達成したいという気持ちがあると、目の前の時間の使い方も変わります。', 'birth-reply'],
+      ['目標に向けて集中を続けるために、自分が取り組む理由を大切にしましょう。', 'birth-emphasis']
     ], shouldFocus => enter('goal', {focus: shouldFocus}), focus);
   }
 
   function askForAnswer(key, focus) {
     const prompts = {
-      goal: ['いま、あなたが叶えたいことは何ですか？', '例　無理なく運動を続けたい'],
-      reason: [`「${draft.goal}」が叶ったら、どんなことがうれしいですか？`, '例　休日に元気に出かけたい'],
-      values: [`「${draft.reason}」の先に、どんな日々が増えたら幸せだと思いますか？`, '例　大切な人と元気に過ごしたい']
+      concentration: ['なぜ集中が続かないと思いますか？', '例　スマホが気になってしまう', 'explain'],
+      goal: ['あなたが達成したい目標は何ですか？', '例　無理なく運動を続けたい', 'reason'],
+      reason: [`「${draft.goal}」を、何のために達成したいですか？`, '例　休日に元気に出かけたい', 'reason-two'],
+      'reason-two': [`「${draft.reason}」。では、それは何のためでしょうか？`, '例　家族と出かける時間を増やしたい', 'reason-three'],
+      'reason-three': [`「${draft.reasonTwo}」を実現できたら、どんなことを得たいですか？`, '例　家族と楽しい思い出をつくりたい', 'meaning'],
+      values: [`「${draft.reason}」の先に、どんな日々が増えたら幸せだと思いますか？`, '例　大切な人と元気に過ごしたい', 'meaning']
     };
-    const [question, placeholder] = prompts[key];
+    const [question, placeholder, next] = prompts[key];
     showQuestion(question, focus);
     controls.innerHTML = `<form class="birth-form">
       <input name="answer" required maxlength="80" placeholder="${placeholder}">
       <button type="submit" class="birth-primary">答える</button>
-    </form>${key === 'goal' ? researchNote('motivation') : ''}
+    </form>${key === 'goal' ? '<p class="birth-map-caption">大きな目標でも、小さな目標でも構いません。</p>' : ''}
     <button type="button" class="birth-quiet birth-edit" data-birth="skip-answer">まだ思いつかない</button>`;
     const form = controls.querySelector('form');
     form.elements.answer.setAttribute('aria-label', question);
@@ -334,26 +333,33 @@ export function mountOnboarding(host, {
         form.elements.answer.reportValidity();
         return;
       }
-      draft[key] = answer;
-      enter({goal: 'reason', reason: 'values', values: 'meaning'}[key], {focus: true});
+      const field = {'reason-two': 'reasonTwo', 'reason-three': 'values'}[key] || key;
+      draft[field] = answer;
+      enter(next, {focus: true});
     });
   }
 
   function showMeaning(focus) {
+    const value = draft.values || draft.reasonTwo || draft.reason;
     showSequence([
-      [draft.values || draft.reason ? `「${draft.values || draft.reason}」。あなたにとっての幸せを考える手がかりが見つかりました。` : 'どんな日が増えたら幸せか、考えるところから始めても大丈夫です。', 'birth-reply'],
-      ['目標の先にある「何のため？」が見えると、今日の行動が自分の幸せにどうつながるか見えてきます。', 'birth-emphasis'],
-      ['そのつながりを、マインドマップで見てみましょう。', 'birth-reply']
+      [value ? `「${value}」。聞かせてくれて、ありがとうございます。` : '答えは、自分のペースで見つけていきましょう。', 'birth-reply'],
+      ['「何のため？」と考えていくと、自分が本当に大切にしているものが少しずつ見えてきます。', 'birth-reply'],
+      ['その先には、自分らしく幸せに暮らしたいという願いがあるかもしれません。', 'birth-reply'],
+      ['例えば、お金を稼ぎたい理由には、家族と安心して暮らしたいという願いがあるかもしれません。', 'birth-reply'],
+      ['目の前の目標は、自分が望む人生に近づくための手段でもあります。', 'birth-emphasis'],
+      ['自分の行動が大切なものにつながっていると感じることが、やる気を支えてくれます。', 'birth-reply'],
+      ['英単語を覚えることも、海外の人と自由に話したいという願いにつながると、取り組む意味が見えてきます。', 'birth-reply'],
+      ['今日の行動と、自分が本当に大切にしていることをつなげてみましょう。', 'birth-emphasis']
     ], shouldFocus => {
-      showQuestion('マインドマップを知っていますか？', shouldFocus);
-      choiceControls([['know-map', '知っている'], ['new-map', '初めて聞いた']], 'マインドマップ');
+      showQuestion('ところで、マインドマップを知っていますか？', shouldFocus);
+      choiceControls([['know-map', '知っている'], ['new-map', '知らない']], 'マインドマップ');
     }, focus);
   }
 
   function showMap(focus, editable) {
     showQuestion(editable ? 'あなたのマインドマップをつくりましょう。' : 'まずは「健康」の枝をタップしてみてください。', focus);
     if (!editable) {
-      const hub = `<div class="map-node map-root"><span aria-hidden="true">◎</span><strong>${exampleMap.name}</strong></div>`;
+      const hub = `<div class="map-node map-root"><span aria-hidden="true">◎</span><strong>自分らしく幸せな人生を送る</strong></div>`;
       const points = exampleMap.branches.map((branch, index) => ({
         tone: index,
         card: `<button type="button" class="map-node" data-example-branch="${index}" aria-expanded="false" aria-controls="birth-example-detail">
@@ -363,9 +369,7 @@ export function mountOnboarding(host, {
       controls.innerHTML = `<div class="birth-example">
         ${mapDiagram(hub, points, {radial: true, label: '幸せな人生のマインドマップ'})}
         <div class="map-subview" id="birth-example-detail" hidden></div>
-        <p class="birth-map-caption">「幸せな人生」は、この地図の一番大きな目標です。エンジニアになることが幸せにつながるかは、何を大切にしたいかで変わります。</p>
-        <button class="birth-primary" type="button" data-birth="example">自分のマインドマップをつくる <span aria-hidden="true">→</span></button>
-        ${researchNote('values')}
+        <div class="birth-example-next"></div>
       </div>`;
       return;
     }
@@ -426,23 +430,22 @@ export function mountOnboarding(host, {
       detail.replaceChildren();
       return;
     }
-    const points = branch.children.map((node, index) => {
-      const path = `${openBranch}.${index}`;
+    function branchCard(node, path) {
       const task = node.kind === 'action';
-      return {tone: openBranch % 4, card: `
-        ${editNodeButton(node, path, task ? '✓' : '✦')}
+      const depth = path.split('.').length;
+      return `${editNodeButton(node, path, task ? '✓' : '✦')}
         <div class="birth-map-point-actions">
-          ${task ? '' : `<button type="button" class="birth-map-add" data-birth-add-node="${path}" data-node-kind="action">＋ タスク</button>`}
+          ${!task && depth < 4 ? `<button type="button" class="birth-map-add" data-birth-add-node="${path}" data-node-kind="action">＋ タスク</button>` : ''}
           ${removeNodeButton(node, path)}
         </div>
-        ${task ? '' : `
-          <ul class="map-task-nodes">${node.children.map((task, taskIndex) => `<li>
-            <button type="button" data-birth-edit-node="${path}.${taskIndex}">
-              ${mapKindLabel('action')}<span>${escapeMapText(task.name)}</span><small>${task.daily}分</small>
-            </button>
-            ${removeNodeButton(task, `${path}.${taskIndex}`)}
-          </li>`).join('')}</ul>`}`};
-    });
+        ${task ? `<p class="birth-map-caption">${node.daily}分</p>` : node.children.length ? `
+          <ul class="map-task-nodes birth-map-nested">${node.children.map((child, index) =>
+            `<li>${branchCard(child, `${path}.${index}`)}</li>`).join('')}</ul>` : ''}`;
+    }
+    const points = branch.children.map((node, index) => ({
+      tone: openBranch % 4,
+      card: branchCard(node, `${openBranch}.${index}`)
+    }));
     detail.innerHTML = `${mapDiagram(editNodeButton(branch, String(openBranch), '◉', 'map-detail-root'), points, {label: '銀河の枝'})}
       <div class="birth-map-add-actions">
         <button type="button" class="birth-map-add" data-birth-add-node="${openBranch}" data-node-kind="goal">＋ 目標を追加</button>
@@ -562,47 +565,115 @@ export function mountOnboarding(host, {
     if (alreadyOpen) return;
     button.setAttribute('aria-expanded', 'true');
     const hub = `<div class="map-node map-detail-root"><strong>${branch.name}</strong></div>`;
-    const points = branch.goals.map(goal => ({
+    const points = branch.goals.map((goal, goalIndex) => ({
       tone: index,
-      card: `<div class="map-node"><span aria-hidden="true">✦</span><span>${mapKindLabel('goal')}<strong>${goal.name}</strong></span></div>
-        <ul class="map-task-nodes">${goal.tasks.map(([name, minutes]) =>
-          `<li><span>${mapKindLabel('action')}${name}</span><small>${minutes}分</small></li>`).join('')}</ul>`
+      card: `<button type="button" class="map-node" data-example-goal="${index}.${goalIndex}" aria-expanded="false">
+        <span aria-hidden="true">✦</span><span>${mapKindLabel('goal')}<strong>${goal.name}</strong></span>
+      </button><div class="birth-example-tasks" hidden></div>`
     }));
-    detail.innerHTML = mapDiagram(hub, points, {label: branch.name}) +
-      (index === 0 ? '<p class="birth-map-caption">「健康でいたい」から枝をたどると、「10分歩く」までたどり着きます。</p>' : '');
+    showQuestion('次に、枝の中の目標を一つタップしてみましょう。', false);
+    detail.innerHTML = mapDiagram(hub, points, {label: branch.name});
     detail.scrollIntoView({block: 'nearest'});
   }
 
+  function showExampleGoal(button) {
+    const [branchIndex, goalIndex] = button.dataset.exampleGoal.split('.').map(Number);
+    const goal = exampleMap.branches[branchIndex].goals[goalIndex];
+    const tasks = button.nextElementSibling;
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    button.setAttribute('aria-expanded', String(!expanded));
+    tasks.hidden = expanded;
+    if (expanded) return;
+    tasks.innerHTML = `<ul class="map-task-nodes">${goal.tasks.map(([name, minutes]) =>
+      `<li><span>${mapKindLabel('action')}${name}</span><small>${minutes}分</small></li>`).join('')}</ul>`;
+    if (controls.querySelector('.birth-example-next button')) return;
+    showQuestion('大きな目標から、今日できる行動までたどり着きました。', false);
+    controls.querySelector('.birth-example-next').innerHTML = `<p class="birth-map-caption">優秀なエンジニアになることが幸せにつながるかは、人によって違います。心理学でも、自分の価値観に合う目標と、取り組む意欲や幸福感との関係が研究されています。</p>
+      ${researchNote('motivation')}
+      <p class="birth-map-caption">最初は一つの枝からで大丈夫です。目標は後から何度でも変えられます。</p>
+      <button class="birth-primary" type="button" data-birth="example">自分のマインドマップをつくる →</button>`;
+    tasks.scrollIntoView({block: 'nearest'});
+  }
+
   function showArrival(focus) {
-    showQuestion('あなたの星にたどり着きました。', focus);
-    renderArrival();
+    const offerMode = shouldFocus => {
+      showQuestion('今日は、どのモードで過ごしたいですか？', shouldFocus);
+      renderArrival();
+    };
+    showSequence([
+      ['あなたの星にたどり着きました。', 'birth-emphasis'],
+      ['マインドマップの枝は、銀河・恒星系・惑星など、この宇宙の目標の階層につながっています。', 'birth-reply'],
+      ['ここには、目標に向かって進んだ記録を残せます。', 'birth-emphasis'],
+      ['JIKUには、休む日・忙しい日・余裕がある日の3つのモードがあります。', 'birth-reply'],
+      ['タスクごとに量とモードを設定しておけば、その日のペースを選ぶだけで、取り組んだ量を記録できます。', 'birth-reply']
+    ], offerMode, focus);
   }
 
   function renderArrival() {
     const task = firstPersonalTask(draft.map);
     const included = task && demoMode && modesForLevel(task.mode || 'rest').includes(demoMode);
     controls.innerHTML = `<div class="birth-example birth-arrival">
-      <p>目標へ向けた行動は、ここで記録できます。</p>
-      <p>休む日・忙しい日・余裕がある日。どのペースから取り組むかは、自分で決められます。</p>
-      ${task ? `<div class="birth-demo" aria-label="記録のお試し">
-        <strong>今日のモードを試す</strong>
+      <div class="birth-demo" aria-label="記録のお試し">
         <div class="birth-demo-modes">${['rest', 'busy', 'full'].map(mode =>
           `<button type="button" class="birth-choice" data-demo-mode="${mode}" aria-pressed="${demoMode === mode}">${MODES[mode].label}</button>`
         ).join('')}</div>
         <div class="birth-demo-result" aria-live="polite">
-        ${demoMode ? included ? `<p>${escapeMapText(task.name)} · ${task.daily}分</p>
-          ${demoRecorded ? `<p><strong>統計のプレビュー</strong> · ${escapeMapText(task.branch)}</p>
-            <progress value="${Math.min(task.daily, task.weekly)}" max="${task.weekly}" aria-label="週の達成度"></progress>
-            <p>今週 ${task.daily} / ${task.weekly}分 · ${Math.round(task.daily / task.weekly * 100)}%</p>
-            <p>記録が星の灯りになりました。日々の積み重ねは、週・月・3か月ごとに振り返れます。</p>`
-            : '<button type="button" class="birth-primary" data-birth="demo-record">このタスクの記録を試す</button>'}`
-          : '<p>このタスクは、もう少し余裕がある日に取り組む設定です。</p>' : ''}
+          ${demoMode ? `<p>${included ? `${escapeMapText(task.name)} · ${task.daily}分` : '選んだモードで統計を確認できます。'}</p>` : ''}
         </div>
-      </div>` : '<p>マインドマップにタスクを追加すると、ここで記録を試せます。</p>'}
-      ${researchNote('recording')}
-      <button class="birth-primary" type="button" data-birth="finish-arrival">自分の星を保存する <span aria-hidden="true">→</span></button>
+      </div>
+      ${demoMode ? `<p class="birth-map-caption">138件の実験をまとめた研究では、進捗の記録・確認が目標達成を後押ししました。</p>
+        ${researchNote('recording')}
+        <button class="birth-primary" type="button" data-birth="show-statistics">統計を見る →</button>` : ''}
       <button class="birth-quiet birth-edit" type="button" data-birth="back-to-map">マインドマップに戻る</button>
     </div>`;
+  }
+
+  const reportTabs = [
+    ['quantity', '1週間', '1週間では、日々の行動を振り返ります。'],
+    ['monthly', '1か月', '1か月では、続けてきた時間や目標までの進み具合を確認できます。'],
+    ['quarter', '3か月', '3か月では、積み重ねを眺め、目標や人生の方向性を見直せます。'],
+    ['calendar', 'カレンダー', 'カレンダーでは、どの日に取り組んだかを振り返れます。']
+  ];
+
+  function showStatistics(focus) {
+    showQuestion('自分の成長を振り返ってみましょう。', focus);
+    controls.innerHTML = `<div class="birth-example birth-statistics">
+      <p class="birth-map-caption">お試しで選んだモードの記録</p>
+      <div class="statistics-tabs" role="group" aria-label="振り返る期間">
+        ${reportTabs.map(([id, label]) => `<button type="button" data-birth-report="${id}" aria-pressed="false">${label}</button>`).join('')}
+      </div>
+      <p class="birth-map-caption birth-report-caption" aria-live="polite"></p>
+      <div class="birth-report-body view-stats"><div class="statistics-content"></div></div>
+      <button class="birth-primary" type="button" data-birth="show-closing">自分の星に戻る →</button>
+    </div>`;
+    updateReport(reportPeriod);
+  }
+
+  function updateReport(period) {
+    reportPeriod = period;
+    for (const tab of controls.querySelectorAll('[data-birth-report]')) {
+      tab.setAttribute('aria-pressed', String(tab.dataset.birthReport === period));
+    }
+    controls.querySelector('.birth-report-caption').textContent = reportTabs.find(([id]) => id === period)[2];
+    const body = controls.querySelector('.birth-report-body .statistics-content');
+    body.classList.toggle('calendar-content', period === 'calendar');
+    body.classList.toggle('quantity-content', period !== 'calendar');
+    body.innerHTML = renderStatistics(draft.map, demoMode, period);
+  }
+
+  function showClosing(focus) {
+    showSequence([
+      ['ここまで、ありがとうございました。', 'birth-reply'],
+      ['あなたが今日つくった宇宙は、まだ始まったばかりです。', 'birth-emphasis'],
+      ['これから、あなたの行動が記録として積み重なり、星を育てていきます。', 'birth-reply'],
+      ['振り返りを重ねると、次に何をするかが少しずつ見えてきます。', 'birth-reply'],
+      ['休む日があっても、目標が変わっても大丈夫です。', 'birth-reply'],
+      ['迷ったときは、この宇宙で、何を目指しているのか、何のために続けるのか、今日できることは何かを思い出してください。', 'birth-reply'],
+      ['今日の一歩に、人生の意味を。', 'birth-emphasis']
+    ], shouldFocus => {
+      showQuestion('さあ、あなたの目標に向かって進んでいきましょう。', shouldFocus);
+      controls.innerHTML = '<button class="birth-primary" type="button" data-birth="start-jiku">JIKUをはじめる →</button>';
+    }, focus);
   }
 
   function enter(next, {focus = false, answer} = {}) {
@@ -613,9 +684,10 @@ export function mountOnboarding(host, {
     const choosing = next === 'login';
     screen.toggleAttribute('data-choosing', choosing);
     screen.toggleAttribute('data-chat', !choosing && !Object.hasOwn(opening, next) && next !== 'bang');
-    screen.toggleAttribute('data-map', next === 'confirm' || next === 'map');
-    screen.toggleAttribute('data-landing', ['travel', 'arrival', 'login'].includes(next));
+    screen.toggleAttribute('data-map', ['confirm', 'map', 'statistics'].includes(next));
+    screen.toggleAttribute('data-landing', ['travel', 'arrival', 'closing', 'login'].includes(next));
     if (choosing || next === 'gaze' || next === 'arrival') delete screen.dataset.forming;
+    screen.toggleAttribute('data-demo-recorded', Boolean(draft.recordedMode));
     sky?.stage(next);
     skip.hidden = !Object.hasOwn(opening, next) && next !== 'bang';
     intro.replaceChildren();
@@ -652,7 +724,12 @@ export function mountOnboarding(host, {
       timer = setTimeout(() => enter('example-choice'), BANG_DURATION);
       return;
     }
-    if (next === 'travel') {
+    if (next === 'departure') {
+      showSequence([
+        ['ありがとうございます。あなた自身の目標が、少しずつ形になりましたね。', 'birth-reply'],
+        ['では、あなたの星へ向かいましょう。', 'birth-emphasis']
+      ], shouldFocus => enter('travel', {focus: shouldFocus}), focus);
+    } else if (next === 'travel') {
       retireTurn();
       const travelCopy = message('p', 'あなたの星へ向かいます。', 'birth-prompt');
       intro.append(travelCopy);
@@ -675,9 +752,11 @@ export function mountOnboarding(host, {
     } else if (next === 'example-choice') showBirthLesson(focus);
     else if (next === 'focus') showFocusQuestion(focus, answer);
     else if (next === 'explain') explain(focus);
-    else if (['goal', 'reason', 'values'].includes(next)) askForAnswer(next, focus);
+    else if (['goal', 'reason', 'reason-two', 'reason-three', 'values'].includes(next)) askForAnswer(next, focus);
     else if (next === 'meaning') showMeaning(focus);
     else if (next === 'arrival') showArrival(focus);
+    else if (next === 'statistics') showStatistics(focus);
+    else if (next === 'closing') showClosing(focus);
     else showMap(focus, next === 'map');
   }
 
@@ -703,6 +782,10 @@ export function mountOnboarding(host, {
       return;
     }
     const button = event.target.closest('button');
+    if (button?.dataset.exampleGoal) {
+      showExampleGoal(button);
+      return;
+    }
     const action = button?.dataset.birth;
     const choice = button?.dataset.choice;
     if (step === 'map' && button && !saving) {
@@ -724,55 +807,46 @@ export function mountOnboarding(host, {
         return;
       }
       if (action === 'generate') {
-        enter('travel', {focus: true});
+        enter('departure', {focus: true});
         return;
       }
     }
     if (step === 'login' && action === 'preview-login') void saveMap(draft.map);
-    if (step === 'login' && action === 'back-to-star') enter('arrival', {focus: true});
+    if (step === 'login' && action === 'back-to-star') enter('closing', {focus: true});
     if (step === 'arrival') {
       if (button?.dataset.demoMode) {
         demoMode = button.dataset.demoMode;
-        demoRecorded = false;
-        delete screen.dataset.demoRecorded;
+        draft.recordedMode = demoMode;
+        persist();
+        screen.dataset.demoRecorded = '';
         renderArrival();
         controls.querySelector('[aria-pressed="true"]').focus({preventScroll: true});
       }
-      if (action === 'demo-record' && !demoRecorded) {
-        demoRecorded = true;
-        screen.dataset.demoRecorded = '';
-        renderArrival();
-        const progress = controls.querySelector('progress');
-        progress.tabIndex = -1;
-        progress.focus({preventScroll: true});
-        progress.scrollIntoView({block: 'nearest'});
-      }
       if (action === 'back-to-map') {
+        delete draft.recordedMode;
         demoMode = null;
-        demoRecorded = false;
-        delete screen.dataset.demoRecorded;
         enter('map', {focus: true});
       }
-      if (action === 'finish-arrival') {
-        if (!loginAtEnd) void saveMap(draft.map);
-        else {
-          try { enter('login', {focus: true}); }
-          catch { enter('arrival'); showError('下書きを保存できませんでした。ブラウザの設定をご確認ください。'); }
-        }
+      if (action === 'show-statistics') enter('statistics', {focus: true});
+    }
+    if (step === 'statistics' && button?.dataset.birthReport) updateReport(button.dataset.birthReport);
+    if (step === 'statistics' && action === 'show-closing') enter('closing', {focus: true});
+    if (step === 'closing' && action === 'start-jiku') {
+      if (!loginAtEnd) void saveMap(draft.map);
+      else {
+        try { enter('login', {focus: true}); }
+        catch { enter('closing'); showError('下書きを保存できませんでした。ブラウザの設定をご確認ください。'); }
       }
     }
-    if (step === 'example-choice' && ['broad', 'walk'].includes(choice)) enter('focus', {focus: true, answer: choice});
-    if (['goal', 'reason', 'values'].includes(step) && action === 'skip-answer') enter('meaning', {focus: true});
-    if (step === 'meaning' && choice === 'know-map') enter('confirm', {focus: true});
-    if (step === 'meaning' && choice === 'new-map') {
+    if (step === 'example-choice' && ['a', 'b'].includes(choice)) enter('focus', {focus: true, answer: choice});
+    if (action === 'skip-answer') enter(step === 'focus' ? 'explain' : 'meaning', {focus: true});
+    if (step === 'meaning' && ['know-map', 'new-map'].includes(choice)) {
       controls.replaceChildren();
-      showSequence([
-        ['真ん中に大きな目標を置き、枝を伸ばして、今日できることまで整理する地図です。', 'birth-reply']
-      ], focus => enter('confirm', {focus}), true);
-    }
-    if (step === 'focus' && Object.hasOwn(focusOptions, choice)) {
-      draft.focusBarrier = choice;
-      enter('explain', {focus: true});
+      const turns = choice === 'new-map' ? [
+        ['マインドマップは、中心に一つのテーマを書き、関連する考えや目標を枝のように広げて整理する方法です。', 'birth-reply']
+      ] : [];
+      turns.push(['今回は、中心に人生の大きな目標を置き、そのために必要なことを整理していきます。', 'birth-reply']);
+      showSequence(turns, focus => enter('confirm', {focus}), true);
     }
     if (action === 'skip') enter('example-choice', {focus: true});
     if (action === 'close') onClose?.();
