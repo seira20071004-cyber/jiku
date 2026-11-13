@@ -22,7 +22,7 @@ export function validate(s){if(!s||s.version!==1||!Array.isArray(s.nodes)||!s.se
 export const UNITS={pages:{label:'ページ',dimension:'pages',factor:1},hours:{label:'時間',dimension:'time',factor:60},minutes:{label:'分',dimension:'time',factor:1},count:{label:'回',dimension:'count',factor:1},questions:{label:'問',dimension:'questions',factor:1},words:{label:'単語',dimension:'words',factor:1},items:{label:'個',dimension:'items',factor:1}};
 export const rounded=n=>Math.round((n+Number.EPSILON)*1e6)/1e6;
 export function measurement(s,id){return setting(s,id).measurement||{unit:'count',weeklyTarget:null}}
-export function validateMeasurement(m){if(m?.dailyAmount!=null&&(!Number.isFinite(m.dailyAmount)||m.dailyAmount<.001||m.dailyAmount>1000000))throw Error('タスクの量は0.001以上で入力してください');if(!m||(!Object.hasOwn(UNITS,m.unit)&&m.unit!=='custom'))throw Error('記録する単位を選んでください');if(m.unit==='custom'&&(typeof m.customUnit!=='string'||!m.customUnit.trim()||m.customUnit.trim().length>12))throw Error('単位は1〜12文字で入力してください');for(const [key,label] of [['weeklyTarget','週'],['monthlyTarget','月']]){const target=m[key];if(target!=null&&(!Number.isFinite(target)||target<=0||target>1000000))throw Error(label+'の目標量は0より大きい数にしてください')}if(m.extras!=null){
+export function validateMeasurement(m){if(m?.dailyAmount!=null&&(!Number.isFinite(m.dailyAmount)||m.dailyAmount<.001||m.dailyAmount>1000000))throw Error('タスクの量は0.001以上で入力してください');if(!m||(!Object.hasOwn(UNITS,m.unit)&&m.unit!=='custom'))throw Error('記録する単位を選んでください');if(m.unit==='custom'&&(typeof m.customUnit!=='string'||!m.customUnit.trim()||m.customUnit.trim().length>12))throw Error('単位は1〜12文字で入力してください');for(const [key,label] of [['totalTarget','全体'],['weeklyTarget','週'],['monthlyTarget','月']]){const target=m[key];if(target!=null&&(!Number.isFinite(target)||target<=0||target>1000000))throw Error(label+'の目標量は0より大きい数にしてください')}if(m.extras!=null){
  if(!Array.isArray(m.extras)||m.extras.length>12)throw Error('追加の単位を確認してください');
  const dimensions=new Set();
  for(const extra of m.extras){
@@ -34,15 +34,22 @@ export function validateMeasurement(m){if(m?.dailyAmount!=null&&(!Number.isFinit
  }return m}
 export function unitInfo(m){validateMeasurement(m);if(Object.hasOwn(UNITS,m.unit))return UNITS[m.unit];const label=m.customUnit.trim(),known=Object.values(UNITS).find(u=>u.label===label);return known||{label,dimension:'custom:'+label,factor:1}}
 export function validDateKey(key){if(typeof key!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(key))return false;const d=new Date(key+'T12:00:00+09:00');return Number.isFinite(d.getTime())&&dateKey(d)===key}
+export function paceForDeadline(total,start,deadline){
+ if(!Number.isFinite(total)||total<.001||total>1000000)throw Error('必要な量を0.001〜1,000,000で入力してください');
+ if(!validDateKey(start)||!validDateKey(deadline)||deadline<start)throw Error('今日以降の期限を入力してください');
+ const days=(Date.parse(deadline)-Date.parse(start))/86400000+1;
+ const daily=total/days;
+ return {totalTarget:total,weeklyTarget:rounded(Math.min(total,daily*7)),dailyAmount:rounded(daily),days};
+}
 export function goalIds(s,id){const path=[];let n=s.nodes.find(n=>n.id===id);while(n){path.unshift(n.id);n=s.nodes.find(p=>p.id===n.parentId)}return path}
 export function validateDuration(minutes){
  if(!Number.isFinite(minutes)||minutes<.001||minutes>1000000)throw Error('取り組む時間を分で入力してください');
 }
 export function timeMeasurement(m){
  const unit=unitInfo(m);
- if(unit.dimension!=='time')return {unit:'minutes',dailyAmount:null,weeklyTarget:null,monthlyTarget:null,extras:[m]};
+ if(unit.dimension!=='time')return {unit:'minutes',dailyAmount:null,totalTarget:null,weeklyTarget:null,monthlyTarget:null,extras:[m]};
  const convert=amount=>amount==null?null:rounded(amount*unit.factor);
- return {unit:'minutes',dailyAmount:convert(m.dailyAmount),weeklyTarget:convert(m.weeklyTarget),monthlyTarget:convert(m.monthlyTarget),extras:m.extras};
+ return {unit:'minutes',dailyAmount:convert(m.dailyAmount),totalTarget:convert(m.totalTarget),weeklyTarget:convert(m.weeklyTarget),monthlyTarget:convert(m.monthlyTarget),extras:m.extras};
 }
 export function taskRecordFields(s,key,id){
  const old=s.logs[key]?.[id]?.quantity;

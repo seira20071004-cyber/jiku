@@ -5,31 +5,49 @@ export const numberText=n=>new Intl.NumberFormat('ja-JP',{maximumFractionDigits:
 function minuteInput(label,name,value='',required=true){
  return `<label>${label}<span class="task-week-target-entry"><input type="number" inputmode="decimal" name="${name}" min="0.001" max="1000000" step="any" ${required?'required':''} value="${esc(value??'')}" aria-label="${label}"><span>分</span></span></label>`;
 }
-function quantitySettingsFields(m){
- return `<section class="task-amount-config">
-  <h3>時間の設定</h3>
-  ${minuteInput('1日に取り組む時間','daily-minutes',m.dailyAmount)}
-  <div class="task-weekly-target"><h3>目標時間</h3><p>週と月のどちらか、または両方を設定できます。</p>
-   <div class="task-target-grid">
-    ${minuteInput('1週間の目標時間','weekly-minutes',m.weeklyTarget,false)}
-    ${minuteInput('1ヶ月の目標時間','monthly-minutes',m.monthlyTarget,false)}
-   </div>
+function targetCalculator({time=false,total=null}={}){
+ return `<details class="target-calculator">
+  <summary>逆算して計算する</summary>
+  <p>今日から期限まで、毎日均等に取り組む場合の目安です。</p>
+  <div class="task-target-grid">
+   <label>${time?'上位目標に必要な時間（分）':'上位目標に必要な量'}<input data-calc-total type="number" inputmode="decimal" step="any" value="${esc(total??'')}"></label>
+   <label>いつまでに達成したいか<input data-calc-date type="date"></label>
   </div>
+  <div class="target-calculator-actions"><button type="button" data-calculate-target>計算する</button>
+   <button type="button" data-apply-target hidden>目標に反映</button></div>
+  <output data-calc-result aria-live="polite"></output>
+ </details>`;
+}
+function quantitySettingsFields(m){
+ return `<section class="task-amount-config" data-target-fields="time">
+  <h3>目標時間</h3>
+  <div class="task-target-grid task-target-three">
+   ${minuteInput('全体の目標時間','total-minutes',m.totalTarget,false)}
+   ${minuteInput('1週間の目標時間','weekly-minutes',m.weeklyTarget,false)}
+   ${minuteInput('1日の目標時間','daily-minutes',m.dailyAmount)}
+  </div>
+  ${targetCalculator({time:true,total:m.totalTarget})}
+  <details class="task-monthly-target" ${m.monthlyTarget?'open':''}><summary>1ヶ月の目標時間（任意）</summary>
+   ${minuteInput('1ヶ月の目標時間','monthly-minutes',m.monthlyTarget,false)}
+  </details>
  </section>`;
 }
 export function extraMetricFields(metric={},event=false){
  const unit=metric.unit||'';
  const amountInput=(label,field,value,required=false)=>`<label>${label}<input type="number" inputmode="decimal" name="${field}" min="0.001" max="1000000" step="any" ${required?'required':''} value="${esc(value??'')}"></label>`;
- return `<div class="extra-metric" data-extra-metric>
+ return `<div class="extra-metric" data-extra-metric data-target-fields="extra">
   <div class="extra-metric-top"><label>追加の単位<select name="extra-unit" required><option value="">選択してください</option>${Object.entries(UNITS).filter(([,u])=>u.dimension!=='time').map(([key,u])=>`<option value="${key}" ${unit===key?'selected':''}>${u.label}</option>`).join('')}<option value="custom" ${unit==='custom'?'selected':''}>自由入力</option></select></label><button type="button" class="text-button" data-remove-extra aria-label="追加の単位を削除">×</button></div>
   <label data-extra-custom ${unit==='custom'?'':'hidden'}>単位の名前<input name="extra-custom-unit" maxlength="12" value="${esc(metric.customUnit||'')}" ${unit==='custom'?'required':'disabled'}></label>
-  ${amountInput('取り組む日の量','extra-daily',metric.dailyAmount,true)}
-  <fieldset data-extra-targets ${event?'hidden disabled':''}><details ${metric.weeklyTarget||metric.monthlyTarget?'open':''}>
-   <summary>この単位の目標（任意）</summary><div class="task-target-grid">
-    ${amountInput('週間目標','extra-weekly',metric.weeklyTarget)}
-    ${amountInput('月間目標','extra-monthly',metric.monthlyTarget)}
+  ${event?amountInput('取り組む日の量','extra-daily',metric.dailyAmount,true):`
+   <div class="task-target-grid task-target-three">
+    ${amountInput('全体の目標','extra-total',metric.totalTarget)}
+    ${amountInput('1週間の目標','extra-weekly',metric.weeklyTarget)}
+    ${amountInput('1日の目標','extra-daily',metric.dailyAmount,true)}
    </div>
-  </details></fieldset>
+   ${targetCalculator({total:metric.totalTarget})}
+   <details class="task-monthly-target" ${metric.monthlyTarget?'open':''}><summary>1ヶ月の目標（任意）</summary>
+    ${amountInput('1ヶ月の目標','extra-monthly',metric.monthlyTarget)}
+   </details>`}
  </div>`;
 }
 function extraRecordFields(metrics=[],amounts=[]){
@@ -38,7 +56,7 @@ function extraRecordFields(metrics=[],amounts=[]){
   ${metrics.map((metric,index)=>{const {label}=unitInfo(metric);return `<label>${esc(label)}<input name="record-extra" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" value="${esc(amounts[index]??'')}"></label>`}).join('')}
  </div></section>`;
 }
-export function taskLevelFields(a,name='task-level'){const selected=taskLevel(a),options=[{value:'rest',title:'毎日取り組む',days:['rest','busy','full']},{value:'busy',title:'忙しい日も取り組む',days:['busy','full']},{value:'full',title:'余裕がある日だけ',days:['full']}];return `<fieldset class="task-schedule-config"><legend>どんな日に取り組みますか？</legend><p class="task-setting-caption">1つ選ぶと、対象の日が自動で決まります。</p><div class="task-schedule-options">${options.map(o=>`<label class="task-schedule-option"><input type="radio" required name="${esc(name)}" value="${o.value}" ${selected===o.value?'checked':''}><span class="task-schedule-copy"><strong>${o.title}</strong><span class="task-day-tags">${o.days.map(d=>`<span>${MODES[d].icon} ${MODES[d].label}</span>`).join('')}</span></span><span class="task-schedule-check" aria-hidden="true">✓</span></label>`).join('')}</div><p class="task-fixed-note">どの日も、設定した量は同じです。</p></fieldset>`}
+export function taskLevelFields(a,name='task-level'){const selected=taskLevel(a),options=[{value:'full',title:'余裕がある日だけ',days:['full']},{value:'busy',title:'忙しい日も',days:['full','busy']},{value:'rest',title:'毎日取り組む',days:['full','busy','rest']}];return `<fieldset class="task-schedule-config"><legend>どんな日に取り組みますか？</legend><p class="task-setting-caption">1つ選ぶと、対象の日が自動で決まります。</p><div class="task-schedule-options">${options.map(o=>`<label class="task-schedule-option"><input type="radio" required name="${esc(name)}" value="${o.value}" ${selected===o.value?'checked':''}><span class="task-schedule-copy"><strong>${o.title}</strong><span class="task-day-tags">${o.days.map(d=>`<span>${MODES[d].icon} ${MODES[d].label}</span>`).join('')}</span></span><span class="task-schedule-check" aria-hidden="true">✓</span></label>`).join('')}</div><p class="task-fixed-note">どの日も、設定した量は同じです。</p></fieldset>`}
 export function taskSettingsFields(s,id){
  const action=setting(s,id),event=isEventTask(action),m=timeMeasurement(action.measurement||{unit:'minutes'});
  return `${event?`
@@ -48,8 +66,8 @@ export function taskSettingsFields(s,id){
  `:`${quantitySettingsFields(m)}${taskLevelFields(action)}`}
  <section class="task-extra-config">
   <h3>追加の記録（任意）</h3><p>ページ数、単語数、回数など、必要な単位を追加できます。</p>
-  <div data-extra-list>${(m.extras||[]).filter(metric=>metric.dailyAmount!=null||metric.weeklyTarget!=null||metric.monthlyTarget!=null).map(metric=>extraMetricFields(metric,event)).join('')}</div>
-  <button type="button" class="text-button add-extra-unit" data-add-extra>＋ 単位を追加</button>
+  <div data-extra-list>${(m.extras||[]).filter(metric=>metric.dailyAmount!=null||metric.totalTarget!=null||metric.weeklyTarget!=null||metric.monthlyTarget!=null).map(metric=>extraMetricFields(metric,event)).join('')}</div>
+  <button type="button" class="text-button add-extra-unit" data-add-extra>＋ 別の単位の目標を設定する</button>
  </section>`;
 }
 export function eventPanel(s,id,date,today){
@@ -67,7 +85,6 @@ export function eventPanel(s,id,date,today){
   <div class="dialog-actions"><button class="primary" type="submit">完了を記録</button></div></form>`}
  <button class="text-button" data-edit="${esc(id)}">イベントの設定を編集 →</button>`;
 }
-export function presetPanel(s,id){const n=s.nodes.find(n=>n.id===id),a=setting(s,id);if(!n)return '';return `<form id="preset-form" data-id="${esc(id)}"><div class="dialog-title"><div><div class="eyebrow">${esc(ancestry(s,id).slice(1,-1).join(' / ')||'自分の宇宙')}</div><h2>${esc(n.name)}</h2></div><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>${taskSettingsFields(s,id)}<div class="dialog-actions"><button type="button" class="text-button" data-edit="${esc(id)}">名前・親目標などを編集</button><button class="primary" type="submit">タスクを保存</button></div><button type="button" class="text-button record-adjust-button" data-record-leaf="${esc(id)}">${isEventTask(a)?'イベントの完了を記録':'今日の記録を調整'}</button></form>`}
 export function modePickerContent(s,key){const current=s.records[key]?.mode;return `<div class="dialog-title"><div><div class="eyebrow">${Number(key.slice(5,7))}月${Number(key.slice(8))}日</div><h2>今日は、どのペース？</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><p class="mode-picker-note">タスクに保存した固定量を、そのまま反映します。</p><div class="quick-mode-options">${['full','busy','rest'].map(k=>{const m=MODES[k],summary=modeTotals(s,k);return `<button data-mode="${k}" data-date="${key}" class="quick-mode ${k} ${current===k?'chosen':''}"><span class="quick-mode-icon">${m.icon}</span><div><strong>${m.label}</strong><small>${summary.count?[...summary.groups].sort((a,b)=>Number(b.dimension==='time')-Number(a.dimension==='time')).map(g=>g.dimension==='time'?hoursText(g.total):numberText(g.total)+esc(g.unit)).join(' ・ '):'固定量を設定したタスクはありません'}</small></div><i>${current===k?'✓':'→'}</i></button>`}).join('')}</div>${Object.values(s.logs[key]||{}).some(l=>l.quantity&&l.source!=='mode')?'<p class="footnote">この日だけ修正した量は、そのまま残ります。</p>':''}<div class="mode-picker-footer"><button class="text-button" data-configure-leaves>タスクの量を設定する</button><button class="text-button quiet" data-do="close">あとで</button></div>`}
 export function recordPanel(s,id,date,today){
  const node=s.nodes.find(n=>n.id===id);
@@ -215,7 +232,7 @@ function trendChart(item,periods){
  const height=148,left=40,right=47,step=78,width=Math.max(310,left+right+step*values.length);
  const top=20,base=top+height;
  const maxHours=Math.max(1,...values.flatMap(({actual,target})=>[actual,target]));
- const maxRate=Math.ceil(Math.max(100,...values.flatMap(value=>[value.rate||0,value.cumulative||0]))/50)*50;
+ const maxRate=Math.ceil(Math.max(125,...values.flatMap(value=>[value.rate||0,value.cumulative||0]))/25)*25;
  const x=index=>left+(width-left-right)*(index+.5)/values.length;
  const y=(amount,max)=>base-height*amount/max;
  const line=(key,kind)=>{
@@ -224,7 +241,7 @@ function trendChart(item,periods){
    if(value[key]===null){active=false;return '';}
    const cx=x(index),cy=y(value[key],maxRate);
    path+=(active?'L':'M')+cx+' '+cy;active=true;
-   return `<circle cx="${cx}" cy="${cy}" r="3.2"/>`;
+   return `<circle cx="${cx}" cy="${cy}" r="3.2"/>${kind==='rate'?`<text class="trend-value" x="${cx}" y="${cy-8}" text-anchor="middle">${numberText(value[key])}%</text>` : ''}`;
   }).join('');
   return `<g class="trend-${kind}"><path d="${path}"/>${dots}</g>`;
  };
@@ -256,16 +273,31 @@ function trendChart(item,periods){
 }
 
 function hierarchyChart(root,current){
- const row=(item,depth)=>`<li>
-  <button class="analysis-tree-row" data-analysis-item="${esc(item.id)}" aria-current="${item===current?'true':'false'}" style="--depth:${depth}">
-   <span><i aria-hidden="true">${item.kind==='action'?'✓':'◉'}</i>${esc(item.name)}</span>
-   <span class="analysis-tree-track" aria-hidden="true"><i style="width:${Math.min(100,percent(item.actual,item.target)||0)}%"></i></span>
-   <strong title="実績 ${hoursText(item.actual)}${item.target?' / 目標 '+hoursText(item.target):''}">${percentText(item.actual,item.target)}</strong>
-  </button>
-  ${item.children.length?`<ul>${item.children.map(child=>row(child,depth+1)).join('')}</ul>`:''}
- </li>`;
- return `<h3>目標とタスクの階層</h3><p class="analysis-note">項目を選ぶと、推移と目標別のグラフがその項目に切り替わります。</p>
-  <ul class="analysis-tree">${row(root,0)}</ul>`;
+ const rows=[];
+ function visit(item,depth){
+  const first=rows.length;
+  if(item.children.length)for(const child of item.children)visit(child,depth+1);
+  else rows.push({path:[],leaf:item,depth});
+  rows[first].path.unshift({item,depth,span:rows.length-first});
+ }
+ visit(root,0);
+ const columns=Math.max(...rows.map(row=>row.depth))+1;
+ const rate=item=>item.target>0?numberText(percent(item.actual,item.target))+'%':'—';
+ const button=(item,vertical)=>`<button data-analysis-item="${esc(item.id)}" aria-current="${item===current}"
+   class="${vertical?'hierarchy-vertical':''}">
+   <span>${esc(item.name)}</span>${item.children.length?`<b>${rate(item)}</b>`:''}
+  </button>`;
+ return `<h3>目標とタスクの階層</h3><p class="analysis-note">左から右へ目標をたどれます。項目を押すと、その項目の推移を表示できます。</p>
+  <div class="hierarchy-table-wrap" tabindex="0" aria-label="目標の階層表。横にスクロールできます">
+   <table class="hierarchy-table" aria-label="目標とタスクの達成率">
+    <thead><tr>${Array.from({length:columns},(_,i)=>`<th scope="col">${i===0?'大きな目標':i===1?'内訳':i===columns-1?'詳細':'下位目標'}</th>`).join('')}<th scope="col">達成率</th></tr></thead>
+    <tbody>${rows.map(({path,leaf,depth})=>`<tr>
+     ${path.map(({item,depth:level,span})=>`<td rowspan="${span}" class="${item.children.length||level===0?'hierarchy-group':'hierarchy-leaf'}">${button(item,item.children.length>0||level===0)}</td>`).join('')}
+     ${depth+1<columns?`<td class="hierarchy-empty" colspan="${columns-depth-1}"></td>`:''}
+     <td class="hierarchy-rate ${percent(leaf.actual,leaf.target)>=100?'reached':''}" title="実績 ${hoursText(leaf.actual)}${leaf.target?' / 目標 '+hoursText(leaf.target):''}">${rate(leaf)}</td>
+    </tr>`).join('')}</tbody>
+   </table>
+  </div>`;
 }
 
 function achievementCards(item){

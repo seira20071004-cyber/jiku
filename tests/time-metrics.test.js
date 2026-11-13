@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {applyMode,quantitySummary,seed,setQuantity,setTaskRecord,taskRecordFields,validate} from '../dist/model.js';
+import {applyMode,quantitySummary,seed,setQuantity,setTaskRecord,taskRecordFields,validate,paceForDeadline,timeMeasurement} from '../dist/model.js';
 import {writeGoal,timeGoalProgress} from '../dist/universe-model.js';
 
 const today='2026-11-09';
@@ -42,4 +42,21 @@ test('目標全体の達成率は時間の合計から計算し、他の単位�
  ]);
  assert.equal(result.count,2);
  assert.equal(result.achievement.percent,50);
+});
+
+test('期限は今日を含み、全体の目標と逆算した配分を保存できる',()=>{
+ const state=seed();
+ const plan=paceForDeadline(420,'2026-11-01','2026-11-14');
+ assert.deepEqual(plan,{totalTarget:420,weeklyTarget:210,dailyAmount:30,days:14});
+ assert.equal(paceForDeadline(120,'2026-11-01','2026-11-02').weeklyTarget,120);
+ assert.throws(()=>paceForDeadline(120,'2026-11-01','2026-10-31'));
+ assert.throws(()=>paceForDeadline(120,'2026-11-01','2026-11-31'));
+ const id=writeGoal(state,{name:'読書',purpose:'知識を広げる',parentId:'health',kind:'action',
+  measurement:{unit:'minutes',dailyAmount:plan.dailyAmount,totalTarget:plan.totalTarget,
+   extras:[{unit:'pages',totalTarget:70,weeklyTarget:35,dailyAmount:5}]}});
+ const saved=validate(JSON.parse(JSON.stringify(state))).settings[id].measurement;
+ assert.equal(timeMeasurement(saved).totalTarget,420);
+ assert.equal(timeMeasurement({...saved,unit:'hours',totalTarget:7}).totalTarget,420);
+ assert.equal(saved.extras[0].totalTarget,70);
+ assert.equal(saved.weeklyTarget,undefined);
 });

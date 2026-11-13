@@ -48,7 +48,7 @@ export function sceneLayout(nodes,width=1000,height=700){const portrait=width/he
 export function shouldPromptDailyMode(s,day){return s.universe?.onboarded===true&&!s.records[day]&&s.universe.lastModePrompt!==day}
 
 export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurement,mode='full',eventDate,symbolName}){
- name=String(name||'').trim();purpose=String(purpose||'').trim();if(!name||name.length>80)throw Error('名前を1〜80文字で入力してください');if(!purpose||purpose.length>1000)throw Error(kind==='action'?'このタスクにした理由を入力してください':'この目標にした目的を入力してください');if(!['goal','action'].includes(kind))throw Error('目標かタスクを選んでください');
+ name=String(name||'').trim();purpose=String(purpose||'').trim();if(!name||name.length>80)throw Error('名前を1〜80文字で入力してください');if(!purpose||purpose.length>1000)throw Error(kind==='action'?'上位目標につながる理由を入力してください':'この目標にした目的を入力してください');if(!['goal','action'].includes(kind))throw Error('目標かタスクを選んでください');
  const n=s.nodes.find(n=>n.id===id),isNew=id==='new';if(!isNew&&!n)throw Error('目標が見つかりません');const isRoot=!isNew&&n.parentId===null;
  if(!isRoot){if(!parentId||!s.nodes.some(p=>p.id===parentId))throw Error('つながっている上位目標を選んでください');if((isNew||parentId!==n.parentId)&&!canPlace(s,id,parentId))throw Error('上位目標を確認してください。宇宙から衛星までの5階層以内で、目標につなげられます。')}
  if(kind==='action'){
@@ -59,7 +59,7 @@ export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurem
   if(measurement.extras?.some(metric=>metric.dailyAmount==null))throw Error('追加で記録する量を入力してください');
   if(eventDate!==undefined)validateEventDate(eventDate);
   else{
-   if(measurement.weeklyTarget==null&&measurement.monthlyTarget==null)throw Error('週間か月間の目標時間を入力してください');
+   if(measurement.totalTarget==null&&measurement.weeklyTarget==null&&measurement.monthlyTarget==null)throw Error('全体、1週間、1ヶ月のいずれかの目標時間を入力してください');
    if(!['rest','busy','full'].includes(mode))throw Error('タスクのモードを選んでください');
   }
  }
