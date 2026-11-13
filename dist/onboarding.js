@@ -53,6 +53,29 @@ export function initialPersonalMap(draft) {
 }
 const legacyFocusBarriers = ['motivation', 'unclear', 'distractions', 'busy'];
 
+const focusOptions = {
+  unclear: {
+    label: '最初の一歩が決まらず、計画を練り直してしまう',
+    reply: 'いつ、何をするかまで決めると、行動に移りやすくなることが研究されています。',
+    study: ['Webb & Sheeran（2007）', 'https://www.sciencedirect.com/science/article/pii/S002210310600028X']
+  },
+  notifications: {
+    label: 'スマホの通知で気がそれる',
+    reply: 'スマホに触らなくても、通知を受け取るだけで、注意が必要な作業に影響が出た実験があります。',
+    study: ['Stothart ほか（2015）', 'https://pubmed.ncbi.nlm.nih.gov/26121498/']
+  },
+  switching: {
+    label: '別の用事に切り替えると、前の作業が気になる',
+    reply: '作業を切り替えたあとも、前の作業に注意が残ることが実験で示されています。',
+    study: ['Leroy（2009）', 'https://www.sciencedirect.com/science/article/pii/S0749597809000399']
+  },
+  sleep: {
+    label: '寝不足の日は注意が途切れやすい',
+    reply: '睡眠をとらない時間が続くと、注意が途切れやすくなることが、複数の実験で報告されています。',
+    study: ['Lim & Dinges（2010）', 'https://pubmed.ncbi.nlm.nih.gov/20438143/']
+  }
+};
+
 const dialogueSteps = ['example-choice', 'focus', 'explain', 'goal', 'reason', 'reason-two', 'reason-three', 'values', 'meaning', 'confirm', 'map', 'arrival', 'statistics', 'closing', 'login'];
 const research = {
   motivation: ['理由が続ける支えになる', '自己決定理論をもとにした研究では、自分の価値観や関心に合う目標ほど努力が続きやすく、その達成はより高い幸福感にもつながりました。', 'Sheldon & Elliot（1999）', 'https://pubmed.ncbi.nlm.nih.gov/10101878/'],
@@ -88,7 +111,8 @@ export function onboardingDraft(saved, legacy) {
   const priorAnswer = source.direction || source.custom;
   const name = ((typeof source.name === 'string' ? source.name : legacyName) ||
     (typeof priorAnswer === 'string' ? priorAnswer : '')).slice(0, 80);
-  const focusBarrier = legacyFocusBarriers.includes(source.focusBarrier) ? source.focusBarrier : null;
+  const focusBarrier = Object.hasOwn(focusOptions, source.focusBarrier) || legacyFocusBarriers.includes(source.focusBarrier)
+    ? source.focusBarrier : null;
   const concentration = typeof source.concentration === 'string' ? source.concentration.trim().slice(0, 80) : '';
   let step = 'gaze';
   if (dialogueSteps.includes(source.step) && source.step !== 'explain') step = source.step;
@@ -266,31 +290,48 @@ export function mountOnboarding(host, {
       ['この宇宙は、あなたの人生を映す場所です。', 'birth-reply'],
       ['これから、この宇宙を少しずつ育てていきましょう。', 'birth-reply'],
       ['目の前のことに集中することが、目標達成への近道になります。', 'birth-emphasis'],
-      ['例えば、英語を話せるようになりたい2人がいるとします。', 'birth-reply'],
-      ['Aさんは、毎日30分、英語の勉強に集中しました。', 'birth-reply'],
-      ['Bさんは、毎日1時間、スマホでSNSを見ながら英語を勉強しました。', 'birth-reply']
+      ['例えば、英語を話せるようになりたい2人に、今夜30分ずつ時間があります。', 'birth-reply'],
+      ['Aさんは、教材を探したり勉強の予定を組み直したりしているうちに、30分が過ぎました。', 'birth-reply'],
+      ['Bさんは、短い会話を1つ選び、残りの時間は声に出して練習しました。', 'birth-reply']
     ], shouldFocus => {
-      showQuestion('あなたは、どちらの方が英語力を伸ばせたと思いますか？', shouldFocus);
-      choiceControls([['a', 'Aさん'], ['b', 'Bさん']], '英語力を伸ばせたと思う人');
+      showQuestion('今夜、英語を話す練習を進められたのはどちらでしょう？', shouldFocus);
+      choiceControls([['a', 'Aさん · 教材と予定を見直した'], ['b', 'Bさん · 会話を声に出して練習した']], '今夜の練習を進められた人');
     }, focus);
   }
 
   function showFocusQuestion(focus, answer) {
-    const ask = shouldFocus => askForAnswer('concentration', shouldFocus);
+    const ask = shouldFocus => {
+      showQuestion('やりたいことがあるのに、集中が途切れたり、手が止まったりするのはどんなときですか？', shouldFocus);
+      choiceControls([...Object.entries(focusOptions).map(([id, option]) => [id, option.label]), ['own', '自分の言葉で答える']], '自分に近い場面');
+      controls.insertAdjacentHTML('beforeend', '<button type="button" class="birth-quiet birth-edit" data-birth="skip-answer">まだわからない</button>');
+    };
     if (!answer) return ask(focus);
     showSequence([
-      [answer === 'a' ? 'Aさんは、30分を英語に集中して使えましたね。' : 'Bさんには、長く勉強できる時間がありましたね。', 'birth-reply'],
-      ['勉強の成果には、使った時間に加えて、その時間にどれだけ集中できたかも関わります。', 'birth-reply'],
-      ['目標を達成するために、まず目の前のことに集中する時間をつくりましょう。', 'birth-emphasis'],
-      ['それでも、集中しようと思っても、なかなか続かないことがあります。', 'birth-reply']
+      [answer === 'a' ? 'Aさんは教材と予定を整えました。実際に声を出すところまで進んだのはBさんです。' : 'Bさんは、短い会話を実際に声に出すところまで進めましたね。', 'birth-reply'],
+      ['計画で最初の一歩を決めたら、その一歩に集中する時間を取りましょう。', 'birth-emphasis'],
+      ['やることが決まっていても、手が止まったり、集中が途切れたりすることがあります。', 'birth-reply']
     ], ask, focus);
   }
 
   function explain(focus) {
+    const option = focusOptions[draft.focusBarrier];
+    if (option) {
+      showQuestion(option.reply, focus);
+      controls.innerHTML = `<div class="birth-example">
+        <details class="birth-research"><summary>この研究を見る</summary>
+          <a href="${option.study[1]}" target="_blank" rel="noopener">${option.study[0]}</a>
+        </details>
+        <button type="button" class="birth-primary" data-birth="continue-explanation">目標について考える →</button>
+      </div>`;
+      return;
+    }
+    showMotivation(focus, draft.concentration ? `「${draft.concentration}」。そういうときは、手が止まることもありますよね。` : '');
+  }
+
+  function showMotivation(focus, reply = '') {
     showSequence([
-      [draft.concentration ? `「${draft.concentration}」。そんなときは集中を続けるのが難しいですよね。` : '集中が続かない理由は、人によってさまざまです。', 'birth-reply'],
-      ['その中で、JIKUはモチベーションに着目しました。', 'birth-emphasis'],
-      ['モチベーションは、行動を始めたり続けたりする支えになるからです。', 'birth-reply'],
+      ...(reply ? [[reply, 'birth-reply']] : []),
+      ['行動を続ける支えの一つが、モチベーションです。', 'birth-emphasis'],
       ['例えば、どうしても合格したい試験があれば、SNSを見る時間を決めて、勉強の時間をつくる人もいます。', 'birth-reply'],
       ['達成したいという気持ちがあると、目の前の時間の使い方も変わります。', 'birth-reply'],
       ['目標に向けて集中を続けるために、自分が取り組む理由を大切にしましょう。', 'birth-emphasis']
@@ -308,13 +349,28 @@ export function mountOnboarding(host, {
     };
     const [question, placeholder, next] = prompts[key];
     showQuestion(question, focus);
-    controls.innerHTML = `<form class="birth-form">
+    const examples = {
+      goal: ['無理なく運動を続けたい', '英語で会話できるようになりたい', '作りたいものを形にしたい'],
+      reason: ['元気に過ごす日を増やしたい', '大切な人ともっと話したい', 'できることを増やしたい'],
+      'reason-two': ['安心して暮らしたい', '家族や友人と過ごす時間を増やしたい', '新しいことに挑戦したい'],
+      'reason-three': ['自分で選べる自由', '大切な人との思い出', 'やり遂げた実感']
+    }[key] || [];
+    controls.innerHTML = `${examples.length ? `<div class="birth-answer-examples" role="group" aria-label="答えの例">
+      ${examples.map((example, index) => `<button type="button" class="birth-choice" data-answer-example="${index}">${example}</button>`).join('')}
+    </div>` : ''}<form class="birth-form">
       <input name="answer" required maxlength="80" placeholder="${placeholder}">
       <button type="submit" class="birth-primary">答える</button>
     </form>${key === 'goal' ? '<p class="birth-map-caption">大きな目標でも、小さな目標でも構いません。</p>' : ''}
     <button type="button" class="birth-quiet birth-edit" data-birth="skip-answer">まだ思いつかない</button>`;
     const form = controls.querySelector('form');
     form.elements.answer.setAttribute('aria-label', question);
+    for (const button of controls.querySelectorAll('[data-answer-example]')) {
+      button.addEventListener('click', () => {
+        form.elements.answer.value = examples[Number(button.dataset.answerExample)];
+        form.elements.answer.setCustomValidity('');
+        form.elements.answer.focus();
+      });
+    }
     form.elements.answer.addEventListener('input', () => form.elements.answer.setCustomValidity(''));
     form.addEventListener('submit', event => {
       event.preventDefault();
@@ -842,7 +898,19 @@ export function mountOnboarding(host, {
       }
     }
     if (step === 'example-choice' && ['a', 'b'].includes(choice)) enter('focus', {focus: true, answer: choice});
-    if (action === 'skip-answer') enter(step === 'focus' ? 'explain' : 'meaning', {focus: true});
+    if (step === 'focus' && Object.hasOwn(focusOptions, choice)) {
+      draft.focusBarrier = choice;
+      enter('explain', {focus: true});
+    }
+    if (step === 'focus' && choice === 'own') askForAnswer('concentration', true);
+    if (step === 'explain' && action === 'continue-explanation') {
+      controls.replaceChildren();
+      showMotivation(true);
+    }
+    if (action === 'skip-answer') {
+      if (step === 'focus') showMotivation(true);
+      else enter('meaning', {focus: true});
+    }
     if (step === 'meaning' && ['know-map', 'new-map'].includes(choice)) {
       controls.replaceChildren();
       const turns = choice === 'new-map' ? [

@@ -139,19 +139,18 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
 
 .map-galaxy-view {
   --map-tone: #cbb2f5;
-  margin-top: 0;
-  padding: 10px clamp(12px, 4vw, 24px) 24px;
+  padding: 14px clamp(12px, 4vw, 24px) 24px;
 }
 .map-galaxy-view[data-map-tone="0"] { --map-tone: #8dd6b2; }
 .map-galaxy-view[data-map-tone="1"] { --map-tone: #a6b6ff; }
 .map-galaxy-view[data-map-tone="2"] { --map-tone: #ec9ec2; }
 .map-galaxy-view[data-map-tone="3"] { --map-tone: #eec284; }
-.map-galaxy-back {
-  min-height: 44px;
-  color: #d9c9f4;
-  font-size: 13px;
+.map-galaxy-view h2 {
+  margin: 0 0 12px;
+  color: #f6efff;
+  font-size: clamp(15px, 4vw, 18px);
+  overflow-wrap: anywhere;
 }
-.map-galaxy-root { max-width: 430px; margin-inline: auto; }
 .map-galaxy-tree,
 .map-galaxy-tree ul {
   list-style: none;

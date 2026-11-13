@@ -425,11 +425,13 @@ function mapActions(){
 function personalMap(){
  const selected=selectedMapNode(),path=nodePath(state,selected.id),root=path[0];
  const galaxies=visibleChildren(state,root.id);
- const tone=Math.max(0,galaxies.findIndex(node=>node.id===path[1]?.id))%4;
- const card=(node,depth,style='')=>{
+ const branchRoot=path[1];
+ const tone=galaxies.findIndex(node=>node.id===branchRoot?.id)%4;
+ const card=(node,depth,style='',overview=false)=>{
   const task=nodeKind(state,node.id)==='action',level=Math.min(depth,LEVELS.length-1);
   const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):'';
-  return `<button class="map-node ${style}" data-map-select="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''}>
+  return `<button class="map-node ${style}" data-map-select="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''}
+    ${overview?`aria-expanded="${node.id===branchRoot?.id}" aria-controls="home-map-branch"`:''}>
     <span aria-hidden="true">${hierarchyMarks[level]}</span>
     <span>${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong></span>
   </button>
@@ -438,18 +440,17 @@ function personalMap(){
     ${depth<LEVELS.length-1&&!task?`<button data-space-add="${esc(node.id)}" aria-label="${esc(node.name)}に目標やタスクを追加">＋</button>`:''}
   </div>`:''}`;
  };
- if(path.length<2)return mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
-  tone:index%4,card:card(node,1)
+ const overview=mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
+  tone:index%4,card:card(node,1,'',true)
  })),{radial:true,label:'マインドマップ全体'});
- const galaxy=path[1];
+ if(!branchRoot)return overview+'<div id="home-map-branch" hidden></div>';
  function branch(node,depth){
   const children=visibleChildren(state,node.id);
   return `<li>${card(node,depth)}${children.length?`<ul>${children.map(child=>branch(child,depth+1)).join('')}</ul>`:''}</li>`;
  }
- const children=visibleChildren(state,galaxy.id);
- return `<section class="map-subview map-galaxy-view" aria-label="${esc(galaxy.name)}の全体図" data-map-tone="${tone}">
-  <button class="map-galaxy-back" data-map-select="${esc(root.id)}">← マップ全体に戻る</button>
-  <div class="map-galaxy-root">${card(galaxy,1,'map-detail-root')}</div>
+ const children=visibleChildren(state,branchRoot.id);
+ return `${overview}<section id="home-map-branch" class="map-subview map-galaxy-view" aria-labelledby="home-map-branch-name" data-map-tone="${tone}">
+  <h2 id="home-map-branch-name">${esc(branchRoot.name)}</h2>
   ${children.length?`<ul class="map-galaxy-tree">${children.map(node=>branch(node,2)).join('')}</ul>`:
    '<p class="map-galaxy-empty">まだ下位の目標やタスクはありません。</p>'}
  </section>`;
@@ -457,16 +458,15 @@ function personalMap(){
 function mindMapPage(){
  const recorded=Boolean(state.records[today]?.mode);
  const growth=universeGrowth(state,today);
- const inGalaxy=Boolean(selectedMapNode().parentId);
  return `<section class="mind-map" aria-labelledby="mind-map-title">
-  ${inGalaxy?'':`<div class="home-universe">
+  <div class="home-universe">
    <div class="home-universe-art" role="img" aria-label="記録とともに育つ自分の星">${planetArt(growth.days)}</div>
    ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
   </div>
   ${recorded?'':`<section class="mind-map-mode" aria-label="今日のモード">
    <h2>今日のモード</h2>
    <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button data-mode="${key}" data-date="${today}"><span aria-hidden="true">${MODES[key].icon}</span> ${MODES[key].label}</button>`).join('')}</div>
-  </section>`}`}
+  </section>`}
   <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1></header>
   <div class="mind-map-scroll">${personalMap()}</div>
   <footer class="mind-map-footer">${mapActions()}</footer>
@@ -526,18 +526,21 @@ function openMindMap(){
  $('.mind-map [aria-current]')?.scrollIntoView({block:'nearest'});
 }
 function selectMapNode(button){
- const previous=nodePath(state,selectedMapNode().id)[1];
- mapSelection=button.dataset.mapSelect;
- const galaxy=nodePath(state,selectedMapNode().id)[1];
- if(galaxy?.id!==previous?.id)render();
- else {
-  $('.mind-map-scroll').innerHTML=personalMap();
-  $('.mind-map-footer').innerHTML=mapActions();
+ const scroll=$('.mind-map-scroll');
+ const fromOverview=button.closest('.map-diagram-overview');
+ const wasExpanded=button.getAttribute('aria-expanded')==='true';
+ const nodeId=button.dataset.mapSelect;
+ mapSelection=wasExpanded?null:nodeId;
+ const scrollTop=scroll.scrollTop;
+ scroll.innerHTML=personalMap();
+ $('.mind-map-footer').innerHTML=mapActions();
+ scroll.scrollTop=scrollTop;
+ const cards=Array.from(scroll.querySelectorAll('.map-node[data-map-select]'));
+ cards.find(card=>card.dataset.mapSelect===nodeId)?.focus({preventScroll:true});
+ if(fromOverview&&!wasExpanded){
+  const heading=scroll.querySelector('#home-map-branch-name');
+  heading?.scrollIntoView({block:'nearest'});
  }
- const cards=Array.from(document.querySelectorAll('.mind-map-scroll .map-node[data-map-select]'));
- const focusCard=!galaxy&&previous?cards.find(card=>card.dataset.mapSelect===previous.id):cards.find(card=>card.hasAttribute('aria-current'));
- focusCard?.focus({preventScroll:true});
- if(galaxy?.id===previous?.id)focusCard?.scrollIntoView({block:'nearest'});
 }
 function leafPanel(id,key=today){
  if(!state.nodes.some(n=>n.id===id))return;

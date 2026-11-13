@@ -557,3 +557,9 @@ body.birth-page, body.birth-active {
   transform: scale(1);
 }
 .birth-screen[data-stage="travel"][data-approaching] .birth-intro { opacity: 0; transition: opacity .4s; }
+
+.birth-answer-examples {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
