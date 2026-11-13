@@ -209,3 +209,30 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
 .map-branch-task > .map-branch-row small { margin: 0; color: #d4c7eb; }
 .map-branch-task > .map-branch-row strong { margin-right: auto; font-weight: 500; }
 .map-galaxy-tree .map-inline-tools { justify-content: flex-end; }
+
+.map-galaxy-tree {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+  border: 0;
+  padding: 0;
+  margin-top: 12px;
+}
+.map-galaxy-tree > li {
+  min-width: 0;
+  margin: 0;
+  padding: 6px;
+  border-radius: 11px;
+  background: #15182a;
+}
+.map-galaxy-tree > li::before { display: none; }
+.map-galaxy-tree ul { padding-inline-start: 7px; }
+.map-galaxy-tree ul li::before { width: 7px; }
+.map-galaxy-tree .map-branch-row > span:last-child { min-width: 0; }
+.map-galaxy-tree .map-inline-tools { flex-wrap: wrap; }
+@media (max-width: 380px) {
+  .map-galaxy-tree { gap: 6px; }
+  .map-galaxy-tree > li { padding: 3px; }
+  .map-galaxy-tree .map-branch-row { padding-inline: 4px; }
+  .map-galaxy-tree .map-branch-row > [aria-hidden] { display: none; }
+}

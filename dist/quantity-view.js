@@ -146,106 +146,152 @@ function recentActivity(summary, events, start, end, today) {
  </section>`;
 }
 
-function radarGraphic(axes){
- const center=140,radius=104;
- const point=(index,ratio)=>{
-  const angle=2*Math.PI*index/axes.length-Math.PI/2;
-  return [center+Math.cos(angle)*radius*ratio,center+Math.sin(angle)*radius*ratio];
+function monthShare(start,end){
+ let fraction=0;
+ for(let month=start.slice(0,7);month<=end.slice(0,7);month=monthOffset(month,1)){
+  const last=Number(shiftDate(monthOffset(month,1)+'-01',-1).slice(8));
+  const from=month===start.slice(0,7)?Number(start.slice(8)):1;
+  const through=month===end.slice(0,7)?Number(end.slice(8)):last;
+  fraction+=(through-from+1)/last;
+ }
+ return fraction;
+}
+
+export function analysisData(state,{start,end,weeks}){
+ const periods=Array.from({length:weeks},(_,index)=>{
+  const from=shiftDate(start,index*7);
+  return {from,to:shiftDate(from,6)};
+ });
+ const root=state.nodes.find(node=>node.parentId===null);
+ const items=new Map(state.nodes.map(node=>[node.id,{
+  ...node,children:[],actual:0,target:0,weekly:periods.map(()=>({actual:0,target:0}))
+ }]));
+ for(const item of items.values())items.get(item.parentId)?.children.push(item);
+ const summary=quantitySummary(state,start,end,'all',false);
+ const timeRows=new Map(summary.rows.filter(row=>row.dimension==='time').map(row=>[row.id,row.byDate]));
+ const weeksByDate=new Map(periods.flatMap(({from},index)=>
+  Array.from({length:7},(_,offset)=>[shiftDate(from,offset),index])));
+ const monthShares=periods.map(({from,to})=>monthShare(from,to));
+ for(const node of leaves(state)){
+  const task=setting(state,node.id);
+  if(node.kind==='goal'||isEventTask(task))continue;
+  const item=items.get(node.id);
+  const time=timeMeasurement(task.measurement||{unit:'minutes'});
+  item.weekly.forEach((week,index)=>{
+   week.target=(time.weeklyTarget||((time.monthlyTarget||0)*monthShares[index]))/60;
+  });
+  for(const [date,hours] of Object.entries(timeRows.get(node.id)||{})){
+   const week=item.weekly[weeksByDate.get(date)];
+   if(week)week.actual+=hours;
+  }
+ }
+ function aggregate(item){
+  item.children.forEach(child=>{
+   aggregate(child);
+   child.weekly.forEach((week,index)=>{
+    const parent=item.weekly[index];
+    parent.target+=week.target;
+    if(week.target>0)parent.actual+=week.actual;
+   });
+  });
+  item.actual=item.weekly.reduce((sum,week)=>sum+week.actual,0);
+  item.target=item.weekly.reduce((sum,week)=>sum+week.target,0);
+ }
+ aggregate(items.get(root.id));
+ return {items,root:items.get(root.id),periods};
+}
+
+const percent=(actual,target)=>target>0?Math.round(actual/target*100):null;
+const percentText=(actual,target)=>target>0?numberText(percent(actual,target))+'%':'目標未設定';
+const shortDate=date=>Number(date.slice(5,7))+'/'+Number(date.slice(8));
+
+function trendChart(item,periods){
+ const weekly=item.weekly;
+ let totalActual=0,totalTarget=0;
+ const values=weekly.map(({actual,target},index)=>{
+  if(target>0){totalActual+=actual;totalTarget+=target;}
+  return {...periods[index],actual,target,rate:percent(actual,target),cumulative:percent(totalActual,totalTarget)};
+ });
+ const height=148,left=40,right=47,step=78,width=Math.max(310,left+right+step*values.length);
+ const top=20,base=top+height;
+ const maxHours=Math.max(1,...values.flatMap(({actual,target})=>[actual,target]));
+ const maxRate=Math.ceil(Math.max(100,...values.flatMap(value=>[value.rate||0,value.cumulative||0]))/50)*50;
+ const x=index=>left+(width-left-right)*(index+.5)/values.length;
+ const y=(amount,max)=>base-height*amount/max;
+ const line=(key,kind)=>{
+  let path='',active=false;
+  const dots=values.map((value,index)=>{
+   if(value[key]===null){active=false;return '';}
+   const cx=x(index),cy=y(value[key],maxRate);
+   path+=(active?'L':'M')+cx+' '+cy;active=true;
+   return `<circle cx="${cx}" cy="${cy}" r="3.2"/>`;
+  }).join('');
+  return `<g class="trend-${kind}"><path d="${path}"/>${dots}</g>`;
  };
- const points=ratio=>axes.map((_,index)=>point(index,ratio).join(',')).join(' ');
- const values=axes.map(({actual,target},index)=>point(index,Math.min(1,actual/target)));
- const shape=axes.length>2?'polygon':'polyline';
- return `<svg class="analysis-radar" viewBox="0 0 280 280" aria-hidden="true">
-  <g class="radar-grid">${[.25,.5,.75,1].map(ratio=>axes.length>2
-   ?`<polygon points="${points(ratio)}"/>`
-   :`<circle cx="${center}" cy="${center}" r="${radius*ratio}"/>`).join('')}</g>
-  ${axes.map((_,index)=>{
-   const [x,y]=point(index,1),[labelX,labelY]=point(index,1.21);
-   return `<line class="radar-axis" x1="${center}" y1="${center}" x2="${x}" y2="${y}"/>
-    <text x="${labelX}" y="${labelY}" text-anchor="middle" dominant-baseline="central">${index+1}</text>`;
-  }).join('')}
-  ${axes.length===1?`<line class="radar-value" x1="${center}" y1="${center}" x2="${values[0][0]}" y2="${values[0][1]}"/>`:
-   `<${shape} class="radar-value" points="${values.map(value=>value.join(',')).join(' ')}"/>`}
-  ${values.map(([x,y])=>`<circle class="radar-point" cx="${x}" cy="${y}" r="3.5"/>`).join('')}
- </svg>`;
+ return `<h3>${esc(item.name)}の週ごとの推移</h3>
+  <div class="trend-legend"><span>目標時間</span><span>実績時間</span><span>週の達成率</span><span>累計達成率</span><span>100%ライン</span></div>
+  <div class="trend-plot" tabindex="0" aria-label="週別グラフ。横にスクロールできます">
+   <svg viewBox="0 0 ${width} 198" style="width:${width}px" aria-hidden="true">
+    ${[0,.25,.5,.75,1].map(fraction=>{
+     const position=y(fraction,1);
+     return `<path class="trend-grid" d="M${left} ${position}H${width-right}"/>
+      <text x="${left-6}" y="${position+3}" text-anchor="end">${numberText(Math.round(maxHours*fraction*10)/10)}h</text>
+      <text x="${width-right+6}" y="${position+3}">${Math.round(maxRate*fraction)}%</text>`;
+    }).join('')}
+    <path class="trend-reference" d="M${left} ${y(100,maxRate)}H${width-right}"/>
+    ${values.map(({actual,target,from},index)=>`<rect class="trend-target" x="${x(index)-15}" y="${y(target,maxHours)}" width="13" height="${height*target/maxHours}" rx="3"/>
+     <rect class="trend-actual" x="${x(index)+2}" y="${y(actual,maxHours)}" width="13" height="${height*actual/maxHours}" rx="3"/>
+     <text x="${x(index)}" y="188" text-anchor="middle">${shortDate(from)}</text>`).join('')}
+    ${line('rate','rate')}${line('cumulative','cumulative')}
+   </svg>
+  </div>
+  <p class="analysis-note">累計達成率は、表示期間の第1週からの実績合計 ÷ 目標合計です。</p>
+  <details class="period-details"><summary>週ごとの数値を見る</summary><div class="trend-table-wrap"><table class="trend-table">
+   <thead><tr><th scope="col">週</th><th scope="col">目標</th><th scope="col">実績</th><th scope="col">達成率</th><th scope="col">累計</th></tr></thead>
+   <tbody>${values.map(value=>`<tr><th scope="row">${shortDate(value.from)}〜${shortDate(value.to)}</th>
+    <td>${value.target?hoursText(value.target):'—'}</td><td>${hoursText(value.actual)}</td>
+    <td>${value.rate===null?'—':numberText(value.rate)+'%'}</td>
+    <td>${value.cumulative===null?'—':numberText(value.cumulative)+'%'}</td></tr>`).join('')}</tbody>
+  </table></div></details>`;
+}
+
+function hierarchyChart(root,current){
+ const row=(item,depth)=>`<li>
+  <button class="analysis-tree-row" data-analysis-item="${esc(item.id)}" aria-current="${item===current?'true':'false'}" style="--depth:${depth}">
+   <span><i aria-hidden="true">${item.kind==='action'?'✓':'◉'}</i>${esc(item.name)}</span>
+   <span class="analysis-tree-track" aria-hidden="true"><i style="width:${Math.min(100,percent(item.actual,item.target)||0)}%"></i></span>
+   <strong title="実績 ${hoursText(item.actual)}${item.target?' / 目標 '+hoursText(item.target):''}">${percentText(item.actual,item.target)}</strong>
+  </button>
+  ${item.children.length?`<ul>${item.children.map(child=>row(child,depth+1)).join('')}</ul>`:''}
+ </li>`;
+ return `<h3>目標とタスクの階層</h3><p class="analysis-note">項目を選ぶと、推移と目標別のグラフがその項目に切り替わります。</p>
+  <ul class="analysis-tree">${row(root,0)}</ul>`;
+}
+
+function achievementCards(item){
+ const rows=[item,...item.children];
+ return `<h3>${esc(item.name)}の目標別達成率</h3><div class="achievement-cards">
+  ${rows.map(row=>{
+   const rate=percent(row.actual,row.target), difference=row.actual-row.target;
+   return `<button class="achievement-card" data-analysis-item="${esc(row.id)}" aria-current="${row===item?'true':'false'}">
+    <strong>${esc(row.name)}</strong><span class="achievement-ring" style="--progress:${Math.min(100,rate||0)}%">
+     <b>${percentText(row.actual,row.target)}</b></span>
+    <span>${hoursText(row.actual)} / ${row.target?hoursText(row.target):'目標未設定'}</span>
+    ${row.target?`<small>${difference>=0?'+':'−'}${hoursText(Math.abs(difference))}</small>`:''}
+   </button>`;
+  }).join('')}</div>`;
 }
 
 export function analysisChart(state,{start,end,scope,weeks}){
- const summary=quantitySummary(state,start,end,scope,false);
- const groups=new Map(), targets=new Map();
- const names=new Map(state.nodes.map(node=>[node.id,node.name]));
- function groupFor(id,path,fallback){
-  const index=scope==='all'?1:path.indexOf(scope)+1;
-  const groupId=path[index]||id;
-  if(!groups.has(groupId))groups.set(groupId,{label:names.get(groupId)||fallback||'以前のタスク',actual:0,target:0,withoutTarget:0});
-  return [groupId,groups.get(groupId)];
- }
- // Monthly targets are prorated by the days covered in each calendar month.
- let monthFraction=0;
- for(let month=start.slice(0,7);month<=end.slice(0,7);month=monthOffset(month,1)){
-  const first=month+'-01';
-  const last=shiftDate(monthOffset(month,1)+'-01',-1);
-  const from=start>first?Number(start.slice(8)):1;
-  const through=end<last?Number(end.slice(8)):Number(last.slice(8));
-  monthFraction+=(through-from+1)/Number(last.slice(8));
- }
- for(const node of leaves(state)){
-  const action=setting(state,node.id);
-  if(node.kind==='goal'||isEventTask(action)||!action.measurement)continue;
-  const path=goalIds(state,node.id);
-  if(scope!=='all'&&!path.includes(scope))continue;
-  const time=timeMeasurement(action.measurement);
-  const target=(time.weeklyTarget ? time.weeklyTarget*weeks : (time.monthlyTarget||0)*monthFraction)/60;
-  if(!target)continue;
-  const [groupId,group]=groupFor(node.id,path,node.name);
-  group.target+=target;
-  targets.set(node.id,groupId);
- }
- for(const entry of summary.entries){
-  if(entry.dimension!=='time'||entry.value<=0)continue;
-  const index=scope==='all'?1:entry.goalIds.indexOf(scope)+1;
-  const [groupId,group]=groupFor(entry.id,entry.goalIds,entry.goalPath[index]||entry.name);
-  if(targets.get(entry.id)===groupId)group.actual+=entry.value;
-  else group.withoutTarget+=entry.value;
- }
- for(const [date,logs] of Object.entries(state.logs)){
-  if(date<start||date>end)continue;
-  for(const [id,log] of Object.entries(logs)){
-   if(!log.eventCompleted||!log.eventMinutes)continue;
-   const path=log.goalIds||goalIds(state,id);
-   if(scope!=='all'&&!path.includes(scope))continue;
-   const index=scope==='all'?1:path.indexOf(scope)+1;
-   const [,group]=groupFor(id,path,log.goalPath?.[index]||log.name);
-   group.withoutTarget+=log.eventMinutes/60;
-  }
- }
- const rows=[...groups.values()];
- const configured=rows.filter(group=>group.target>0);
- const axes=configured.slice(0,8);
- if(configured.length>8){
-  const others=configured.slice(7);
-  axes.splice(7,1,{
-   label:'その他',actual:others.reduce((sum,row)=>sum+row.actual,0),target:others.reduce((sum,row)=>sum+row.target,0)
-  });
- }
- const withoutTarget=rows.filter(group=>group.withoutTarget>0);
- const dateLabel=date=>date.split('-').map(Number).join('/');
- const additional=summary.groups.filter(group=>group.dimension!=='time'&&group.total>0);
- const row=({label,actual,target},index)=>`<li>
-  ${index==null?'':`<b class="radar-key">${index+1}</b>`}<span>${esc(label)}</span>
-  <span>${hoursText(actual)} / ${hoursText(target)}</span><strong>${numberText(Math.round(actual/target*100))}%</strong>
- </li>`;
- return `<section class="activity-chart analysis-chart" aria-labelledby="analysis-chart-title">
-  <header><h2 id="analysis-chart-title">目標に対する達成度</h2><span>${dateLabel(start)} 〜 ${dateLabel(end)}</span></header>
-  ${axes.length?`<p class="radar-caption">外周は目標時間の100%</p>
-   <div class="analysis-chart-content">${radarGraphic(axes)}<ol aria-label="実績と目標時間">${axes.map(row).join('')}</ol></div>
-   ${configured.length>8?`<details class="period-details"><summary>すべての項目の達成度</summary>
-    <ul>${configured.map(item=>row(item,null)).join('')}</ul></details>`:''}
-  `:'<p class="analysis-empty">タスクに週または月の目標時間を設定すると、達成度を表示できます。</p>'}
-  ${withoutTarget.length?`<details class="period-details"><summary>達成度の計算に含まれない活動時間</summary>
-   <ul>${withoutTarget.map(group=>`<li>${esc(group.label)} · ${hoursText(group.withoutTarget)}</li>`).join('')}</ul>
-  </details>`:''}
-  ${additional.length?`<div class="period-extra-totals">${additional.map(group=>`<span>${numberText(group.total)}${esc(group.unit)}</span>`).join('')}</div>`:''}
+ const {items,root,periods}=analysisData(state,{start,end,weeks});
+ const current=items.get(scope)||root;
+ return `<section class="activity-chart analysis-chart" aria-label="目標の達成度">
+  <header><h2>達成度</h2><span>${start.replaceAll('-','/')} 〜 ${end.replaceAll('-','/')}</span></header>
+  <div class="analysis-slides" tabindex="0" aria-label="グラフ。左右にスワイプして切り替え">
+   <section class="analysis-slide">${trendChart(current,periods)}</section>
+   <section class="analysis-slide">${hierarchyChart(root,current)}</section>
+   <section class="analysis-slide">${achievementCards(current)}</section>
+  </div>
  </section>`;
 }
 
