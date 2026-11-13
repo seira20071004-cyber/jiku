@@ -24,7 +24,7 @@ let needsLegacyImport=false,storageLocked=false;let state;try{const raw=guest?nu
 let treeScene=null,treeView=null,showGoalLabels=true,statsTab='quantity',quantityScope='all',statsWeek=weekStart(dateKey()),statsMonth=dateKey().slice(0,7),quantityDimension=null;
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
 let guideSession=null,guideTimer,mapPreviewReturn=null,onboardingResume=null;
-let exploring=false,mapSelection=null,mapEditing=false;
+let mapSelection=null,mapEditing=false;
 let disposeHomeOrigin=null;
 function save(){if(guideSession||mapPreviewReturn||guest)return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 applyPending(state,today);if(state.universe?.onboarded)save();
@@ -41,7 +41,7 @@ function render(){clearTimeout(guideTimer);disposeHomeOrigin?.();disposeHomeOrig
  document.body.classList.toggle('birth-active',Boolean(birthActive));
  if(birthActive){if(treeScene){treeScene.dispose();treeScene=null}if(!onboardingScene)showOnboarding();return}
  if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){if(statsMonth===today.slice(0,7))statsMonth=latest.slice(0,7);if(statsWeek===weekStart(today))statsWeek=weekStart(latest);today=latest;selected=today;applyPending(state,today);save()}
- const page=view==='stats'?statsPage():exploring||guideSession?treePage():mindMapPage();
+ const page=view==='stats'?statsPage():guideSession?treePage():mindMapPage();
  $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku 自分の宇宙">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>検証用</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">戻る ↗</button></div>':''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();bindHomeOrigin();scheduleGuide()}
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
 function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n.id];return `<div class="action-row ${done?'done':''}"><button class="check ${done?'checked':''}" data-check="${esc(n.id)}" data-date="${key}" aria-label="${esc(n.name)}の実行記録" aria-pressed="${done}">${done?'✓':''}</button><div class="action-copy"><strong>${esc(n.name)}</strong><small>${esc(ancestry(state,n.id).slice(1,-1).join(' / ')||'自分の宇宙')}</small></div><span class="priority p${a.priority}">${['高','中','低'][a.priority]}</span><button class="edit-action" data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">⋯</button></div>`}
@@ -240,7 +240,7 @@ function showOnboarding(){
    if(preview){
     const generated=freshUniverse();
     populateMappedUniverse(generated,map);
-    mapPreviewReturn={state,view,focus,universeOutside,exploring,mapSelection};
+    mapPreviewReturn={state,view,focus,universeOutside,mapSelection};
     state=generated;
     onboardingPreview=false;
    }else{
@@ -249,7 +249,7 @@ function showOnboarding(){
     history.replaceState(null,'','#tree');
    }
    onboardingScene?.dispose();onboardingScene=null;
-   view='tree';focus=null;universeOutside=false;exploring=false;mapSelection=null;
+   view='tree';focus=null;universeOutside=false;mapSelection=null;
    render();
   },
   onClose:preview?endOnboardingPreview:null,
@@ -296,7 +296,7 @@ function endOnboardingPreview(){
 }
 function endMapPreview(){
  if(!mapPreviewReturn)return;
- ({state,view,focus,universeOutside,exploring,mapSelection}=mapPreviewReturn);
+ ({state,view,focus,universeOutside,mapSelection}=mapPreviewReturn);
  mapPreviewReturn=null;
  const url=new URL(location.href);url.searchParams.delete('preview');url.hash=view;
  history.replaceState(null,'',url);
@@ -387,13 +387,10 @@ function selectedMapNode(){
 function mapActions(){
  const node=selectedMapNode();
  return `<div class="mind-map-tools">
+  ${nodeKind(state,node.id)==='action'?`<button data-space-detail="${esc(node.id)}">タスクの詳細</button>`:''}
   <button data-space-stats="${esc(node.id)}">レポートを見る</button>
   <button data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
- </div>
- <button class="primary mind-map-explore" data-map-explore>
-  <span>宇宙を探検する <span aria-hidden="true">↗</span></span>
-  ${node.parentId?`<small>${esc(node.name)}へ</small>`:''}
- </button>`;
+ </div>`;
 }
 function personalMap(){
  const selected=selectedMapNode(),path=nodePath(state,selected.id),root=path[0];
@@ -455,7 +452,7 @@ function bindHomeOrigin(){
 }
 function openMindMap(){
  if(guideSession||navigating)return;
- exploring=false;view='tree';
+ view='tree';
  if(location.hash!=='#tree')location.hash='tree';
  render();
  $('.mind-map [aria-current]')?.scrollIntoView({block:'nearest'});
@@ -469,15 +466,6 @@ function selectMapNode(button){
  (detail||selected)?.scrollIntoView({block:'nearest'});
  $('.mind-map-footer').innerHTML=mapActions();
 }
-function exploreMap(){
- const node=selectedMapNode();
- if(nodeDepth(state,node.id)>4){legacyDetail(node.id);return}
- exploring=true;focus=node.id;universeOutside=!node.parentId;
- render();
- if(universeOutside)enterSpace(node.id);
- else if(nodeKind(state,node.id)==='action')spaceDetail(node.id);
-}
-
 function leafPanel(id,key=today){
  if(!state.nodes.some(n=>n.id===id))return;
  const useEvent=isEventTask(setting(state,id))&&!state.logs[key]?.[id]?.quantity;
@@ -550,7 +538,6 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   $('.mind-map [aria-current]')?.scrollIntoView({block:'nearest'});
   return;
  }
- if(b.hasAttribute('data-map-explore')){exploreMap();return}
  if(d.do==='open-scenery'){openScenery();return}
  if(d.do==='close-scenery'){closeScenery();return}
  if(b.hasAttribute('data-map-expand')){
@@ -598,7 +585,7 @@ document.addEventListener('dblclick',event=>{
  if(button&&!$('#dialog').open)editor(button.dataset.editTitle);
 });
 document.addEventListener('error',e=>{if(e.target.matches?.('[data-account-photo]'))e.target.remove()},true);
-document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-submit'))return;e.preventDefault();if(e.target.id==='node-form'){const f=new FormData(e.target),id=e.target.dataset.id,previous=structuredClone(state);try{const kind=f.get('node-kind')||'goal',newId=writeGoal(state,{id,name:f.get('name'),purpose:f.get('description'),parentId:id==='new'?(addParent||currentSpace().id):state.nodes.find(n=>n.id===id)?.parentId,kind,...(kind==='action'?readTaskSettings(e.target):{}),symbolName:f.has('symbol-name')?f.get('symbol-name'):undefined});refreshTodayMode();if(!save()){state=previous;return}if(id==='new'&&!exploring)mapSelection=newId;close();render();if(id==='new')treeScene?.birth(newId);toast(id==='new'?(universeGrowth(previous,today).level===0&&universeGrowth(state,today).level>0?'最初の銀河が誕生し、宇宙に光が灯りました':'新しい天体が誕生しました'):'目標を更新しました')}catch(err){state=previous;toast(err.message)}}if(e.target.id==='preset-form'){
+document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-submit'))return;e.preventDefault();if(e.target.id==='node-form'){const f=new FormData(e.target),id=e.target.dataset.id,previous=structuredClone(state);try{const kind=f.get('node-kind')||'goal',newId=writeGoal(state,{id,name:f.get('name'),purpose:f.get('description'),parentId:id==='new'?(addParent||currentSpace().id):state.nodes.find(n=>n.id===id)?.parentId,kind,...(kind==='action'?readTaskSettings(e.target):{}),symbolName:f.has('symbol-name')?f.get('symbol-name'):undefined});refreshTodayMode();if(!save()){state=previous;return}if(id==='new')mapSelection=newId;close();render();if(id==='new')treeScene?.birth(newId);toast(id==='new'?(universeGrowth(previous,today).level===0&&universeGrowth(state,today).level>0?'最初の銀河が誕生し、宇宙に光が灯りました':'新しい天体が誕生しました'):'目標を更新しました')}catch(err){state=previous;toast(err.message)}}if(e.target.id==='preset-form'){
  const id=e.target.dataset.id,node=state.nodes.find(n=>n.id===id),previous=structuredClone(state);
  if(!node)return;
  try{
@@ -635,7 +622,7 @@ document.addEventListener('change',async e=>{if(e.target.name==='node-kind'){
 function bindTree(){const host=$('.universe-stage');if(!host)return;try{treeScene=createUniverse(host,{nodes:state.nodes,auraStrength:universeGrowth(state,today).strength,current:showUniverseOrigin()?UNIVERSE_ORIGIN:currentSpace().id,onSelect:id=>{if(!guideSession)openNode(id)},onZoom:value=>{const label=$('[data-zoom-label]');if(label)label.textContent=value+'%'}})}catch(error){if(showUniverseOrigin()){host.innerHTML=`<button class="universe-origin-fallback" style="--fallback-growth:${universeGrowth(state,today).strength}" data-space-enter="${esc(currentSpace().id)}" aria-label="宇宙に入る"></button>`;return}host.innerHTML=`<div class="universe-fallback"><p>この端末では、目標一覧で宇宙を探索できます。</p>${visibleChildren(state,currentSpace().id).map(n=>`<button data-space-enter="${esc(n.id)}">✧ ${esc(n.name)} →</button>`).join('')}</div>`}}
 function applyLabelVisibility(){}
 $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}});
-window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar')statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){if(h==='tree')exploring=false;view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
+window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar')statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
 else if(!onboardingPreview&&!storageLocked&&!needsLegacyImport&&state.universe?.firstSteps)startGuide();
 if(authReturn&&guestHandoff?.step==='login'&&guestHandoff.map&&!storageLocked){
  try{

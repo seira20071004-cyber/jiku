@@ -282,23 +282,6 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 }
 .mind-map-tools { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
 .mind-map-tools button { min-height:35px; padding-inline:8px; color:#c8bce6; font-size:12px; }
-.mind-map .mind-map-explore {
-  display:grid;
-  place-content:center;
-  justify-items:center;
-  gap:2px;
-  min-height:49px;
-  padding:7px 12px;
-  border:1px solid #c3aff085;
-  border-radius:12px;
-  background:linear-gradient(112deg,#43316f,#242f57);
-  color:#fff5ff;
-  font-size:14px;
-  text-align:center;
-  white-space:normal;
-  overflow-wrap:anywhere;
-}
-.mind-map-explore small { color:#d9caef; font-size:11px; }
 .space-map-back { display:none; }
 .at-origin .space-map-back {
   display:block;
