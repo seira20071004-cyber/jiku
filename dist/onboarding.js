@@ -197,6 +197,7 @@ export function mountOnboarding(host, {
         <p class="birth-error" role="alert" hidden></p>
       </div>
       <button type="button" class="birth-quiet birth-skip" data-birth="skip">演出をスキップ</button>
+      ${loginAtEnd && !preview ? '<a class="birth-quiet birth-sample-link" href="/?demo=1#stats">サンプルで試す</a>' : ''}
     </main>`;
 
   const screen = host.firstElementChild;

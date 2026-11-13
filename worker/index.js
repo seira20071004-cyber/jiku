@@ -2,7 +2,7 @@ import {googleConfig,authRoute,session,googlePicture} from './auth.js';
 const PUBLIC_ASSETS=new Set([
  '/','/index.html','/app.js','/style.css','/model.js','/quantity-view.js','/universe.js',
  '/universe-model.js','/demo.js','/example-map.js','/mind-map.js','/mind-map.css',
- '/onboarding.css','/onboarding.js','/onboarding-sky.js','/origin-framing.js','/origin-preview.js',
+ '/onboarding.css','/onboarding.js','/birth-music.js','/onboarding-sky.js','/origin-framing.js','/origin-preview.js',
  '/manifest.webmanifest','/icons/jiku.svg','/icons/jiku-180.png','/icons/jiku-192.png','/icons/jiku-512.png'
 ]);
 // ASSET_MAP is embedded at build time. Authentication runs before serving assets.

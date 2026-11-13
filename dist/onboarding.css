@@ -566,3 +566,11 @@ body.birth-page, body.birth-active {
   gap: 5px;
   margin-bottom: 10px;
 }
+
+.birth-screen .birth-sample-link {
+  position: absolute;
+  z-index: 2;
+  right: max(14px, env(safe-area-inset-right));
+  top: max(61px, calc(env(safe-area-inset-top) + 47px));
+}
+.birth-screen:is([data-map], [data-landing], [data-choosing]) .birth-sample-link { display: none; }

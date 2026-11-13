@@ -35,7 +35,7 @@ test('未ログインでも初回体験の素材だけを返し、認証設定�
  assert.equal((await worker.fetch(req('/'),{})).status,503);
  assert.equal((await worker.fetch(req('/tree3d.js'),env)).status,401);
  assert.equal((await worker.fetch(req('/api/session'),env)).status,401);
- for(const name of ['onboarding.css','onboarding.js','onboarding-sky.js','origin-framing.js','origin-preview.js','app.js','model.js','universe-model.js','mind-map.js','example-map.js']){
+ for(const name of ['onboarding.css','onboarding.js','birth-music.js','onboarding-sky.js','origin-framing.js','origin-preview.js','app.js','model.js','universe-model.js','mind-map.js','example-map.js']){
   const asset=await worker.fetch(req('/'+name),env);assert.equal(asset.status,200);
  }
  const page=await worker.fetch(req('/'),env);
