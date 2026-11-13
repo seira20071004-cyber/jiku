@@ -563,7 +563,7 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .trend-rate path,.trend-cumulative path { fill:none; stroke:var(--trend-color); stroke-width:2; }
 .trend-cumulative path { stroke-dasharray:5 4; }
 .trend-plot .trend-value { fill:#ffd16b; font-weight:700; }
-.hierarchy-table-wrap { max-height:360px; overflow:auto; scrollbar-width:thin; }
+.hierarchy-table-wrap { flex:1; min-height:0; overflow:auto; scrollbar-width:thin; }
 .hierarchy-table { width:100%; border-collapse:separate; border-spacing:0; font-size:12px; line-height:1.4; }
 .hierarchy-table th {
  position:sticky; top:0; z-index:2; padding:7px 4px; background:#20213a; color:#ddd1f2;
@@ -670,3 +670,33 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 .target-calculator output:not(:empty) { display:block; margin-top:7px; color:#f2e5ff; }
 .hierarchy-table .hierarchy-group { vertical-align:top; }
 .hierarchy-table .hierarchy-group button { position:sticky; top:30px; }
+
+
+.stats-dashboard .quantity-content {
+ display:flex; flex-direction:column; overflow:hidden; padding-bottom:6px;
+}
+.analysis-chart {
+ flex:1; min-height:0; min-width:0; display:flex; flex-direction:column; margin-bottom:0;
+}
+.analysis-slides { flex:1; min-height:0; align-items:stretch; }
+.analysis-slide { min-height:0; overflow-y:auto; scrollbar-width:thin; }
+.analysis-slide.analysis-rates { display:flex; flex-direction:column; overflow:hidden; }
+.analysis-pagination { flex:none; }
+.header-actions { display:flex; flex:none; align-items:center; gap:6px; }
+.app-audio {
+ display:grid; place-items:center; min-width:34px; min-height:34px;
+ border-radius:50%; color:#c9b8e4; font-size:19px;
+}
+.app-audio[aria-pressed="true"] { color:#f4e7ff; background:#38264c; }
+.planet-energy-balance {
+ min-height:34px; padding:5px 11px; border-radius:18px;
+ border:1px solid #796597; background:#151429;
+}
+.energy-total { color:#e9d4ff; font-size:28px; font-weight:700; }
+.energy-total small { font-size:13px; }
+.energy-prize { color:#cbeedc; }
+.energy-collection { padding:0; list-style:none; }
+.energy-collection i {
+ display:inline-block; width:10px; height:10px; margin-right:7px; border-radius:50%; background:var(--planet-prize);
+}
+.period-task-metric span[class*="rate-"] { color:var(--rate-color); }

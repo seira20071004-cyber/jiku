@@ -28,7 +28,19 @@ test('階層を合計し、超過と不足が累計で相殺される',()=>{
  const chart=analysisChart(state,{...period,scope:task});
  assert.match(chart,/11\/1の週、達成率120%、累計120%/);
  assert.match(chart,/11\/8の週、達成率80%、累計100%/);
- assert.match(chart,/class="trend-value rate-mid"[^>]*>80%/);
- assert.deepEqual([null,50,51,80,81,101].map(achievementTone),
+ assert.match(chart,/class="trend-value "[^>]*>80%/);
+ assert.match(analysisChart(state,{...period,end:'2026-11-15',scope:task}),/class="trend-value rate-mid"[^>]*>80%/);
+ assert.deepEqual([null,50,51,80,81,101].map(rate=>achievementTone(rate,100)),
   ['', 'rate-low', 'rate-mid', 'rate-mid', '', 'rate-reached']);
+});
+
+test('週の開始直後は50%未満でも順調な進捗を警告しない',()=>{
+ const state=freshUniverse();
+ const task=writeGoal(state,{name:'読書',purpose:'本を読む',parentId:'root',kind:'action',
+  measurement:{unit:'minutes',dailyAmount:30,weeklyTarget:120},mode:'rest'});
+ setTaskRecord(state,'2026-11-16',task,30,[],'2026-11-17');
+ const view=end=>analysisChart(state,{start:'2026-11-16',end,scope:task,weeks:1});
+ assert.match(view('2026-11-17'),/class="trend-value "[^>]*>25%/);
+ assert.match(view('2026-11-20'),/class="trend-value rate-low"[^>]*>25%/);
+ assert.equal(achievementTone(0,100,0),'');
 });

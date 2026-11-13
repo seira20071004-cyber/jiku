@@ -1,6 +1,13 @@
 const chords = [[48, 55, 62, 64], [45, 52, 59, 60], [41, 48, 55, 57], [43, 50, 57, 62]];
 const frequency = note => 440 * 2 ** ((note - 69) / 12);
 
+const cues = {
+  navigate: {notes:[76], length:.2, level:.11, gap:0},
+  star: {notes:[60, 67, 72], length:1.5, level:.2, gap:.11},
+  save: {notes:[67, 72], length:.65, level:.15, gap:.09},
+  prize: {notes:[60, 67, 72, 76], length:1.5, level:.2, gap:.12}
+};
+
 export function createBirthMusic() {
   const Audio = globalThis.AudioContext || globalThis.webkitAudioContext;
   if (!Audio) return null;
@@ -59,6 +66,14 @@ export function createBirthMusic() {
       } catch {
         return false;
       }
+    },
+    cue(name) {
+      const sound = cues[name];
+      if (!playing || context.state !== 'running' || !sound) return;
+      const start = context.currentTime + .03;
+      sound.notes.forEach((note, index) => {
+        tone(note, start + index * sound.gap, sound.length, sound.level);
+      });
     },
     accent() {
       if (!playing) return;

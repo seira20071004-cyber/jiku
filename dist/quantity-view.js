@@ -107,7 +107,7 @@ export function recordPanel(s,id,date,today){
 const formatHours=new Intl.NumberFormat('ja-JP',{maximumFractionDigits:2});
 const hoursNumber=hours=>hours>0&&hours<.01?numberText(hours):formatHours.format(hours);
 export const hoursText=hours=>hoursNumber(hours)+'時間';
-function taskDetails(s,section,targetLabel,editableIds,end,today){
+function taskDetails(s,section,targetLabel,editableIds,start,end,today){
  const tasks=new Map();
  for(const row of section.rows){
   if(!tasks.has(row.id))tasks.set(row.id,[]);
@@ -121,10 +121,12 @@ function taskDetails(s,section,targetLabel,editableIds,end,today){
    <header><strong>${esc(task.name)}</strong>${task.deleted?'<small>過去のタスク</small>':''}
    ${editable?`<button type="button" data-record-leaf="${esc(task.id)}" data-log-date="${date}" aria-label="${esc(task.name)}の記録を修正">›</button>`:''}</header>
    ${sorted.map(row=>{
-    const progress=weeklyAchievement(row.achievementAmount??row.amount,row.target);
+    const actual=row.achievementAmount??row.amount;
+    const progress=weeklyAchievement(actual,row.target);
+    const tone=achievementTone(actual,row.target,row.target*completedDayShare(start,end,today));
     return `<div class="period-task-metric"><div><strong>${row.dimension==='time'?hoursText(row.amount):numberText(row.amount)+esc(row.unit)}</strong>
-      ${progress?`<span class="${achievementTone(progress.percent)}">${targetLabel} ${row.dimension==='time'?hoursText(row.target):numberText(row.target)+esc(row.unit)} · ${progress.percent}%</span>`:''}</div>
-      ${progress?`<div class="weekly-task-progress-track ${achievementTone(progress.percent)}" role="progressbar" aria-label="${esc(task.name)}の${targetLabel}達成度（${esc(row.unit)}）" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.bar}" aria-valuetext="${progress.percent}%"><i style="width:${progress.bar}%"></i></div>`:''}
+      ${progress?`<span class="${tone}">${targetLabel} ${row.dimension==='time'?hoursText(row.target):numberText(row.target)+esc(row.unit)} · ${progress.percent}%</span>`:''}</div>
+      ${progress?`<div class="weekly-task-progress-track ${tone}" role="progressbar" aria-label="${esc(task.name)}の${targetLabel}達成度（${esc(row.unit)}）" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.bar}" aria-valuetext="${progress.percent}%"><i style="width:${progress.bar}%"></i></div>`:''}
      </div>`;
    }).join('')}
    ${editable&&!isEventTask(setting(s,task.id))&&!sorted.some(row=>row.dimension==='time'&&row.hasTarget)?`<button type="button" class="text-button" data-open-preset="${esc(task.id)}">目標時間を設定 →</button>`:''}
@@ -219,21 +221,31 @@ export function analysisData(state,{start,end,weeks}){
 }
 
 const percent=(actual,target)=>target>0?Math.round(actual/target*100):null;
-export function achievementTone(rate){
- if(rate===null)return '';
- if(rate<=50)return 'rate-low';
- if(rate<=80)return 'rate-mid';
- return rate>=100?'rate-reached':'';
+function completedDayShare(from,to,today){
+ const day=86400000, first=Date.parse(from);
+ const length=(Date.parse(to)-first)/day+1;
+ return Math.max(0,Math.min(1,(Date.parse(today)-first)/day/length));
+}
+export function achievementTone(actual,target,due=target){
+ if(actual===null||!(target>0))return '';
+ if(actual>=target)return 'rate-reached';
+ if(!(due>0))return '';
+ const pace=actual/due;
+ if(pace<=.5)return 'rate-low';
+ if(pace<=.8)return 'rate-mid';
+ return '';
 }
 const percentText=(actual,target)=>target>0?numberText(percent(actual,target))+'%':'目標未設定';
 const shortDate=date=>Number(date.slice(5,7))+'/'+Number(date.slice(8));
 
-function trendChart(item,periods){
+function trendChart(item,periods,dueTargets){
  const weekly=item.weekly;
- let totalActual=0,totalTarget=0;
+ let totalActual=0,totalTarget=0,totalDue=0;
  const values=weekly.map(({actual,target},index)=>{
-  if(target>0){totalActual+=actual;totalTarget+=target;}
-  return {...periods[index],actual,target,rate:percent(actual,target),cumulative:percent(totalActual,totalTarget)};
+  const due=dueTargets[index];
+  if(target>0){totalActual+=actual;totalTarget+=target;totalDue+=due;}
+  return {...periods[index],actual,target,rate:percent(actual,target),cumulative:percent(totalActual,totalTarget),
+   rateTone:achievementTone(actual,target,due),cumulativeTone:achievementTone(totalActual,totalTarget,totalDue)};
  });
  const height=148,left=40,right=47,step=58,width=Math.max(300,left+right+step*values.length);
  const top=20,base=top+height;
@@ -247,7 +259,7 @@ function trendChart(item,periods){
    if(value[key]===null){active=false;return '';}
    const cx=x(index),cy=y(value[key],maxRate);
    path+=(active?'L':'M')+cx+' '+cy;active=true;
-   const tone=achievementTone(value[key]);
+   const tone=value[key+'Tone'];
    return `<circle class="${tone}" cx="${cx}" cy="${cy}" r="3.2"/>${kind==='rate'?`<text class="trend-value ${tone}" x="${cx}" y="${cy-8}" text-anchor="middle">${numberText(value[key])}%</text>`:''}`;
   }).join('');
   return `<g class="trend-${kind}"><path d="${path}"/>${dots}</g>`;
@@ -271,7 +283,7 @@ function trendChart(item,periods){
   </div>`;
 }
 
-function hierarchyChart(root,current){
+function hierarchyChart(root,current,tone){
  const rows=[];
  function visit(item,depth){
   const first=rows.length;
@@ -284,26 +296,26 @@ function hierarchyChart(root,current){
  const rate=item=>item.target>0?numberText(percent(item.actual,item.target))+'%':'—';
  const button=(item,vertical)=>`<button data-analysis-item="${esc(item.id)}" aria-current="${item===current}"
    class="${vertical?'hierarchy-vertical':''}">
-   <span>${esc(item.name)}</span>${item.children.length?`<b class="${achievementTone(percent(item.actual,item.target))}">${rate(item)}</b>`:''}
+   <span>${esc(item.name)}</span>${item.children.length?`<b class="${tone(item)}">${rate(item)}</b>`:''}
   </button>`;
- return `<h3>目標とタスクの階層</h3>
+ return `<h3>達成率</h3>
   <div class="hierarchy-table-wrap" tabindex="0" aria-label="目標の階層表。横にスクロールできます">
    <table class="hierarchy-table" aria-label="目標とタスクの達成率">
     <thead><tr>${Array.from({length:columns},(_,i)=>`<th scope="col">${i===0?'大きな目標':i===1?'内訳':i===columns-1?'詳細':'下位目標'}</th>`).join('')}<th scope="col">達成率</th></tr></thead>
     <tbody>${rows.map(({path,leaf,depth})=>`<tr>
      ${path.map(({item,depth:level,span})=>`<td rowspan="${span}" class="${item.children.length||level===0?'hierarchy-group':'hierarchy-leaf'}">${button(item,item.children.length>0||level===0)}</td>`).join('')}
      ${depth+1<columns?`<td class="hierarchy-empty" colspan="${columns-depth-1}"></td>`:''}
-     <td class="hierarchy-rate ${achievementTone(percent(leaf.actual,leaf.target))}" title="実績 ${hoursText(leaf.actual)}${leaf.target?' / 目標 '+hoursText(leaf.target):''}">${rate(leaf)}</td>
+     <td class="hierarchy-rate ${tone(leaf)}" title="実績 ${hoursText(leaf.actual)}${leaf.target?' / 目標 '+hoursText(leaf.target):''}">${rate(leaf)}</td>
     </tr>`).join('')}</tbody>
    </table>
   </div>`;
 }
 
-function achievementCards(item,parent){
+function achievementCards(item,parent,tone){
  const card=(row,summary=false)=>{
   const rate=percent(row.actual,row.target),difference=row.actual-row.target;
   const tag=summary?'div':'button';
-  return `<${tag} class="achievement-card ${achievementTone(rate)}" ${summary?'':`type="button" data-analysis-item="${esc(row.id)}"`}>
+  return `<${tag} class="achievement-card ${tone(row)}" ${summary?'':`type="button" data-analysis-item="${esc(row.id)}"`}>
    <strong>${summary?'この目標の達成率':esc(row.name)}</strong>
    <span class="achievement-ring" style="--progress:${Math.min(100,rate||0)}%"><b>${percentText(row.actual,row.target)}</b></span>
    <span>${hoursText(row.actual)} / ${row.target?hoursText(row.target):'目標未設定'}</span>
@@ -320,12 +332,15 @@ function achievementCards(item,parent){
 export function analysisChart(state,{start,end,scope,weeks}){
  const {items,root,periods}=analysisData(state,{start,end,weeks});
  const current=items.get(scope)||root;
+ const shares=periods.map(({from,to})=>completedDayShare(from,to,end));
+ const dueTargets=item=>item.weekly.map(({target},index)=>target*shares[index]);
+ const tone=item=>achievementTone(item.actual,item.target,dueTargets(item).reduce((sum,due)=>sum+due,0));
  return `<section class="activity-chart analysis-chart" aria-label="目標の達成度">
   <header><time datetime="${start}">${start.replaceAll('-','/')}</time><span>〜</span><time datetime="${end}">${end.replaceAll('-','/')}</time></header>
   <div class="analysis-slides" tabindex="0" aria-label="達成度。左右にスワイプ、または矢印キーで切り替え">
-   <section class="analysis-slide" aria-label="推移">${trendChart(current,periods)}</section>
-   <section class="analysis-slide" aria-label="階層">${hierarchyChart(root,current)}</section>
-   <section class="analysis-slide" aria-label="目標別">${achievementCards(current,items.get(current.parentId))}</section>
+   <section class="analysis-slide" aria-label="推移">${trendChart(current,periods,dueTargets(current))}</section>
+   <section class="analysis-slide analysis-rates" aria-label="達成率">${hierarchyChart(root,current,tone)}</section>
+   <section class="analysis-slide" aria-label="目標別">${achievementCards(current,items.get(current.parentId),tone)}</section>
   </div>
   <div class="analysis-pagination" aria-hidden="true"><i></i><i></i><i></i></div>
  </section>`;
@@ -366,6 +381,7 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=fal
  const additional=summary.groups.filter(group=>group.dimension!=='time'&&group.total>0);
  const sections=weeklyTaskSections(s,summary,scope).filter(section=>section.rows.length);
  const progress=timeGoalProgress(progressRows);
+ const progressTone=achievementTone(progress.actual,progress.target,progress.target*completedDayShare(start,end,today));
  const editableIds=new Set(readOnly?[]:leaves(s).map(n=>n.id));
  const goal=s.nodes.find(n=>n.id===scope)||s.nodes.find(n=>n.parentId===null);
  const short=date=>`${Number(date.slice(5,7))}/${Number(date.slice(8))}`;
@@ -380,8 +396,8 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=fal
    <div class="weekly-total-values"><div><strong>${hoursNumber(time)}</strong><span>時間</span></div></div>
    ${additional.length?`<div class="period-extra-totals">${additional.map(group=>`<span>${numberText(group.total)}${esc(group.unit)}</span>`).join('')}</div>`:''}
    <div class="period-achievement">
-    <div><strong>時間目標の達成率</strong>${progress.achievement?`<div class="report-ring ${achievementTone(progress.achievement.percent)}" style="--progress:${progress.achievement.bar}%" aria-label="達成率 ${progress.achievement.percent}%"><b>${progress.achievement.percent}%</b></div>`:''}</div>
-    ${progress.achievement?`<div class="weekly-task-progress-track ${achievementTone(progress.achievement.percent)}" role="progressbar" aria-label="目標全体の達成率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.achievement.bar}" aria-valuetext="${progress.achievement.percent}%"><i style="width:${progress.achievement.bar}%"></i></div>
+    <div><strong>時間目標の達成率</strong>${progress.achievement?`<div class="report-ring ${progressTone}" style="--progress:${progress.achievement.bar}%" aria-label="達成率 ${progress.achievement.percent}%"><b>${progress.achievement.percent}%</b></div>`:''}</div>
+    ${progress.achievement?`<div class="weekly-task-progress-track ${progressTone}" role="progressbar" aria-label="目標全体の達成率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.achievement.bar}" aria-valuetext="${progress.achievement.percent}%"><i style="width:${progress.achievement.bar}%"></i></div>
     <p>${hoursText(progress.actual)} / ${hoursText(progress.target)} · ${progress.count}件の時間目標</p>`:`<p>この${period}の時間目標があるタスクを設定すると、達成率が表示されます。</p>`}
     ${quarter?'<p>月ごとの記録から確認できる月間目標を合算しています。</p>':''}
    </div>
@@ -390,7 +406,7 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=fal
   <p class="weekly-source-note">期間中の記録をもとに自動で更新されます。</p>
   <details class="period-details" ${sections.length||events.length?'':'open'}>
    <summary>タスク別の内訳</summary>
-   ${sections.map(section=>taskDetails(s,section,targetLabel,editableIds,end,today)).join('')}
+   ${sections.map(section=>taskDetails(s,section,targetLabel,editableIds,start,end,today)).join('')}
    ${events.length?`<section class="weekly-goal-section"><h2><span>✧</span>完了したイベント</h2>${events.map(event=>`<div class="weekly-task-row"><strong>${esc(event.name)}</strong><span class="event-state">${short(event.date)} · 完了${event.minutes?' · '+hoursText(event.minutes/60):''}${event.quantities.map(q=>' · '+numberText(q.amount)+esc(unitInfo(q.measurement).label)).join('')}</span></div>`).join('')}</section>`:''}
    ${sections.length||events.length?'':'<p class="weekly-empty-note">この期間のタスクの記録は、まだありません。</p>'}
   </details>

@@ -1,3 +1,4 @@
+import {createBirthMusic} from './birth-music.js?v=2';
 import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,planetArt} from './onboarding.js';
 import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
@@ -28,6 +29,21 @@ let mapSelection=null,mapEditing=false;
 function save(){if(guideSession||mapPreviewReturn||(guest&&!demoMode))return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 const icon=(name)=>({home:'⌂',tree:'✧',calendar:'▦',stats:'◴',settings:'⚙'}[name]);
 const names={tree:'ホーム',stats:'統計'};
+const appAudio=createBirthMusic();
+let appAudioOn=false,appAudioChanging=false;
+function syncAudioButton(){
+ const button=$('[data-do="app-audio"]');
+ button?.setAttribute('aria-pressed',String(appAudioOn));
+ if(button)button.textContent=appAudioOn?'♪':'♫';
+}
+async function toggleAppAudio(){
+ if(!appAudio||appAudioChanging)return;
+ appAudioChanging=true;
+ try{
+  appAudioOn=await appAudio.toggle();
+  syncAudioButton();
+ }finally{appAudioChanging=false;}
+}
 function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3500)}
 function modal(html){const d=$('#dialog');d.innerHTML=html;d.showModal();d.querySelector('[autofocus]')?.focus()}
 function close(){$('#dialog').close()}
@@ -37,10 +53,10 @@ function render(){clearTimeout(guideTimer);
  const birthActive=onboardingScene||onboardingPreview||
  (guest&&!demoMode&&!guideSession&&!mapPreviewReturn)||(!storageLocked&&!state.universe?.onboarded);
  document.body.classList.toggle('birth-active',Boolean(birthActive));
- if(birthActive){if(treeScene){treeScene.dispose();treeScene=null}if(!onboardingScene)showOnboarding();return}
+ if(birthActive){if(appAudioOn&&!appAudioChanging)void toggleAppAudio();if(treeScene){treeScene.dispose();treeScene=null}if(!onboardingScene)showOnboarding();return}
  if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){today=latest;selected=today;applyPending(state,today);save()}
  const page=view==='stats'?statsPage():guideSession?treePage():mindMapPage();
- $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();bindAnalysisSlides();scheduleGuide()}
+ $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();bindAnalysisSlides();scheduleGuide()}
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
 function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n.id];return `<div class="action-row ${done?'done':''}"><button class="check ${done?'checked':''}" data-check="${esc(n.id)}" data-date="${key}" aria-label="${esc(n.name)}の実行記録" aria-pressed="${done}">${done?'✓':''}</button><div class="action-copy"><strong>${esc(n.name)}</strong><small>${esc(ancestry(state,n.id).slice(1,-1).join(' / ')||'自分の宇宙')}</small></div><span class="priority p${a.priority}">${['高','中','低'][a.priority]}</span><button class="edit-action" data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">⋯</button></div>`}
 let universeOutside=!state.universe?.firstSteps,navigating=false,onboardingScene=null;
@@ -380,20 +396,15 @@ function bindAnalysisSlides(){
  const slides=$('.analysis-slides');
  if(!slides)return;
  const pages=[...slides.children],dots=[...document.querySelectorAll('.analysis-pagination i')];
- const sizeToPage=()=>{slides.style.height=pages[analysisSlide].offsetHeight+'px';};
- const observer=new ResizeObserver(()=>{
-  if(slides.isConnected)sizeToPage();
-  else observer.disconnect();
- });
- pages.forEach(page=>observer.observe(page));
  const sync=index=>{
-  analysisSlide=Math.max(0,Math.min(pages.length-1,index));
+  const next=Math.max(0,Math.min(pages.length-1,index));
+  if(next!==analysisSlide)appAudio?.cue?.('navigate');
+  analysisSlide=next;
   for(const [i,page] of pages.entries()){
    if(i!==analysisSlide&&page.contains(document.activeElement))slides.focus({preventScroll:true});
    page.inert=i!==analysisSlide;
    dots[i].classList.toggle('active',i===analysisSlide);
   }
-  sizeToPage();
  };
  const goTo=index=>slides.scrollTo({
   left:index*slides.clientWidth,
@@ -429,7 +440,7 @@ function statsPage(){
  quantityScope=reportScope(quantityScope);
  const tabs=[['calendar','カレンダー'],['graph','グラフ']];
  const calendar=statsTab==='calendar';
- const start=shiftDate(today,1-statsWeeks*7);
+ const start=shiftDate(weekStart(today),-7*(statsWeeks-1));
  const panel=calendar ? calendarPage()+calendarModeChart() : `
   <div class="analysis-controls"><button type="button" data-do="analysis-conditions">条件を変更</button></div>
   ${analysisChart(state,{start,end:today,scope:quantityScope,weeks:statsWeeks})}`;
@@ -539,7 +550,7 @@ function mindMapPage(){
  return `<section class="mind-map" aria-labelledby="mind-map-title">
   <div class="home-universe">
    <button type="button" class="home-universe-art" data-do="planet-pulse" aria-label="星を光らせる">${planetArt(growth.days)}${energy.colors.length?`<span class="planet-prize" style="--planet-prize:${planetPrizes[energy.colors.at(-1)].color}" aria-hidden="true"></span>`:''}</button>
-   <span class="planet-energy-balance">✦ ${numberText(energy.balance)} <span>宇宙エネルギー</span></span>
+   <button type="button" class="planet-energy-balance" data-do="planet-energy" aria-label="宇宙エネルギー ${numberText(energy.balance)}ポイント、ガチャを開く">✦ ${numberText(energy.balance)} <span>宇宙エネルギー</span></button>
    ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
   </div>
   ${recorded?'':`<section class="mind-map-mode" aria-label="今日のモード">
@@ -558,6 +569,7 @@ const planetPrizes=[
  {name:'オーロラの光',color:'#70ebbd'},
  {name:'夕焼けの光',color:'#ffb385'}
 ];
+const planetDrawCost=20;
 function planetEnergy(){
  const energy=state.planetEnergy;
  if(!Number.isSafeInteger(energy?.balance)||energy.balance<0||!Array.isArray(energy.colors)||new Set(energy.colors).size!==energy.colors.length||!energy.colors.every(index=>Number.isInteger(index)&&planetPrizes[index])||
@@ -582,9 +594,11 @@ function earnEnergy(kind,date){
  return points;
 }
 function energyToast(message,points){
+ appAudio?.cue?.('save');
  toast(points?`${message} · 宇宙エネルギー ＋${points}`:message);
 }
 function pulsePlanet(button){
+ appAudio?.cue?.('star');
  const globe=button.querySelector('.planet-globe');
  if(!globe||!globe.animate)return;
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -606,6 +620,29 @@ function pulsePlanet(button){
  const remove=()=>effect.remove();
  effect.querySelector('.second').addEventListener('animationend',remove,{once:true});
  pulse.finished.catch(remove);
+}
+function showPlanetEnergy(prize){
+ const energy=planetEnergy();
+ const remaining=planetPrizes.length-energy.colors.length;
+ modal(`<div class="dialog-title"><h2>宇宙エネルギー</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <p class="energy-total">✦ ${numberText(energy.balance)} <small>ポイント</small></p>
+  ${prize?`<p class="energy-prize" role="status">${esc(prize.name)}を獲得しました。</p>`:''}
+  <p>最初の記録で10ポイント、最初のマップ編集で5ポイント。どちらも1日1回貯まります。</p>
+  <button type="button" class="primary" data-do="energy-draw" ${!remaining||energy.balance<planetDrawCost?'disabled':''}>${remaining?'星のガチャを回す · '+planetDrawCost+'ポイント':'星のオーラがすべて揃いました'}</button>
+  ${energy.colors.length?`<ul class="energy-collection">${energy.colors.map(index=>`<li><i style="--planet-prize:${planetPrizes[index].color}"></i>${esc(planetPrizes[index].name)}</li>`).join('')}</ul>`:''}`);
+}
+function drawPlanetPrize(){
+ const energy=planetEnergy();
+ const remaining=planetPrizes.map((_,index)=>index).filter(index=>!energy.colors.includes(index));
+ if(!remaining.length||energy.balance<planetDrawCost)return;
+ const index=remaining[Math.floor(Math.random()*remaining.length)];
+ const previous=state.planetEnergy;
+ state.planetEnergy={...energy,balance:energy.balance-planetDrawCost,colors:[...energy.colors,index]};
+ if(!save()){state.planetEnergy=previous;return;}
+ close();
+ render();
+ appAudio?.cue?.('prize');
+ showPlanetEnergy(planetPrizes[index]);
 }
 async function absorbModeButton(button) {
  const section=button.closest('.mind-map-mode');
@@ -732,8 +769,8 @@ function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">Y
 document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do],[data-view],[data-day],[data-focus],[data-map-back]');if(!b)return;const d=b.dataset;
  if(d.guide==='dismiss'){dismissGuide();return}
  if(b.hasAttribute('data-map-exit')){endMapPreview();return}
- if(b.hasAttribute('data-map-back')||d.view==='tree'){e.preventDefault();openMindMap();return}
- if(d.do==='analysis-conditions'){analysisConditions();return}
+ if(b.hasAttribute('data-map-back')||d.view==='tree'){e.preventDefault();appAudio?.cue?.('navigate');openMindMap();return}
+ if(d.do==='analysis-conditions'){appAudio?.cue?.('navigate');analysisConditions();return}
  if(b.hasAttribute('data-calculate-target')||b.hasAttribute('data-apply-target')){
   const box=b.closest('.target-calculator'),fields=box.closest('[data-target-fields]'),time=fields.dataset.targetFields==='time';
   const output=box.querySelector('output'),apply=box.querySelector('[data-apply-target]');
@@ -754,6 +791,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   return;
  }
  if(d.analysisItem){
+  appAudio?.cue?.('navigate');
   const fromCards=b.closest('.achievement-panel');
   quantityScope=reportScope(d.analysisItem);
   const table=$('.hierarchy-table-wrap'),position=table&&[table.scrollLeft,table.scrollTop];
@@ -768,9 +806,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   }
   return;
  }
+ if(d.do==='app-audio'){void toggleAppAudio();return}
  if(d.do==='planet-pulse'){pulsePlanet(b);return}
- if(d.mapSelect){selectMapNode(b);return}
+ if(d.do==='planet-energy'){appAudio?.cue?.('navigate');showPlanetEnergy();return}
+ if(d.do==='energy-draw'){drawPlanetPrize();return}
+ if(d.mapSelect){appAudio?.cue?.('navigate');selectMapNode(b);return}
  if(b.hasAttribute('data-map-edit-mode')){
+  appAudio?.cue?.('navigate');
   mapEditing=!mapEditing;
   render();
   $('[data-map-edit-mode]')?.focus({preventScroll:true});
@@ -801,11 +843,12 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  }
  if(b.hasAttribute('data-remove-extra')){b.closest('[data-extra-metric]').remove();return}
  if(d.spaceEnter){enterSpace(d.spaceEnter);return}if(d.spaceGo){close();enterSpace(d.spaceGo);return}if(d.legacyDetail){legacyDetail(d.legacyDetail);return}if(d.spaceAdd){creationDraft=null;chooseCreationType(d.spaceAdd);return}if(d.createKind){editor('new',d.createKind);return}if(b.hasAttribute('data-create-back')){const form=b.closest('form');creationDraft={...creationDraft,...Object.fromEntries(new FormData(form)),extras:readExtraSettings(form)};chooseCreationType(addParent||currentSpace().id);return}if(d.spaceDetail){spaceDetail(d.spaceDetail);return}if(d.spaceStats){quantityScope=d.spaceStats;analysisSlide=0;statsTab='graph';view='stats';location.hash='stats';close();render();return}if(d.spaceReorder){const previous=structuredClone(state);reorderNode(state,d.spaceReorder,Number(d.direction));const points=JSON.stringify(state.nodes)!==JSON.stringify(previous.nodes)?earnEnergy('edit',today):0;if(!save()){state=previous;return}render();spaceList();if(points)energyToast('表示順を変更しました',points);return}if(d.openPreset)openPreset(d.openPreset);if(b.hasAttribute('data-configure-leaves')){close();view='tree';location.hash='tree';render();toast('タスクを押して、タスクの固定量を設定してください')}if(d.recordLeaf)leafPanel(d.recordLeaf,d.logDate||today);if(d.pickLeaf)chooseLeaf(d.pickLeaf);if(d.quantityDay)dayEditor(d.quantityDay);if(d.addQuantity){const input=$('#quantity-form [name=record-minutes]');if(input)input.value=String(Math.round(((Number(input.value)||0)+Number(d.addQuantity))*1000000)/1000000)}if(d.removeQuantity){modal(`<h2>この日の量の記録を削除しますか？</h2><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-remove-quantity="${esc(d.removeQuantity)}" data-log-date="${d.logDate}">削除する</button></div>`)}if(d.confirmRemoveQuantity){removeQuantity(state,d.logDate,d.confirmRemoveQuantity);save();close();render();toast('この日の記録を削除しました')}if(b.hasAttribute('data-scroll-tree')){$('#goal-tree')?.scrollIntoView({behavior:'smooth',block:'start'})}if(d.statTab){
+  if(d.statTab!==statsTab)appAudio?.cue?.('navigate');
   statsTab=d.statTab;
   render();
   $(`[data-stat-tab="${statsTab}"]`)?.focus({preventScroll:true});
   return;
- }if(d.view){if(d.view==='stats')statsTab='calendar';view=d.view;location.hash=view;render();window.scrollTo(0,0)}if(d.mode){void recordModeChoice(b);return}if(d.check){const n=state.nodes.find(n=>n.id===d.check);if(n){const previous=structuredClone(state);toggleLog(state,d.date,n);const points=state.logs[d.date]?.[n.id]?earnEnergy('record',d.date):0;if(!save()){state=previous;return}render();if(points)energyToast('実行を記録しました',points)}}if(d.edit){addParent=null;editor(d.edit);if(b.hasAttribute('data-quantity-settings'))$('#node-form [name=quantity-unit]')?.focus()}if(d.selectDate){selected=d.selectDate;render();dayEditor(selected)}if(d.day){selected=d.day;month=selected.slice(0,7);view='stats';statsTab='calendar';render()}if(d.month){month=boundedMonth(month,Number(d.month),today);render()}if(d.focus){focus=d.focus;treeView=null;treeScene?.dispose();treeScene=null;zoom=1;pan={x:0,y:0};close();render()}if(d.delete){const id=d.delete,n=state.nodes.find(n=>n.id===id),count=descendants(state,id).size;modal(`<h2>「${esc(n.name)}」を削除しますか？</h2><p>子孫を含め ${count} 個の目標を削除します。過去の実行記録は残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-delete="${esc(id)}">削除する</button></div>`)}if(d.confirmDelete){const previous=structuredClone(state);deleteNode(state,d.confirmDelete);const points=earnEnergy('edit',today);if(!save()){state=previous;return}focus=null;treeScene?.dispose();treeScene=null;treeView=null;close();render();energyToast('目標を削除しました',points)}if(d.do)({close,settings,review,'open-demo':()=>switchDemo(true),'exit-demo':()=>switchDemo(false),'test-demo-mode':modePicker,'space-map':()=>showHierarchy(false),'preview-onboarding':previewOnboarding,'space-list':spaceList,'quick-actions':()=>chooseLeaf(today),'today-mode':modePicker,'labels':()=>{showGoalLabels=!showGoalLabels;applyLabelVisibility();b.setAttribute('aria-pressed',String(showGoalLabels))},'zoom-in':()=>{if(treeScene)treeScene.zoom(1.25);else{zoom=Math.min(2.5,zoom+.2);render()}},'zoom-out':()=>{if(treeScene)treeScene.zoom(.8);else{zoom=Math.max(.4,zoom-.2);render()}},'reset-tree':()=>{if(focus){focus=null;treeScene?.dispose();treeScene=null;treeView=null;render()}else if(treeScene)treeScene.reset();else{zoom=1;pan={x:0,y:0};render()}},today:()=>{month=today.slice(0,7);selected=today;render()},'clear-record':()=>{clearMode(state,selected);save();render();close();toast('モードを未記録に戻しました')},export:()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`jiku-${demoMode?'demo':'backup'}-${today}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}}[d.do])?.()});
+ }if(d.view){if(view!==d.view)appAudio?.cue?.('navigate');if(d.view==='stats')statsTab='calendar';view=d.view;location.hash=view;render();window.scrollTo(0,0)}if(d.mode){void recordModeChoice(b);return}if(d.check){const n=state.nodes.find(n=>n.id===d.check);if(n){const previous=structuredClone(state);toggleLog(state,d.date,n);const points=state.logs[d.date]?.[n.id]?earnEnergy('record',d.date):0;if(!save()){state=previous;return}render();if(points)energyToast('実行を記録しました',points)}}if(d.edit){addParent=null;editor(d.edit);if(b.hasAttribute('data-quantity-settings'))$('#node-form [name=quantity-unit]')?.focus()}if(d.selectDate){selected=d.selectDate;render();dayEditor(selected)}if(d.day){selected=d.day;month=selected.slice(0,7);view='stats';statsTab='calendar';render()}if(d.month){month=boundedMonth(month,Number(d.month),today);render()}if(d.focus){focus=d.focus;treeView=null;treeScene?.dispose();treeScene=null;zoom=1;pan={x:0,y:0};close();render()}if(d.delete){const id=d.delete,n=state.nodes.find(n=>n.id===id),count=descendants(state,id).size;modal(`<h2>「${esc(n.name)}」を削除しますか？</h2><p>子孫を含め ${count} 個の目標を削除します。過去の実行記録は残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-delete="${esc(id)}">削除する</button></div>`)}if(d.confirmDelete){const previous=structuredClone(state);deleteNode(state,d.confirmDelete);const points=earnEnergy('edit',today);if(!save()){state=previous;return}focus=null;treeScene?.dispose();treeScene=null;treeView=null;close();render();energyToast('目標を削除しました',points)}if(d.do)({close,settings,review,'open-demo':()=>switchDemo(true),'exit-demo':()=>switchDemo(false),'test-demo-mode':modePicker,'space-map':()=>showHierarchy(false),'preview-onboarding':previewOnboarding,'space-list':spaceList,'quick-actions':()=>chooseLeaf(today),'today-mode':modePicker,'labels':()=>{showGoalLabels=!showGoalLabels;applyLabelVisibility();b.setAttribute('aria-pressed',String(showGoalLabels))},'zoom-in':()=>{if(treeScene)treeScene.zoom(1.25);else{zoom=Math.min(2.5,zoom+.2);render()}},'zoom-out':()=>{if(treeScene)treeScene.zoom(.8);else{zoom=Math.max(.4,zoom-.2);render()}},'reset-tree':()=>{if(focus){focus=null;treeScene?.dispose();treeScene=null;treeView=null;render()}else if(treeScene)treeScene.reset();else{zoom=1;pan={x:0,y:0};render()}},today:()=>{month=today.slice(0,7);selected=today;render()},'clear-record':()=>{clearMode(state,selected);save();render();close();toast('モードを未記録に戻しました')},export:()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`jiku-${demoMode?'demo':'backup'}-${today}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}}[d.do])?.()});
 let lastTitleTap;
 document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&!$('.space-vista')?.hidden)closeScenery();
