@@ -18,18 +18,18 @@ function targetCalculator({time=false,total=null}={}){
   <output data-calc-result aria-live="polite"></output>
  </details>`;
 }
+function weeklyTargetForEdit(m){
+ return m.weeklyTarget??(m.monthlyTarget!=null&&m.totalTarget==null?Number((m.monthlyTarget*12/52).toFixed(6)):null);
+}
 function quantitySettingsFields(m){
  return `<section class="task-amount-config" data-target-fields="time">
   <h3>目標時間</h3>
   <div class="task-target-grid task-target-three">
    ${minuteInput('全体の目標時間','total-minutes',m.totalTarget,false)}
-   ${minuteInput('1週間の目標時間','weekly-minutes',m.weeklyTarget,false)}
+   ${minuteInput('1週間の目標時間','weekly-minutes',weeklyTargetForEdit(m),false)}
    ${minuteInput('1日の目標時間','daily-minutes',m.dailyAmount)}
   </div>
   ${targetCalculator({time:true,total:m.totalTarget})}
-  <details class="task-monthly-target" ${m.monthlyTarget?'open':''}><summary>1ヶ月の目標時間（任意）</summary>
-   ${minuteInput('1ヶ月の目標時間','monthly-minutes',m.monthlyTarget,false)}
-  </details>
  </section>`;
 }
 export function extraMetricFields(metric={},event=false){
@@ -38,16 +38,12 @@ export function extraMetricFields(metric={},event=false){
  return `<div class="extra-metric" data-extra-metric data-target-fields="extra">
   <div class="extra-metric-top"><label>追加の単位<select name="extra-unit" required><option value="">選択してください</option>${Object.entries(UNITS).filter(([,u])=>u.dimension!=='time').map(([key,u])=>`<option value="${key}" ${unit===key?'selected':''}>${u.label}</option>`).join('')}<option value="custom" ${unit==='custom'?'selected':''}>自由入力</option></select></label><button type="button" class="text-button" data-remove-extra aria-label="追加の単位を削除">×</button></div>
   <label data-extra-custom ${unit==='custom'?'':'hidden'}>単位の名前<input name="extra-custom-unit" maxlength="12" value="${esc(metric.customUnit||'')}" ${unit==='custom'?'required':'disabled'}></label>
-  ${event?amountInput('取り組む日の量','extra-daily',metric.dailyAmount,true):`
-   <div class="task-target-grid task-target-three">
-    ${amountInput('全体の目標','extra-total',metric.totalTarget)}
-    ${amountInput('1週間の目標','extra-weekly',metric.weeklyTarget)}
-    ${amountInput('1日の目標','extra-daily',metric.dailyAmount,true)}
-   </div>
-   ${targetCalculator({total:metric.totalTarget})}
-   <details class="task-monthly-target" ${metric.monthlyTarget?'open':''}><summary>1ヶ月の目標（任意）</summary>
-    ${amountInput('1ヶ月の目標','extra-monthly',metric.monthlyTarget)}
-   </details>`}
+  <div class="task-target-grid task-target-three">
+   <label data-repeat-metric ${event?'hidden':''}>全体の目標<input name="extra-total" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" value="${esc(metric.totalTarget??'')}" ${event?'disabled':''}></label>
+   <label data-repeat-metric ${event?'hidden':''}>1週間の目標<input name="extra-weekly" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" value="${esc(weeklyTargetForEdit(metric)??'')}" ${event?'disabled':''}></label>
+   ${amountInput('取り組む量','extra-daily',metric.dailyAmount,true)}
+  </div>
+  <fieldset data-repeat-metric ${event?'hidden disabled':''}>${targetCalculator({total:metric.totalTarget})}</fieldset>
  </div>`;
 }
 function extraRecordFields(metrics=[],amounts=[]){
@@ -59,16 +55,22 @@ function extraRecordFields(metrics=[],amounts=[]){
 export function taskLevelFields(a,name='task-level'){const selected=taskLevel(a),options=[{value:'full',title:'余裕がある日だけ',days:['full']},{value:'busy',title:'忙しい日も',days:['full','busy']},{value:'rest',title:'毎日取り組む',days:['full','busy','rest']}];return `<fieldset class="task-schedule-config"><legend>どんな日に取り組みますか？</legend><p class="task-setting-caption">1つ選ぶと、対象の日が自動で決まります。</p><div class="task-schedule-options">${options.map(o=>`<label class="task-schedule-option"><input type="radio" required name="${esc(name)}" value="${o.value}" ${selected===o.value?'checked':''}><span class="task-schedule-copy"><strong>${o.title}</strong><span class="task-day-tags">${o.days.map(d=>`<span>${MODES[d].icon} ${MODES[d].label}</span>`).join('')}</span></span><span class="task-schedule-check" aria-hidden="true">✓</span></label>`).join('')}</div><p class="task-fixed-note">どの日も、設定した量は同じです。</p></fieldset>`}
 export function taskSettingsFields(s,id){
  const action=setting(s,id),event=isEventTask(action),m=timeMeasurement(action.measurement||{unit:'minutes'});
- return `${event?`
-  <input type="hidden" name="task-format" value="event">
+ const completed=Boolean(eventCompletionDate(s,id));
+ const format=event?'event':'routine';
+ return `<fieldset class="task-format-picker"><legend>取り組み方</legend>
+  <label><input type="radio" name="task-format" value="routine" ${event?'':'checked'} ${completed?'disabled':''}> 繰り返す</label>
+  <label><input type="radio" name="task-format" value="event" ${event?'checked':''}> 1回のイベント</label>
+ </fieldset>
+ <fieldset data-routine-fields ${event?'hidden disabled':''}>${quantitySettingsFields(m)}</fieldset>
+ <fieldset data-event-fields ${event?'':'hidden disabled'}>
   <label>イベントの日付（任意）<input type="date" name="event-date" value="${esc(action.eventDate||'')}"></label>
-  ${minuteInput('イベントに取り組む時間','event-minutes',m.dailyAmount)}
- `:`${quantitySettingsFields(m)}${taskLevelFields(action)}`}
+  ${minuteInput('取り組む予定の時間','event-minutes',m.dailyAmount)}
+ </fieldset>
  <section class="task-extra-config">
-  <h3>追加の記録（任意）</h3><p>ページ数、単語数、回数など、必要な単位を追加できます。</p>
-  <div data-extra-list>${(m.extras||[]).filter(metric=>metric.dailyAmount!=null||metric.totalTarget!=null||metric.weeklyTarget!=null||metric.monthlyTarget!=null).map(metric=>extraMetricFields(metric,event)).join('')}</div>
-  <button type="button" class="text-button add-extra-unit" data-add-extra>＋ 別の単位の目標を設定する</button>
- </section>`;
+  <button type="button" class="text-button add-extra-unit" data-add-extra>＋ 別の単位でも記録する</button>
+  <div data-extra-list>${(m.extras||[]).filter(metric=>metric.dailyAmount!=null).map(metric=>extraMetricFields(metric,event)).join('')}</div>
+ </section>
+ <fieldset data-routine-schedule ${format==='event'?'hidden disabled':''}>${taskLevelFields(action)}</fieldset>`;
 }
 export function eventPanel(s,id,date,today){
  const node=s.nodes.find(n=>n.id===id),action=setting(s,id),done=eventCompletionDate(s,id);

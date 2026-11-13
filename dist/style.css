@@ -657,8 +657,8 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 #dialog .task-target-three input { width:100%; padding-inline:5px; }
 #dialog .task-target-three .task-week-target-entry { gap:3px; }
 #dialog .task-target-three .task-week-target-entry span { flex:none; }
-.target-calculator,.task-monthly-target { margin-top:10px; font-size:12px; color:#dfd0f5; }
-.target-calculator summary,.task-monthly-target summary { cursor:pointer; min-height:28px; padding-block:5px; }
+.target-calculator { margin-top:10px; font-size:12px; color:#dfd0f5; }
+.target-calculator summary { cursor:pointer; min-height:28px; padding-block:5px; }
 .target-calculator[open] { padding:8px; border:1px solid #77649370; border-radius:9px; }
 .target-calculator p { margin:3px 0 5px; color:#c8badc; }
 .target-calculator .task-target-grid { margin-top:4px; align-items:end; }
@@ -700,3 +700,50 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
  display:inline-block; width:10px; height:10px; margin-right:7px; border-radius:50%; background:var(--planet-prize);
 }
 .period-task-metric span[class*="rate-"] { color:var(--rate-color); }
+
+#dialog.map-editor-dialog {
+ width:min(calc(100% - 16px),680px);
+ height:min(calc(100dvh - 16px),900px);
+ max-height:calc(100dvh - 16px);
+ padding:0;
+ overflow:hidden;
+}
+.map-editor-layout {
+ display:grid;
+ grid-template-rows:minmax(0,1fr) minmax(0,2fr);
+ height:100%;
+}
+.map-editor-preview,.map-editor-fields { min-width:0; overflow:auto; overscroll-behavior:contain; }
+.map-editor-preview { padding:12px; background:#0c101c; border-bottom:1px solid #564568; }
+.map-editor-fields { padding:clamp(14px,4vw,25px); }
+#dialog :is(#node-form,#journey-form) :is(input:not([type="radio"]),textarea,select) {
+ background:#1a2031; border:1px solid #645874; color:#f0e7f7; color-scheme:dark;
+}
+#dialog :is(#node-form,#journey-form) :is(input,textarea)::placeholder { color:#b2a4c0; }
+#dialog :is(#node-form,#journey-form) :is(input:not([type="radio"]),textarea,select):focus {
+ background:#22283a; border-color:#9d83c0;
+}
+#dialog #node-form [data-purpose-label],#dialog #node-form [data-node-name-label] { color:#d7c9e7; }
+#dialog #node-form [hidden] { display:none; }
+#dialog #node-form :is([data-routine-schedule],.extra-metric fieldset) { border:0; margin:0; padding:0; min-width:0; }
+#dialog .task-format-picker { display:flex; gap:16px; border:0; margin:16px 0; padding:0; min-width:0; }
+#dialog .task-format-picker legend { margin-bottom:6px; color:#d7c9e7; }
+#dialog .task-format-picker label { display:flex; align-items:center; gap:6px; margin:0; }
+#dialog .task-format-picker input { width:auto; margin:0; accent-color:#b6a1dc; }
+#dialog .task-extra-config { margin:12px 0 0; padding:0; border:0; }
+#dialog [data-extra-list]:not(:empty) { margin-top:10px; }
+.mind-map-header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.journey-entry {
+ flex:none; min-height:36px; padding:5px 11px; border:1px solid #75628d;
+ border-radius:20px; background:#1c1b30; color:#eadcf9; font-size:12px;
+}
+.journey-entry span { color:#bd9fee; margin-right:3px; }
+.journey-sections { display:grid; gap:14px; margin-top:14px; }
+.journey-list { list-style:none; margin:0; padding:0; }
+.journey-list button {
+ display:flex; justify-content:space-between; align-items:center; gap:12px;
+ width:100%; min-height:44px; border-bottom:1px solid #66557567; text-align:left;
+}
+.journey-list button strong { overflow-wrap:anywhere; }
+.journey-list button span { flex:none; color:#c4b2d7; font-size:11px; }
+.journey-back { min-height:34px; margin:0 0 9px; }

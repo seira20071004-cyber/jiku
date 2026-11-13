@@ -59,7 +59,7 @@ export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurem
   if(measurement.extras?.some(metric=>metric.dailyAmount==null))throw Error('追加で記録する量を入力してください');
   if(eventDate!==undefined)validateEventDate(eventDate);
   else{
-   if(measurement.totalTarget==null&&measurement.weeklyTarget==null&&measurement.monthlyTarget==null)throw Error('全体、1週間、1ヶ月のいずれかの目標時間を入力してください');
+   if(measurement.totalTarget==null&&measurement.weeklyTarget==null&&measurement.monthlyTarget==null)throw Error('全体または1週間の目標時間を入力してください');
    if(!['rest','busy','full'].includes(mode))throw Error('タスクのモードを選んでください');
   }
  }
