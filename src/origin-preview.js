@@ -4,13 +4,13 @@ import {noiseGLSL} from './space-noise.js';
 
 // Uses the same sphere and camera as the app's entrance, in a transparent
 // layer so the last stars from the explosion can fade underneath it.
-export function mountOriginPreview(host, motion) {
+export function mountOriginPreview(host, motion, {strength=1}={}) {
  const renderer=new WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
  renderer.toneMapping=ACESFilmicToneMapping;
  renderer.toneMappingExposure=1.18;
  renderer.setClearColor(0,0);
  const scene=new Scene(),camera=new PerspectiveCamera(ORIGIN_FOV,1,.01,100);
- const sphere=originSphere(noiseGLSL,1,true);
+ const sphere=originSphere(noiseGLSL,strength,true);
  scene.add(sphere);
  const canvas=renderer.domElement;
  const screen=host.closest('.birth-screen');
@@ -39,7 +39,7 @@ export function mountOriginPreview(host, motion) {
  }
  function animate(time){
   frame=requestAnimationFrame(animate);
-  if(!document.hidden&&!motion.matches&&screen?.matches('[data-forming], [data-chat]')&&time-last>=32){
+  if(!document.hidden&&!motion.matches&&(!screen||screen.matches('[data-forming], [data-chat]'))&&time-last>=32){
    last=time;
    draw(time);
   }
