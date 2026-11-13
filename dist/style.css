@@ -310,3 +310,34 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
   color:#d3c7ed;
   font-size:12px;
 }
+
+.weekly-workspace .statistics-toolbar { min-width:0; }
+.weekly-workspace .statistics-tabs { gap:clamp(4px,2.4vw,22px); }
+.weekly-workspace .statistics-tabs button { white-space:nowrap; padding-inline:clamp(5px,2vw,17px); }
+.report-ring {
+ display:grid; place-items:center; position:relative; isolation:isolate;
+ width:78px; aspect-ratio:1; flex:none; border-radius:50%;
+ background:conic-gradient(#bc9aff var(--progress),#343047 0);
+}
+.report-ring::before { content:""; position:absolute; inset:7px; z-index:-1; background:#151326; border-radius:50%; }
+.report-ring b { font-size:17px; color:#f4eaff; }
+.report-activity {
+ margin:16px 0; padding:16px; border:1px solid #aaa1e331; border-radius:14px; background:#111322; color:#eee8fa;
+}
+.report-activity h2,.report-activity h3 { margin:0; }
+.report-activity p { margin:5px 0 12px; color:#c6bed9; }
+.report-activity p strong { color:#f1e5ff; margin-inline-end:5px; }
+.report-days { display:grid; grid-template-columns:repeat(15,minmax(0,1fr)); gap:4px; max-width:440px; }
+.report-days span { aspect-ratio:1; border-radius:4px; background:#29283d; border:1px solid #615a78; }
+.report-days span[data-intensity="1"] { background:#68508e; }
+.report-days span[data-intensity="2"] { background:#956dc9; }
+.report-days span[data-intensity="3"] { background:#ca9fff; }
+.report-days span[data-future] { background:transparent; border-color:#36334a; }
+.report-days-key { margin:8px 0 14px; color:#bbb1d0; font-size:11px; }
+.report-activity h3 { display:flex; justify-content:space-between; gap:8px; }
+.report-cumulative { display:flex; gap:1px; align-items:end; height:80px; margin-top:8px; border-bottom:1px solid #625a7e; }
+.report-cumulative i { flex:1; height:var(--height); background:linear-gradient(#cba4ff,#6d53a9); border-radius:2px 2px 0 0; }
+.map-inline-tools { display:flex; justify-content:center; gap:5px; margin-top:4px; }
+.map-inline-tools button { min-height:40px; min-width:40px; padding-inline:7px; border:1px solid #a68cce73; border-radius:9px; background:#201b33; font-size:12px; }
+.map-mode-heading { justify-content:space-between; flex-wrap:wrap; }
+.map-mode-heading span { color:#c6b1ea; font-size:12px; }

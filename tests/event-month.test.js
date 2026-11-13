@@ -4,6 +4,26 @@ import {
  seed,applyMode,quantitySummary,recordEventCompletion,undoEventCompletion,validate,setTaskRecord
 } from '../dist/model.js';
 import {writeGoal} from '../dist/universe-model.js';
+import {weeklyPanel} from '../dist/quantity-view.js';
+
+test('3か月レポートは選んだタスクだけの日数と月間目標を合算する',()=>{
+ const state=seed(),today='2026-01-10';
+ const task=writeGoal(state,{name:'朝の読書',purpose:'本を読む',parentId:'health',kind:'action',
+  measurement:{unit:'minutes',dailyAmount:30,monthlyTarget:60}});
+ const other=writeGoal(state,{name:'散歩',purpose:'運動する',parentId:'health',kind:'action',
+  measurement:{unit:'minutes',dailyAmount:30,monthlyTarget:60}});
+ setTaskRecord(state,'2025-10-31',task,30,[],today);
+ setTaskRecord(state,'2025-11-01',task,30,[],today);
+ setTaskRecord(state,'2025-12-08',task,30,[],today);
+ setTaskRecord(state,'2026-01-10',task,30,[],today);
+ setTaskRecord(state,'2026-01-10',other,60,[],today);
+ const html=weeklyPanel(state,{scope:task,today,month:'2026-01',quarter:true});
+ assert.match(html,/11\/1 <i>—<\/i> 1\/31/);
+ assert.match(html,/達成率 50%/);
+ assert.match(html,/<strong>3日<\/strong>記録しました/);
+ assert.match(html,/期間内の累積時間は 1\.5時間/);
+ assert.doesNotMatch(html,/散歩/);
+});
 
 test('イベントはモードで記録せず、完了日を一度だけ集計し取り消せる',()=>{
  const state=seed(),today='2026-11-09';

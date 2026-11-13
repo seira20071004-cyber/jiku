@@ -105,7 +105,7 @@ function taskDetails(s,section,targetLabel,editableIds,end,today){
    <header><strong>${esc(task.name)}</strong>${task.deleted?'<small>過去のタスク</small>':''}
    ${editable?`<button type="button" data-record-leaf="${esc(task.id)}" data-log-date="${date}" aria-label="${esc(task.name)}の記録を修正">›</button>`:''}</header>
    ${sorted.map(row=>{
-    const progress=weeklyAchievement(row.amount,row.target);
+    const progress=weeklyAchievement(row.achievementAmount??row.amount,row.target);
     return `<div class="period-task-metric"><div><strong>${row.dimension==='time'?hoursText(row.amount):numberText(row.amount)+esc(row.unit)}</strong>
       ${progress?`<span>${targetLabel} ${row.dimension==='time'?hoursText(row.target):numberText(row.target)+esc(row.unit)} · ${progress.percent}%</span>`:''}</div>
       ${progress?`<div class="weekly-task-progress-track" role="progressbar" aria-label="${esc(task.name)}の${targetLabel}達成度（${esc(row.unit)}）" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.bar}" aria-valuetext="${progress.percent}%"><i style="width:${progress.bar}%"></i></div>`:''}
@@ -115,35 +115,95 @@ function taskDetails(s,section,targetLabel,editableIds,end,today){
   </article>`;
  }).join('')}</section>`;
 }
-export function weeklyPanel(s,{week,scope,today,month}){
- const monthly=Boolean(month),period=monthly?'月':'週',targetLabel=monthly?'月間目標':'週間目標';
- const start=monthly?month+'-01':week;
- const end=monthly?month+'-'+new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).getUTCDate():shiftDate(week,6);
+function monthOffset(month, offset) {
+ const date = new Date(month+'-01T00:00:00Z');
+ date.setUTCMonth(date.getUTCMonth()+offset);
+ return date.toISOString().slice(0,7);
+}
+
+function recentActivity(summary, events, start, end, today) {
+ const recordedDays=new Set([...summary.entries.map(entry=>entry.date),...events.map(event=>event.date)]);
+ const timeByDay=summary.groups.find(group=>group.dimension==='time')?.byDate||{};
+ const peak=Math.max(0,...Object.values(timeByDay));
+ const days=[],totals=[];
+ let accumulated=0;
+ for(let day=start;day<=end;day=shiftDate(day,1)){
+  const recorded=day<=today&&recordedDays.has(day);
+  const color=recorded ? Math.max(1,Math.ceil(3*(timeByDay[day]||0)/(peak||1))) : 0;
+  const title=day+' '+(day>today?'これから':recorded?(timeByDay[day]?hoursText(timeByDay[day]):'記録あり'):'記録なし');
+  days.push(`<span data-intensity="${color}" ${day>today?'data-future':''} title="${title}"></span>`);
+  if(day<=today){accumulated+=timeByDay[day]||0;totals.push(accumulated)}
+ }
+ const bars=accumulated?totals.map(value=>`<i style="--height:${value/accumulated*100}%"></i>`).join(''):'';
+ return `<section class="report-activity">
+  <h2>日々の記録</h2>
+  <p><strong>${recordedDays.size}日</strong>記録しました</p>
+  <div class="report-days" role="img" aria-label="${start}から${end}の記録 ${recordedDays.size}日">
+   ${days.join('')}
+  </div>
+  <div class="report-days-key">1マス＝1日 · 色が明るいほど記録した時間が長い</div>
+  ${bars?`<h3>期間内の累積時間 <strong>${hoursText(accumulated)}</strong></h3>
+   <div class="report-cumulative" role="img" aria-label="期間内の累積時間は ${hoursText(accumulated)}">${bars}</div>`:''}
+ </section>`;
+}
+
+export function weeklyPanel(s,{week,scope,today,month,quarter=false}){
+ const monthly=Boolean(month),period=quarter?'3か月':monthly?'月':'週';
+ const targetLabel=quarter?'月間目標の合計':monthly?'月間目標':'週間目標';
+ const firstMonth=quarter?monthOffset(month,-2):month;
+ const start=monthly?firstMonth+'-01':week;
+ const end=monthly?shiftDate(monthOffset(month,1)+'-01',-1):shiftDate(week,6);
  const isCurrent=monthly?month===today.slice(0,7):week===weekStart(today);
- const summary=quantitySummary(s,start,end,scope,isCurrent,monthly?'month':'week');
+ const through=end<today?end:today;
+ const summary=quantitySummary(s,start,through,scope,isCurrent,monthly?'month':'week');
+ let progressRows=summary.rows;
+ if(quarter){
+  const periodRows=new Map();
+  for(let cursor=firstMonth;cursor<=month;cursor=monthOffset(cursor,1)){
+   const current=cursor===today.slice(0,7);
+   const monthEnd=current?today:shiftDate(monthOffset(cursor,1)+'-01',-1);
+   const result=quantitySummary(s,cursor+'-01',monthEnd,scope,current,'month');
+   for(const row of result.rows){
+    if(!(row.target>0))continue;
+    const total=periodRows.get(row.key)||{...row,amount:0,target:0};
+    total.amount+=row.amount;
+    total.target+=row.target;
+    periodRows.set(row.key,total);
+   }
+  }
+  progressRows=[...periodRows.values()];
+  for(const row of summary.rows){
+   const matched=periodRows.get(row.key);
+   row.target=matched?.target??null;
+   row.achievementAmount=matched?.amount;
+  }
+ }
  const time=summary.groups.find(group=>group.dimension==='time')?.total||0;
  const additional=summary.groups.filter(group=>group.dimension!=='time'&&group.total>0);
  const sections=weeklyTaskSections(s,summary,scope).filter(section=>section.rows.length);
- const progress=timeGoalProgress(summary.rows);
+ const progress=timeGoalProgress(progressRows);
  const editableIds=new Set(leaves(s).map(n=>n.id));
  const goal=s.nodes.find(n=>n.id===scope)||s.nodes.find(n=>n.parentId===null);
  const short=date=>`${Number(date.slice(5,7))}/${Number(date.slice(8))}`;
- const events=Object.entries(s.logs).filter(([date])=>date>=start&&date<=end).sort(([a],[b])=>b.localeCompare(a)).flatMap(([date,logs])=>Object.entries(logs)
+ const events=Object.entries(s.logs).filter(([date])=>date>=start&&date<=through).sort(([a],[b])=>b.localeCompare(a)).flatMap(([date,logs])=>Object.entries(logs)
   .filter(([id,log])=>log.eventCompleted&&(scope==='all'||(log.goalIds||goalIds(s,id)).includes(scope)))
   .map(([id,log])=>({date,name:log.name,minutes:log.eventMinutes,quantities:log.eventQuantities||[]})));
  return `<section class="weekly-record" aria-label="${period}の記録">
-  <header class="weekly-period"><button class="week-arrow" data-quantity-period="-1" aria-label="前の${period}">‹</button><div><span>${start.slice(0,4)}年${isCurrent?' · 今'+period:''}</span><h1>${monthly?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div><button class="week-arrow" data-quantity-period="1" aria-label="次の${period}" ${isCurrent?'disabled':''}>›</button></header>
-  <div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する目標</span><strong>${esc(goal?.name||'宇宙')}</strong><i>⌄</i></button>${!isCurrent?`<button class="text-button" data-reset-period>今${period}へ戻る</button>`:''}</div>
+  <header class="weekly-period"><button class="week-arrow" data-quantity-period="-1" aria-label="前の期間">‹</button><div><span>${start.slice(0,4)}年 · ${quarter?'3か月':'期間'}</span><h1>${monthly&&!quarter?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div><button class="week-arrow" data-quantity-period="1" aria-label="次の期間" ${isCurrent?'disabled':''}>›</button></header>
+  <div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する範囲</span><strong>${esc(goal?.name||'宇宙')}</strong><i>⌄</i></button>${!isCurrent?'<button class="text-button" data-reset-period>現在の期間へ</button>':''}</div>
   <section class="weekly-total-block period-overview" aria-label="目標の達成率">
-   <h2>この${period}に取り組んだ時間</h2>
+   <h2>取り組んだ時間</h2>
    <div class="weekly-total-values"><div><strong>${hoursNumber(time)}</strong><span>時間</span></div></div>
    ${additional.length?`<div class="period-extra-totals">${additional.map(group=>`<span>${numberText(group.total)}${esc(group.unit)}</span>`).join('')}</div>`:''}
    <div class="period-achievement">
-    <div><strong>時間目標の達成率</strong>${progress.achievement?`<b>${progress.achievement.percent}%</b>`:''}</div>
+    <div><strong>時間目標の達成率</strong>${progress.achievement?`<div class="report-ring" style="--progress:${progress.achievement.bar}%" aria-label="達成率 ${progress.achievement.percent}%"><b>${progress.achievement.percent}%</b></div>`:''}</div>
     ${progress.achievement?`<div class="weekly-task-progress-track" role="progressbar" aria-label="目標全体の達成率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.achievement.bar}" aria-valuetext="${progress.achievement.percent}%"><i style="width:${progress.achievement.bar}%"></i></div>
     <p>${hoursText(progress.actual)} / ${hoursText(progress.target)} · ${progress.count}件の時間目標</p>`:`<p>この${period}の時間目標があるタスクを設定すると、達成率が表示されます。</p>`}
+    ${quarter?'<p>月ごとの記録から確認できる月間目標を合算しています。</p>':''}
    </div>
   </section>
+  ${recentActivity(summary,events,start,end,today)}
+  <p class="weekly-source-note">期間中の記録をもとに自動で更新されます。</p>
   <details class="period-details" ${sections.length||events.length?'':'open'}>
    <summary>タスク別の内訳</summary>
    ${sections.map(section=>taskDetails(s,section,targetLabel,editableIds,end,today)).join('')}

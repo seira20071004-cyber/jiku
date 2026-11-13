@@ -488,3 +488,8 @@ body.birth-page, body.birth-active {
 @media (prefers-reduced-motion: reduce) {
   .birth-screen *, .birth-screen *::before, .birth-screen *::after { animation: none !important; transition: none !important; }
 }
+
+.birth-research { padding:9px 12px; color:#d4c8e8; font-size:12px; }
+.birth-research summary { cursor:pointer; }
+.birth-research a { color:#e2cbff; text-decoration:underline; }
+.birth-header a.birth-quiet { text-decoration:none; margin-left:auto; }

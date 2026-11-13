@@ -47,7 +47,7 @@ const focusOptions = {
   motivation: {
     label: 'やる気が湧かないとき',
     reply: 'やる気が湧かない日は、最初の一歩が重く感じますよね。',
-    benefit: '宇宙を育てて自分の積み重ねが見えると、また取り組むきっかけが生まれます。'
+    benefit: 'たとえば読書を記録すれば、今週どれだけ読めたかが見え、次に取り組む量を決めやすくなります。'
   },
   unclear: {
     label: '何から手をつけるか迷うとき',
@@ -74,15 +74,16 @@ export function onboardingDraft(saved, legacy) {
     (typeof priorAnswer === 'string' ? priorAnswer : '')).slice(0, 80);
   const focusBarrier = Object.hasOwn(focusOptions, source.focusBarrier) ? source.focusBarrier : null;
   let step = 'gaze';
-  if (['map', 'focus'].includes(source.step)) step = source.step;
+  if (['map', 'focus', 'login'].includes(source.step)) step = source.step;
   else if (['ready', 'confirm'].includes(source.step)) step = 'confirm';
   else if (source.step === 'explain') step = focusBarrier ? 'explain' : 'focus';
   const starter = {};
   for (const key of Object.keys(starterMap)) {
     if (typeof source.starter?.[key] === 'string') starter[key] = source.starter[key].slice(0, 80);
   }
-  const map = step === 'map' && typeof source.map?.name === 'string'
+  const map = ['map', 'login'].includes(step) && typeof source.map?.name === 'string'
     ? {name: source.map.name.slice(0, 80), children: draftChildren(source.map.children)} : null;
+  if (step === 'login' && !map) step = 'map';
   return {name, ...(focusBarrier ? {focusBarrier} : {}), ...(Object.keys(starter).length ? {starter} : {}),
     ...(map ? {map} : {}), step};
 }
@@ -94,7 +95,15 @@ function guestDraft() {
 
 export function pendingUniverse() {
   const draft = guestDraft();
-  return draft?.step === 'confirm' ? draft : null;
+  return ['confirm', 'login'].includes(draft?.step) ? draft : null;
+}
+
+export function saveGuestDraft(draft) {
+  sessionStorage.setItem(guestDraftKey, JSON.stringify(draft));
+}
+
+export function resumeGuestDraft() {
+  return guestDraft();
 }
 
 export function clearPendingUniverse() {
@@ -102,8 +111,8 @@ export function clearPendingUniverse() {
 }
 
 export function mountOnboarding(host, {
-  initial, preview = false, previewStart = 'welcome',
-  onDraft, onExample, onSave, onClose, onSettings, renderOrigin
+  initial, preview = false, previewStart = 'gaze',
+  onDraft, onExample, onSave, onClose, onSettings, renderOrigin, loginAtEnd = false, loginError
 } = {}) {
   const draft = onboardingDraft(initial);
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -123,6 +132,7 @@ export function mountOnboarding(host, {
         ${preview ? '<span class="birth-edition">初回体験プレビュー</span>' : ''}
         ${onClose ? '<button type="button" class="birth-quiet" data-birth="close">閉じる</button>' : ''}
         ${onSettings ? '<button type="button" class="birth-quiet" data-birth="settings" aria-label="Googleアカウントと設定">設定</button>' : ''}
+        ${loginAtEnd && !preview ? '<a class="birth-quiet" href="/api/auth/google">登録済みの方</a>' : ''}
       </header>
       <div class="birth-intro" aria-live="polite"></div>
       <div class="birth-content">
@@ -237,8 +247,8 @@ export function mountOnboarding(host, {
     const option = focusOptions[draft.focusBarrier];
     showSequence([
       [option.reply, 'birth-reply'],
-      ['でも、いい知らせがあります。', 'birth-emphasis'],
       [option.benefit, 'birth-reply'],
+      ['138件の実験をまとめた研究では、進捗を記録・確認する工夫が、平均して目標達成を助けました。', 'birth-emphasis'],
       ['この宇宙では、大きな目標を日々のタスクまで分けられます。', 'birth-emphasis'],
       ['目標と今日の一歩を線でつなぐと、何のために取り組むのかが見えてきます。', 'birth-welcome'],
       ['まずは「幸せな人生」を例に、そのつながりをマインドマップで見てみましょう。', 'birth-reply']
@@ -259,6 +269,10 @@ export function mountOnboarding(host, {
         ${mapDiagram(hub, points, {radial: true, label: '幸せな人生のマインドマップ'})}
         <div class="map-subview" id="birth-example-detail" hidden></div>
         <button class="birth-primary" type="button" data-birth="example">宇宙船に乗る <span aria-hidden="true">→</span></button>
+        <details class="birth-research"><summary>進捗を記録する効果の研究</summary>
+          <p>138件の実験をまとめた分析で、進捗の確認を促すと目標達成が改善し、記録を残す場合に効果がより大きい傾向がありました。</p>
+          <a href="https://pubmed.ncbi.nlm.nih.gov/26479070/" target="_blank" rel="noopener">Harkin ほか（2016）</a>
+        </details>
       </div>`;
       return;
     }
@@ -304,7 +318,7 @@ export function mountOnboarding(host, {
       <button type="button" class="birth-map-add" data-birth-add-node="" data-node-kind="goal">＋ 銀河を追加</button>
       <div class="map-subview" id="birth-personal-detail" hidden></div>
       <div class="birth-node-editor" hidden></div>
-      <button class="birth-primary" type="button" data-birth="generate">宇宙をつくる <span aria-hidden="true">→</span></button>
+      <button class="birth-primary" type="button" data-birth="generate">${loginAtEnd ? '作成を完了する' : '宇宙をつくる'} <span aria-hidden="true">→</span></button>
     </div>`;
     renderPersonalBranch();
   }
@@ -468,7 +482,7 @@ export function mountOnboarding(host, {
     const previous = step;
     step = next;
     screen.dataset.stage = next;
-    const choosing = next === 'welcome';
+    const choosing = next === 'login';
     screen.toggleAttribute('data-choosing', choosing);
     screen.toggleAttribute('data-chat', !choosing && !Object.hasOwn(opening, next) && next !== 'bang');
     screen.toggleAttribute('data-map', next === 'confirm' || next === 'map');
@@ -480,16 +494,18 @@ export function mountOnboarding(host, {
     controls.replaceChildren();
     showError('');
 
-    if (['gaze', 'focus', 'explain', 'confirm', 'map'].includes(next)) {
+    if (['gaze', 'focus', 'explain', 'confirm', 'map', 'login'].includes(next)) {
       draft.step = next;
       persist();
     }
-    if (next === 'welcome') {
-      showQuestion('Jikuへようこそ。', focus);
-      const description = message('p', 'あなたの目標達成をサポートします。', 'birth-welcome-description');
-      conversation.lastElementChild.append(description);
-      controls.innerHTML = `<p class="birth-login-instruction">まずはログインしてください。</p>
-        <button class="birth-primary" type="button" data-birth="preview-login">ログイン後の画面へ <span aria-hidden="true">→</span></button>`;
+    if (next === 'login') {
+      showQuestion('あなたの宇宙を保存しましょう。', focus);
+      controls.innerHTML = `<div class="birth-example">
+        ${preview ? '<button class="birth-primary" type="button" data-birth="preview-login">ログイン後の画面へ →</button>'
+          : '<a class="birth-primary" href="/api/auth/google?onboarding=1">Googleでログイン →</a>'}
+        <button class="birth-quiet birth-edit" type="button" data-birth="back-to-map">マインドマップに戻る</button>
+      </div>`;
+      if (loginError) showError(loginError);
       return;
     }
     if (next !== 'gaze') prepareOrigin();
@@ -514,7 +530,7 @@ export function mountOnboarding(host, {
   }
 
   async function saveMap(map) {
-    if (step !== 'map' || saving) return;
+    if (saving) return;
     saving = true;
     controls.querySelectorAll('button').forEach(button => {button.disabled = true;});
     showError('');
@@ -556,11 +572,15 @@ export function mountOnboarding(host, {
         return;
       }
       if (action === 'generate') {
-        saveMap(draft.map);
+        if (loginAtEnd) {
+          try { enter('login', {focus: true}); }
+          catch { enter('map'); showError('下書きを保存できませんでした。ブラウザの設定をご確認ください。'); }
+        } else saveMap(draft.map);
         return;
       }
     }
-    if (step === 'welcome' && action === 'preview-login') enter('gaze');
+    if (step === 'login' && action === 'preview-login') saveMap(draft.map);
+    if (step === 'login' && action === 'back-to-map') enter('map', {focus: true});
     if (step === 'focus' && Object.hasOwn(focusOptions, choice)) {
       draft.focusBarrier = choice;
       enter('explain', {focus: true});

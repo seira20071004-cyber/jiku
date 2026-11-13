@@ -29,22 +29,20 @@ test('追加で許可したGoogleアカウントが、既存アカウントと�
  assert.equal(await session(request, c), null);
 });
 
-test('公開Workerは認証設定なし・セッションなしでアプリを返さない',async()=>{
+test('未ログインでも初回体験の素材だけを返し、認証設定不足や未認証セッションを拒否する',async()=>{
  const {default:worker}=await import('../dist/server/index.js');
  const env={JIKU_AUTH_MODE:'google',JIKU_AUTH_ORIGIN:'https://jiku.example',GOOGLE_CLIENT_ID:'test-id',GOOGLE_CLIENT_SECRET:'test-secret',JIKU_SESSION_SECRET:'a'.repeat(40),JIKU_ALLOWED_EMAILS:'owner@example.com'};
  assert.equal((await worker.fetch(req('/'),{})).status,503);
- assert.equal((await worker.fetch(req('/app.js'),env)).status,401);
- assert.equal((await worker.fetch(req('/model.js'),env)).status,401);assert.equal((await worker.fetch(req('/tree3d.js'),env)).status,401);
+ assert.equal((await worker.fetch(req('/tree3d.js'),env)).status,401);
  assert.equal((await worker.fetch(req('/api/session'),env)).status,401);
- for(const name of ['onboarding.css','onboarding.js','onboarding-sky.js','origin-framing.js','origin-preview.js']){
+ for(const name of ['onboarding.css','onboarding.js','onboarding-sky.js','origin-framing.js','origin-preview.js','app.js','model.js','universe-model.js','mind-map.js','example-map.js']){
   const asset=await worker.fetch(req('/'+name),env);assert.equal(asset.status,200);
  }
- assert.equal((await worker.fetch(req('/universe-model.js'),env)).status,401);
  const page=await worker.fetch(req('/'),env);
  assert.equal(page.status,200);
  const welcome=await page.text();
- assert.match(welcome,/Jikuへようこそ。/);
- assert.match(welcome,/href="\/api\/auth\/google"[^>]*>Googleでログイン/);
+ assert.match(welcome,/data-auth="google"/);
+ assert.match(welcome,/src="app.js"/);
  assert.doesNotMatch(welcome,/すでに大きな目標/);
  const token=await sign({sub:'owner-id',email:'owner@example.com',name:'Owner',exp:Math.floor(Date.now()/1000)+60},'session',c);
  const authed=new Request('https://jiku.example/app.js',{headers:{Cookie:'__Host-jiku-session='+token}});
