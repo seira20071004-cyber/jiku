@@ -146,66 +146,106 @@ function recentActivity(summary, events, start, end, today) {
  </section>`;
 }
 
-const analysisColors=['#c5a9ff','#7cb8ed','#77d9ba','#e6b37f','#e7a0c1','#8e88df'];
+function radarGraphic(axes){
+ const center=140,radius=104;
+ const point=(index,ratio)=>{
+  const angle=2*Math.PI*index/axes.length-Math.PI/2;
+  return [center+Math.cos(angle)*radius*ratio,center+Math.sin(angle)*radius*ratio];
+ };
+ const points=ratio=>axes.map((_,index)=>point(index,ratio).join(',')).join(' ');
+ const values=axes.map(({actual,target},index)=>point(index,Math.min(1,actual/target)));
+ const shape=axes.length>2?'polygon':'polyline';
+ return `<svg class="analysis-radar" viewBox="0 0 280 280" aria-hidden="true">
+  <g class="radar-grid">${[.25,.5,.75,1].map(ratio=>axes.length>2
+   ?`<polygon points="${points(ratio)}"/>`
+   :`<circle cx="${center}" cy="${center}" r="${radius*ratio}"/>`).join('')}</g>
+  ${axes.map((_,index)=>{
+   const [x,y]=point(index,1),[labelX,labelY]=point(index,1.21);
+   return `<line class="radar-axis" x1="${center}" y1="${center}" x2="${x}" y2="${y}"/>
+    <text x="${labelX}" y="${labelY}" text-anchor="middle" dominant-baseline="central">${index+1}</text>`;
+  }).join('')}
+  ${axes.length===1?`<line class="radar-value" x1="${center}" y1="${center}" x2="${values[0][0]}" y2="${values[0][1]}"/>`:
+   `<${shape} class="radar-value" points="${values.map(value=>value.join(',')).join(' ')}"/>`}
+  ${values.map(([x,y])=>`<circle class="radar-point" cx="${x}" cy="${y}" r="3.5"/>`).join('')}
+ </svg>`;
+}
 
-export function analysisChart(state,{start,end,scope}){
+export function analysisChart(state,{start,end,scope,weeks}){
  const summary=quantitySummary(state,start,end,scope,false);
- const groups=new Map();
- function addTime({id,name,goalIds,goalPath,value}){
-  const index=(scope==='all'?0:goalIds.indexOf(scope))+1;
-  const groupId=goalIds[index]||id;
-  const label=state.nodes.find(node=>node.id===groupId)?.name||goalPath[index]||name;
-  const group=groups.get(groupId)||{label,value:0};
-  group.value+=value;
-  groups.set(groupId,group);
+ const groups=new Map(), targets=new Map();
+ const names=new Map(state.nodes.map(node=>[node.id,node.name]));
+ function groupFor(id,path,fallback){
+  const index=scope==='all'?1:path.indexOf(scope)+1;
+  const groupId=path[index]||id;
+  if(!groups.has(groupId))groups.set(groupId,{label:names.get(groupId)||fallback||'以前のタスク',actual:0,target:0,withoutTarget:0});
+  return [groupId,groups.get(groupId)];
+ }
+ // Monthly targets are prorated by the days covered in each calendar month.
+ let monthFraction=0;
+ for(let month=start.slice(0,7);month<=end.slice(0,7);month=monthOffset(month,1)){
+  const first=month+'-01';
+  const last=shiftDate(monthOffset(month,1)+'-01',-1);
+  const from=start>first?Number(start.slice(8)):1;
+  const through=end<last?Number(end.slice(8)):Number(last.slice(8));
+  monthFraction+=(through-from+1)/Number(last.slice(8));
+ }
+ for(const node of leaves(state)){
+  const action=setting(state,node.id);
+  if(node.kind==='goal'||isEventTask(action)||!action.measurement)continue;
+  const path=goalIds(state,node.id);
+  if(scope!=='all'&&!path.includes(scope))continue;
+  const time=timeMeasurement(action.measurement);
+  const target=(time.weeklyTarget ? time.weeklyTarget*weeks : (time.monthlyTarget||0)*monthFraction)/60;
+  if(!target)continue;
+  const [groupId,group]=groupFor(node.id,path,node.name);
+  group.target+=target;
+  targets.set(node.id,groupId);
  }
  for(const entry of summary.entries){
-  if(entry.dimension==='time'&&entry.value>0)addTime(entry);
+  if(entry.dimension!=='time'||entry.value<=0)continue;
+  const index=scope==='all'?1:entry.goalIds.indexOf(scope)+1;
+  const [groupId,group]=groupFor(entry.id,entry.goalIds,entry.goalPath[index]||entry.name);
+  if(targets.get(entry.id)===groupId)group.actual+=entry.value;
+  else group.withoutTarget+=entry.value;
  }
  for(const [date,logs] of Object.entries(state.logs)){
   if(date<start||date>end)continue;
   for(const [id,log] of Object.entries(logs)){
    if(!log.eventCompleted||!log.eventMinutes)continue;
-   const ids=log.goalIds||goalIds(state,id);
-   if(scope==='all'||ids.includes(scope)){
-    addTime({id,name:log.name,goalIds:ids,goalPath:log.goalPath||ancestry(state,id),value:log.eventMinutes/60});
-   }
+   const path=log.goalIds||goalIds(state,id);
+   if(scope!=='all'&&!path.includes(scope))continue;
+   const index=scope==='all'?1:path.indexOf(scope)+1;
+   const [,group]=groupFor(id,path,log.goalPath?.[index]||log.name);
+   group.withoutTarget+=log.eventMinutes/60;
   }
  }
- const sorted=[...groups.values()].sort((a,b)=>b.value-a.value);
- const total=sorted.reduce((sum,group)=>sum+group.value,0);
- const segments=sorted.slice(0,analysisColors.length);
- if(sorted.length>analysisColors.length){
-  segments.splice(analysisColors.length-1,1,{
-   label:'その他',value:sorted.slice(analysisColors.length-1).reduce((sum,group)=>sum+group.value,0)
+ const rows=[...groups.values()];
+ const configured=rows.filter(group=>group.target>0);
+ const axes=configured.slice(0,8);
+ if(configured.length>8){
+  const others=configured.slice(7);
+  axes.splice(7,1,{
+   label:'その他',actual:others.reduce((sum,row)=>sum+row.actual,0),target:others.reduce((sum,row)=>sum+row.target,0)
   });
  }
- let offset=0;
- const slices=segments.map(({label,value},index)=>{
-  const percent=value/total*100;
-  const color=analysisColors[index];
-  const stop=`${color} ${offset}% ${Math.min(100,offset+percent)}%`;
-  offset+=percent;
-  return {label,value,percent,color,stop};
- });
+ const withoutTarget=rows.filter(group=>group.withoutTarget>0);
  const dateLabel=date=>date.split('-').map(Number).join('/');
  const additional=summary.groups.filter(group=>group.dimension!=='time'&&group.total>0);
+ const row=({label,actual,target},index)=>`<li>
+  ${index==null?'':`<b class="radar-key">${index+1}</b>`}<span>${esc(label)}</span>
+  <span>${hoursText(actual)} / ${hoursText(target)}</span><strong>${numberText(Math.round(actual/target*100))}%</strong>
+ </li>`;
  return `<section class="activity-chart analysis-chart" aria-labelledby="analysis-chart-title">
-  <header><h2 id="analysis-chart-title">活動時間の内訳</h2><span>${dateLabel(start)} 〜 ${dateLabel(end)}</span></header>
-  ${slices.length?`<div class="analysis-chart-content">
-   <div class="analysis-chart-ring" aria-label="合計 ${hoursText(total)}" role="img"
-    style="--chart-stops:${slices.map(slice=>slice.stop).join(',')}">
-    <strong>${hoursNumber(total)}<small>時間</small></strong>
-   </div>
-   <ul>${slices.map(({label,value,percent,color})=>`<li>
-    <i aria-hidden="true" style="background:${color}"></i><span>${esc(label)}</span>
-    <span>${hoursText(value)}</span><strong>${numberText(Math.round(percent*10)/10)}%</strong>
-   </li>`).join('')}</ul>
-  </div>`:'<p class="analysis-empty">この期間には活動時間の記録がありません。</p>'}
-  ${additional.length?`<div class="period-extra-totals">${additional.map(group=>`<span>${numberText(group.total)}${esc(group.unit)}</span>`).join('')}</div>`:''}
-  ${sorted.length>analysisColors.length?`<details class="period-details">
-   <summary>すべての項目の内訳</summary><ul>${sorted.map(({label,value})=>`<li>${esc(label)} · ${hoursText(value)}</li>`).join('')}</ul>
+  <header><h2 id="analysis-chart-title">目標に対する達成度</h2><span>${dateLabel(start)} 〜 ${dateLabel(end)}</span></header>
+  ${axes.length?`<p class="radar-caption">外周は目標時間の100%</p>
+   <div class="analysis-chart-content">${radarGraphic(axes)}<ol aria-label="実績と目標時間">${axes.map(row).join('')}</ol></div>
+   ${configured.length>8?`<details class="period-details"><summary>すべての項目の達成度</summary>
+    <ul>${configured.map(item=>row(item,null)).join('')}</ul></details>`:''}
+  `:'<p class="analysis-empty">タスクに週または月の目標時間を設定すると、達成度を表示できます。</p>'}
+  ${withoutTarget.length?`<details class="period-details"><summary>達成度の計算に含まれない活動時間</summary>
+   <ul>${withoutTarget.map(group=>`<li>${esc(group.label)} · ${hoursText(group.withoutTarget)}</li>`).join('')}</ul>
   </details>`:''}
+  ${additional.length?`<div class="period-extra-totals">${additional.map(group=>`<span>${numberText(group.total)}${esc(group.unit)}</span>`).join('')}</div>`:''}
  </section>`;
 }
 

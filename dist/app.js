@@ -393,7 +393,7 @@ function statsPage(){
    <label>分析する項目<select name="stats-scope">${analysisOptions()}</select></label>
    <button class="primary" type="submit">分析する</button>
   </form>
-  ${analysisChart(state,{start,end:today,scope:quantityScope})}`;
+  ${analysisChart(state,{start,end:today,scope:quantityScope,weeks:statsWeeks})}`;
  return `<section class="statistics-workspace weekly-workspace stats-dashboard">
   <div class="statistics-toolbar"><div class="statistics-tabs" role="group" aria-label="統計の表示">
    ${tabs.map(([id,label])=>`<button type="button" aria-pressed="${statsTab===id}" data-stat-tab="${id}">${label}</button>`).join('')}
