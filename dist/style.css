@@ -337,20 +337,63 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
   width:min(100%,360px);
   height:clamp(92px,21dvh,195px);
 }
-.home-universe-art canvas { display:block; width:100%; height:100%; }
-.home-universe-art:not(:has(canvas:not([hidden])))::before {
-  content:"";
-  position:absolute;
-  inset:50% auto auto 50%;
-  transform:translate(-50%,-50%);
-  height:72%;
-  aspect-ratio:1;
-  border-radius:50%;
-  background:radial-gradient(circle at 34% 30%,#eee5ff,#a791d4 12%,#536a9b 30%,#342950 58%,#110e24 79%);
-  box-shadow:0 0 25px #a18de16b;
-}
 .home-universe-days { color:#c6b1ea; font-size:12px; margin-top:-4px; }
 @media (max-height:640px) {
   .home-universe { margin-bottom:8px; }
   .home-universe-art { height:86px; }
+}
+
+.black-hole {
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:var(--hole-width, min(100%, 290px));
+  aspect-ratio: 2 / 1;
+  transform:translate(-50%,-50%);
+  isolation:isolate;
+  pointer-events:none;
+}
+.black-hole > i { position:absolute; display:block; left:50%; top:50%; transform:translate(-50%,-50%); }
+.black-hole-halo {
+  width:95%;
+  height:90%;
+  background:radial-gradient(ellipse,#a45249 0%,#5d295c 38%,transparent 72%);
+  opacity:calc(.32 + var(--growth) * .58);
+  filter:blur(12px);
+}
+.black-hole-disk {
+  width:95%;
+  height:49%;
+  border-radius:50%;
+  transform:translate(-50%,-50%) rotate(-13deg) !important;
+  background:radial-gradient(ellipse,transparent 29%,#913c47 41%,#e98159 47%,#fff3c5 50%,#ee9963 53%,#963e55 59%,#47234c66 68%,transparent 72%);
+  box-shadow:0 0 calc(10px + var(--growth) * 14px) #e870583d;
+  opacity:calc(.72 + var(--growth) * .28);
+}
+.black-hole-core {
+  width:35%;
+  aspect-ratio:1;
+  border-radius:50%;
+  background:#030208;
+  box-shadow:0 -3px 4px #ffbb87,0 -7px 13px #e98663a8;
+}
+.black-hole-rim {
+  width:84%;
+  height:37%;
+  border-radius:50%;
+  transform:translate(-50%,-50%) rotate(-13deg) !important;
+  border-bottom:3px solid #ffd0a5;
+  border-inline:1px solid #da7e63;
+  filter:drop-shadow(0 1px 4px #ff895b);
+}
+.mind-map-mode.is-absorbing { opacity:.32; transition:opacity .28s ease; }
+.mode-absorption-light {
+  position:fixed;
+  z-index:1000;
+  width:22px;
+  height:12px;
+  border-radius:50%;
+  background:#fff6d9;
+  box-shadow:0 0 12px 5px #ffb881,0 0 29px 10px #e975678c;
+  pointer-events:none;
 }

@@ -3,6 +3,12 @@ import {createExampleDraft, exampleMap, starterMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 
 const guestDraftKey = 'jiku:pending-universe';
+export function blackHoleArt(strength = 0) {
+  return `<div class="black-hole" style="--growth:${strength}" aria-hidden="true">
+    <i class="black-hole-halo"></i><i class="black-hole-disk"></i>
+    <i class="black-hole-core"></i><i class="black-hole-rim"></i>
+  </div>`;
+}
 const opening = {
   gaze: {prompt: '光を見つめてください。', duration: 4400, reducedDuration: 2800, next: 'gather'},
   gather: {prompt: 'もう少し、しっかり見つめてみて。', duration: GATHER_DURATION, reducedDuration: 2000, next: 'ignite'},
@@ -112,20 +118,21 @@ export function clearPendingUniverse() {
 
 export function mountOnboarding(host, {
   initial, preview = false, previewStart = 'gaze',
-  onDraft, onExample, onSave, onClose, onSettings, renderOrigin, loginAtEnd = false, loginError
+  onDraft, onExample, onSave, onClose, onSettings, loginAtEnd = false, loginError
 } = {}) {
   const draft = onboardingDraft(initial);
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const viewport = window.visualViewport;
   const events = new AbortController();
   const {signal} = events;
-  let step, timer, formingTimer, sky, disposeOrigin, originRequested = false, saving = false;
+  let step, timer, formingTimer, sky, saving = false;
   let openBranch = null;
 
   host.innerHTML = `
     <main class="birth-screen" aria-label="Jiku はじまりの宇宙">
       <div class="birth-sky" aria-hidden="true">
-        <div class="birth-haze"></div><canvas class="birth-stars"></canvas><div class="birth-light"></div><div class="birth-origin"></div>
+        <div class="birth-haze"></div><canvas class="birth-stars"></canvas><div class="birth-light"></div>
+        <div class="birth-origin">${blackHoleArt()}</div>
       </div>
       <header class="birth-header">
         <span class="birth-wordmark">Jiku<span>●</span></span>
@@ -234,7 +241,8 @@ export function mountOnboarding(host, {
       return;
     }
     const turns = witnessedBirth ? [
-      ['あなたが見つめた小さな光から、宇宙が生まれました。', 'birth-emphasis']
+      ['あなたが見つめた小さな光から、ブラックホールが生まれました。', 'birth-emphasis'],
+      ['今日の記録を残すたびに、この光の輪が少しずつ育ちます。', 'birth-reply']
     ] : [];
     turns.push(
       ['目標達成に関しても同じことが言えます。', 'birth-welcome'],
@@ -469,13 +477,6 @@ export function mountOnboarding(host, {
     detail.scrollIntoView({block: 'nearest'});
   }
 
-  function prepareOrigin() {
-    if (originRequested) return;
-    originRequested = true;
-    const getRenderer = renderOrigin ? Promise.resolve(renderOrigin) : import('./origin-preview.js').then(module => module.mountOriginPreview);
-    getRenderer.then(render => {if (!signal.aborted) disposeOrigin = render(origin, motion);}).catch(() => {});
-  }
-
   function enter(next, {focus = false, witnessedBirth = false} = {}) {
     clearTimeout(timer);
     clearTimeout(formingTimer);
@@ -489,7 +490,6 @@ export function mountOnboarding(host, {
     if (choosing || next === 'gaze') delete screen.dataset.forming;
     sky?.stage(next);
     skip.hidden = !Object.hasOwn(opening, next) && next !== 'bang';
-    origin.toggleAttribute('data-lit', next === 'confirm');
     intro.replaceChildren();
     controls.replaceChildren();
     showError('');
@@ -508,7 +508,6 @@ export function mountOnboarding(host, {
       if (loginError) showError(loginError);
       return;
     }
-    if (next !== 'gaze') prepareOrigin();
     if (Object.hasOwn(opening, next)) {
       retireTurn();
       const {prompt, duration, reducedDuration, next: following} = opening[next];
@@ -604,6 +603,6 @@ export function mountOnboarding(host, {
   enter(preview ? previewStart : draft.step);
   return {dispose() {
     clearTimeout(timer); clearTimeout(formingTimer); events.abort();
-    sky?.dispose(); disposeOrigin?.();
+    sky?.dispose();
   }};
 }

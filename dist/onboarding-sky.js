@@ -127,7 +127,7 @@ export function startBirthSky(canvas, origin, motion) {
     const scale = Math.min(width, height);
     const cx = width / 2, cy = center;
     const flight = smooth((burst - .13) / .87);
-    const convergence = expanding ? smooth((burst - .52) / .39) : 0;
+    const convergence = expanding ? smooth((burst - .11) / .84) : 0;
     const launch = smooth((burst - .12) / .32);
     ctx.clearRect(0, 0, width, height);
 
@@ -188,13 +188,14 @@ export function startBirthSky(canvas, origin, motion) {
           beatEnvelope(phase, .015, .16, .35) + .6 * beatEnvelope(phase, .26, .42, .64)
         );
         const breathing = 1 + pulse * (.36 + particle.depth * .27);
-        const start = scale * particle.radius * (.36 * (1 - gathering * .74) * contraction * breathing + outgoing * speed);
-        const finish = sphereRadius * (.984 + particle.depth * .031);
+        const start = expanding ? scale * particle.radius * .38 * speed
+          : scale * particle.radius * .36 * (1 - gathering * .74) * contraction * breathing;
+        const finish = 0;
         const angle = particle.angle + gathering * .8 + ignition * (.24 + particle.depth * .14) + outgoing * .4;
         const curl = .62 + particle.depth * .85;
         const sweep = angle + curl * convergence;
         const distance = mix(start, finish, convergence);
-        const stretch = mix(.77, 1, convergence);
+        const stretch = mix(.77, .48, convergence);
         const x = cx + Math.cos(sweep) * distance;
         const y = cy + Math.sin(sweep) * distance * stretch;
         const life = expanding
@@ -239,26 +240,26 @@ export function startBirthSky(canvas, origin, motion) {
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    if (expanding && burst > .11 && burst < .81) {
+    if (expanding && burst > .72 && burst < .96) {
       const reach = Math.hypot(Math.max(cx, width - cx), Math.max(cy, height - cy));
-      const wave = clamp((burst - .11) / .30);
-      const radius = reach * (.008 + wave ** .79 * 1.12);
+      const wave = clamp((burst - .72) / .24);
+      const radius = Math.min(reach, sphereRadius * 2) * (.22 + wave * .78);
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = (1 - wave ** 1.55) * .97;
       glow(ctx, cx, cy, radius + 1, [
         [0, '#0000'], [.59, '#0000'], [.79, '#664fd633'], [.9, '#a976ff96'],
         [.948, '#e3cfffb8'], [.968, '#fff8eedd'], [.985, '#9ae5ff94'], [1, '#0000']
       ]);
-      const echo = smooth((burst - .19) / .43);
+      const echo = smooth((burst - .76) / .20);
       if (echo > 0 && echo < 1) {
         ctx.globalAlpha = .42 * (1 - echo);
-        glow(ctx, cx, cy, reach * (.01 + echo * 1.03), [
+        glow(ctx, cx, cy, radius * .75, [
           [0, '#0000'], [.75, '#0000'], [.91, '#9261d98c'], [.96, '#f6d4ffbd'], [1, '#0000']
         ]);
       }
-      const flash = smooth((burst - .11) / .038) * (1 - smooth((burst - .15) / .19));
+      const flash = smooth((burst - .72) / .038) * (1 - smooth((burst - .76) / .10));
       ctx.globalAlpha = flash * .96;
-      glow(ctx, cx, cy, scale * (.17 + wave * .34), [
+      glow(ctx, cx, cy, sphereRadius * (.40 + wave * .36), [
         [0, '#fff6e7'], [.05, '#fff7e6'], [.14, '#eab5ffdf'], [.34, '#9a72f786'],
         [.64, '#679dff25'], [1, '#0000']
       ]);

@@ -58,25 +58,6 @@ body.birth-page, body.birth-active {
   opacity: 0;
   transition: opacity 1.4s ease, top 1.6s cubic-bezier(.2,.65,.3,1), transform 1.6s cubic-bezier(.2,.65,.3,1);
 }
-.birth-origin canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.birth-origin:not(:has(canvas:not([hidden])))::before {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--birth-orb-diameter, min(44vw, 35cqh));
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 29% 22%, #f3e6ff87, transparent 27%),
-    radial-gradient(ellipse at center, #090619 20%, #120d2680 53%, transparent 73%),
-    conic-gradient(from 16deg, #7853a2, #6fb5d2, #cc8ad9, #cd987a, #739ca5, #7853a2);
-  box-shadow: inset 0 0 14px #e7d9ff64;
-  content: "";
-}
 .birth-origin { container-type: size; }
 .birth-screen:is([data-forming], [data-chat]) .birth-origin {
   opacity: 1;
@@ -85,23 +66,7 @@ body.birth-page, body.birth-active {
   top: clamp(64px, 23%, 220px);
   transform: translateY(-50%) scale(.66);
 }
-.birth-origin[data-lit]::after {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--birth-orb-diameter, min(44vw, 35cqh));
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  box-shadow: 0 0 10px 1px #f6dcf8c0, -8px -3px 27px 2px #b299ff7c, 9px 5px 34px 2px #71bef486;
-  animation: birth-halo 1.2s ease-out both;
-  content: "";
-}
-@keyframes birth-halo {
-  0% { opacity: 0; scale: .96; }
-  43% { opacity: 1; }
-  100% { opacity: .63; scale: 1; }
-}
+
 .birth-screen:is([data-forming], [data-chat]) .birth-stars { opacity: .35; }
 .birth-screen[data-stage="bang"][data-forming] .birth-stars { opacity: .62; }
 @media (max-width: 560px) {
@@ -493,3 +458,13 @@ body.birth-page, body.birth-active {
 .birth-research summary { cursor:pointer; }
 .birth-research a { color:#e2cbff; text-decoration:underline; }
 .birth-header a.birth-quiet { text-decoration:none; margin-left:auto; }
+
+.birth-origin .black-hole { --hole-width:min(76vw,70cqh,460px); }
+.birth-screen[data-stage="bang"][data-forming] .black-hole { animation:birth-black-hole 1.2s ease-out both; }
+@keyframes birth-black-hole {
+  from { scale:.25; opacity:0; }
+  to { scale:1; opacity:1; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .birth-screen[data-stage="bang"][data-forming] .black-hole { animation:none; }
+}
