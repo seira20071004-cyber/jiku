@@ -29,8 +29,9 @@ export function createPortalWarp(lowQuality) {
   });
   let width, height, backdrop;
 
-  function draw(progress) {
+  function draw(progress, opacity = 1) {
     canvas.hidden = false;
+    canvas.style.opacity = String(clamp(opacity));
     const nextWidth = canvas.clientWidth, nextHeight = canvas.clientHeight;
     if (!nextWidth || !nextHeight) return;
     if (width !== nextWidth || height !== nextHeight) {

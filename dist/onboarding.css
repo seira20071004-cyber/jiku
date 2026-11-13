@@ -459,12 +459,51 @@ body.birth-page, body.birth-active {
 .birth-research a { color:#e2cbff; text-decoration:underline; }
 .birth-header a.birth-quiet { text-decoration:none; margin-left:auto; }
 
-.birth-origin .black-hole { --hole-width:min(76vw,70cqh,460px); }
-.birth-screen[data-stage="bang"][data-forming] .black-hole { animation:birth-black-hole 1.2s ease-out both; }
-@keyframes birth-black-hole {
-  from { scale:.25; opacity:0; }
-  to { scale:1; opacity:1; }
+.birth-origin canvas { display: block; width: 100%; height: 100%; }
+.birth-orb-fallback {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--birth-orb-diameter, min(30vw, 150px));
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 38% 27%, #f3e2ff, #da9afb7d 26%, transparent 56%),
+    radial-gradient(ellipse at 76% 32%, #efb5a3, #b792e07d 42%, transparent 67%),
+    linear-gradient(140deg, #659cbd, #5269a5 38%, #7a549e 65%, #322044);
+  box-shadow: 0 0 35px #9781db86, inset -6px -8px 18px #120a41ba;
 }
-@media (prefers-reduced-motion:reduce) {
-  .birth-screen[data-stage="bang"][data-forming] .black-hole { animation:none; }
+.birth-origin[data-webgl] .birth-orb-fallback { display: none; }
+.birth-screen[data-stage="travel"] .birth-origin {
+  top: 50%;
+  transform: translateY(-50%) scale(7);
+  transition: transform 1.2s cubic-bezier(.32,.04,.72,.63), top 1.2s ease;
 }
+.birth-screen[data-stage="travel"] .birth-intro { inset: auto 22px 14%; }
+.birth-screen[data-landing]:not([data-stage="travel"]) .birth-origin { opacity: 0; }
+.birth-landing-planet {
+  position: absolute;
+  inset: 8% 0 auto;
+  height: 28%;
+  --planet-size: min(40vw, 21svh, 170px);
+  opacity: 0;
+  transform: scale(.86);
+  transition: opacity .9s, transform 1.4s cubic-bezier(.2,.65,.3,1);
+}
+.birth-screen:is([data-stage="arrival"], [data-stage="login"]) .birth-landing-planet { opacity: 1; transform: scale(1); }
+.birth-screen[data-demo-recorded] .planet-beacon { opacity: 1; box-shadow: 0 0 10px 4px #ffd194, 0 0 28px 9px #ff8f68a0; }
+.birth-map-caption, .birth-arrival p {
+  margin: 0;
+  color: #ddd4eb;
+  font-size: 13px;
+}
+.birth-example .birth-map-caption { text-align: center; }
+.birth-demo { display: grid; gap: 8px; padding: 12px; border: 1px solid #a594cf48; border-radius: 18px; background: #121022c9; }
+.birth-demo-modes { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.birth-demo-modes .birth-choice { justify-content: center; padding: 7px 4px; font-size: 12px; text-align: center; }
+.birth-demo-modes .birth-choice[aria-pressed="true"] { border-color: #c5b3f3; background: #372e56; }
+.birth-demo-result { display: grid; gap: 6px; }
+.birth-demo-result progress { width: 100%; accent-color: #b7a3e9; }
+.birth-demo-result .birth-primary { min-height: 42px; }
+.birth-node-form select { display: block; margin-top: 5px; width: 100%; padding: 8px; background: #0c0a18; color: inherit; border: 1px solid #b6a5e369; border-radius: 8px; font: inherit; font-size: 16px; }

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {initialPersonalMap,onboardingDraft} from '../dist/onboarding.js';
+import {firstPersonalTask,initialPersonalMap,onboardingDraft} from '../dist/onboarding.js';
 import {exampleMap} from '../dist/example-map.js';
 import {completeUniverse,freshUniverse,writeGoal} from '../dist/universe-model.js';
 import {validate} from '../dist/model.js';
@@ -79,4 +79,25 @@ test('新規マインドマップは見本を全階層でコピーし、編集�
   assert.equal(initialPersonalMap({}).children[0].children[0].children[0].name, '10分歩く');
   const resumed = onboardingDraft({name:map.name, step:'map', map});
   assert.deepEqual(initialPersonalMap(resumed), map);
+});
+
+
+test('会話の回答を本人の枝に反映し、着陸とログインを再開できる', () => {
+  const answers = {goal:'運動を続けたい', reason:'休日に元気に出かけたい', values:'家族と出かける日を増やす'};
+  const draft = onboardingDraft({step:'meaning', ...answers});
+  assert.deepEqual(draft, {name:'', step:'meaning', ...answers});
+  const map = initialPersonalMap(draft);
+  const branch = map.children[0];
+  assert.equal(map.name, '幸せな人生');
+  assert.equal(branch.name, answers.values);
+  assert.equal(branch.children[0].name, answers.goal);
+  assert.equal(branch.children[0].purpose, answers.reason);
+  branch.children[0].children.push({name:'夕食後に歩く', kind:'action', daily:10, weekly:30, mode:'busy'});
+  assert.deepEqual(firstPersonalTask(map), {
+    name:'夕食後に歩く', kind:'action', daily:10, weekly:30, mode:'busy', branch:answers.values
+  });
+  for (const step of ['arrival', 'login']) {
+    const saved = {name:'', step, ...answers, map};
+    assert.deepEqual(onboardingDraft(JSON.parse(JSON.stringify(saved))), saved);
+  }
 });

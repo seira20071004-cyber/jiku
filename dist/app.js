@@ -1,4 +1,4 @@
-import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,blackHoleArt} from './onboarding.js';
+import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,planetArt} from './onboarding.js';
 import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 import {createDemoUniverse} from './demo.js';
@@ -230,11 +230,6 @@ function showOnboarding(){
    try{if(guest)saveGuestDraft(draft);else localStorage.setItem(onboardingKey,JSON.stringify(draft))}
    catch(error){if(guest&&draft.step==='login')throw error}
   },
-  onExample:draft=>{
-   onboardingScene?.dispose();onboardingScene=null;onboardingPreview=false;
-   startGuide(preview,draft);
-   render();
-  },
   onSave:async map=>{
    if(preview){
     const generated=freshUniverse();
@@ -429,7 +424,7 @@ function mindMapPage(){
  const growth=universeGrowth(state,today);
  return `<section class="mind-map" aria-labelledby="mind-map-title">
   <div class="home-universe">
-   <div class="home-universe-art" role="img" aria-label="記録とともに育つブラックホール">${blackHoleArt(1-Math.exp(-growth.days/24))}</div>
+   <div class="home-universe-art" role="img" aria-label="記録とともに育つ自分の星">${planetArt(growth.days)}</div>
    ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
   </div>
   ${recorded?'':`<section class="mind-map-mode" aria-label="今日のモード">
@@ -444,9 +439,9 @@ function mindMapPage(){
 
 async function absorbModeButton(button) {
  const section=button.closest('.mind-map-mode');
- const hole=$('.home-universe-art .black-hole');
- if(!section||!hole||matchMedia('(prefers-reduced-motion: reduce)').matches||!button.animate)return;
- const rect=button.getBoundingClientRect(),target=hole.getBoundingClientRect();
+ const planet=$('.home-universe-art .planet-globe');
+ if(!section||!planet||matchMedia('(prefers-reduced-motion: reduce)').matches||!button.animate)return;
+ const rect=button.getBoundingClientRect(),target=planet.getBoundingClientRect();
  const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
  const dx=target.left+target.width/2-x,dy=target.top+target.height/2-y;
  const light=document.createElement('span');
@@ -464,7 +459,7 @@ async function absorbModeButton(button) {
    {transform:`translate(calc(-50% + ${dx*.35+32}px), calc(-50% + ${dy*.7}px)) scale(.85)`,opacity:1,offset:.62},
    {transform:`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.1)`,opacity:0}
   ],{duration:440,easing:'ease-in'}).finished;
-  await hole.animate([{filter:'brightness(1.8)'},{filter:'brightness(1)'}],{duration:160}).finished;
+  await planet.animate([{filter:'brightness(1.8)'},{filter:'brightness(1)'}],{duration:160}).finished;
  } finally { light.remove(); }
 }
 
@@ -666,7 +661,7 @@ if(authReturn&&guestHandoff?.step==='login'&&guestHandoff.map&&!storageLocked){
   needsLegacyImport=false;
   finishOnboardingReturn();
  }catch{
-  onboardingResume={...guestHandoff,step:'map'};
+  onboardingResume={...guestHandoff,step:'arrival'};
   setTimeout(()=>toast('宇宙を保存できませんでした。もう一度お試しください。'),0);
  }
 }

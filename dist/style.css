@@ -343,48 +343,58 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
   .home-universe-art { height:86px; }
 }
 
-.black-hole {
-  position:absolute;
-  top:50%;
-  left:50%;
-  width:var(--hole-width, min(100%, 290px));
-  aspect-ratio: 2 / 1;
-  transform:translate(-50%,-50%);
-  isolation:isolate;
-  pointer-events:none;
+/* The same planet is visible on arrival and when returning to the map. */
+.home-planet {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
 }
-.black-hole > i { position:absolute; display:block; left:50%; top:50%; transform:translate(-50%,-50%); }
-.black-hole-halo {
-  width:95%;
-  height:90%;
-  background:radial-gradient(ellipse,#a45249 0%,#5d295c 38%,transparent 72%);
-  opacity:calc(.32 + var(--growth) * .58);
-  filter:blur(12px);
+.planet-globe {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: var(--planet-size, clamp(72px, 17dvh, 150px));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 30% 14%, #c9f6ffa0, transparent 47%),
+    radial-gradient(ellipse at 67% 39%, #524283c9, transparent 45%),
+    linear-gradient(145deg, #82c8e4, #416b88 38%, #201e44 62%, #070b23 82%);
+  box-shadow: inset 1px 1px 4px #b8eeff, 0 0 18px #79b9e05e, 0 0 46px #605ab44d;
 }
-.black-hole-disk {
-  width:95%;
-  height:49%;
-  border-radius:50%;
-  transform:translate(-50%,-50%) rotate(-13deg) !important;
-  background:radial-gradient(ellipse,transparent 29%,#913c47 41%,#e98159 47%,#fff3c5 50%,#ee9963 53%,#963e55 59%,#47234c66 68%,transparent 72%);
-  box-shadow:0 0 calc(10px + var(--growth) * 14px) #e870583d;
-  opacity:calc(.72 + var(--growth) * .28);
+.planet-globe::before {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  rotate: -26deg;
+  background:
+    radial-gradient(ellipse at 18% 37%, #9fd6caaa 0 13%, transparent 15%),
+    radial-gradient(ellipse at 42% 24%, #abd8cab3 0 12%, transparent 14%),
+    radial-gradient(ellipse at 52% 40%, #649fc0e6 0 9%, transparent 13%),
+    radial-gradient(ellipse at 70% 60%, #6c639ba0 0 15%, transparent 18%),
+    repeating-linear-gradient(177deg, #d1e6f112, #d7eaff00 9%, #c4eff34f 16%, #d7eaff00 20%);
+  filter: blur(2px);
 }
-.black-hole-core {
-  width:35%;
-  aspect-ratio:1;
-  border-radius:50%;
-  background:#030208;
-  box-shadow:0 -3px 4px #ffbb87,0 -7px 13px #e98663a8;
+.planet-globe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 28% 15%, transparent 29%, #06092232 58%, #04061de6 90%);
 }
-.black-hole-rim {
-  width:84%;
-  height:37%;
-  border-radius:50%;
-  transform:translate(-50%,-50%) rotate(-13deg) !important;
-  border-bottom:3px solid #ffd0a5;
-  border-inline:1px solid #da7e63;
-  filter:drop-shadow(0 1px 4px #ff895b);
+.planet-beacon {
+  position: absolute;
+  z-index: 1;
+  top: 57%;
+  left: 62%;
+  width: 4%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff2c7;
+  box-shadow: 0 0 7px 2px #ffca80, 0 0 24px 6px #f68b76a0;
+  opacity: var(--planet-light, 0);
+  transition: opacity .6s ease, box-shadow .6s ease;
 }
 .mind-map-mode.is-absorbing { opacity:.32; transition:opacity .28s ease; }
 .mode-absorption-light {

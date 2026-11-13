@@ -1,6 +1,7 @@
 import {ACESFilmicToneMapping, PerspectiveCamera, Scene, WebGLRenderer} from 'three';
 import {ORIGIN_FOV, originDistance, originSphere} from './origin-sphere.js';
 import {noiseGLSL} from './space-noise.js';
+export {createPortalWarp} from './portal-warp.js';
 
 // Uses the same sphere and camera as the app's entrance, in a transparent
 // layer so the last stars from the explosion can fade underneath it.
@@ -44,13 +45,14 @@ export function mountOriginPreview(host, motion, {strength=1}={}) {
    draw(time);
   }
  }
- function loseContext(event){event.preventDefault();canvas.hidden=true;}
- function restoreContext(){canvas.hidden=false;resize();}
+ function loseContext(event){event.preventDefault();canvas.hidden=true; host.removeAttribute('data-webgl');}
+ function restoreContext(){canvas.hidden=false;resize();host.dataset.webgl='';}
  canvas.addEventListener('webglcontextlost',loseContext);
  canvas.addEventListener('webglcontextrestored',restoreContext);
  const observer=new ResizeObserver(resize);
  observer.observe(host);
  resize();
+ host.dataset.webgl='';
  frame=requestAnimationFrame(animate);
  return ()=>{
   cancelAnimationFrame(frame);observer.disconnect();
