@@ -426,47 +426,47 @@ function personalMap(){
  const selected=selectedMapNode(),path=nodePath(state,selected.id),root=path[0];
  const galaxies=visibleChildren(state,root.id);
  const tone=Math.max(0,galaxies.findIndex(node=>node.id===path[1]?.id))%4;
- const card=(node,depth,style='',active=false)=>{
+ const card=(node,depth,style='')=>{
   const task=nodeKind(state,node.id)==='action',level=Math.min(depth,LEVELS.length-1);
-  const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):LEVELS[level];
-  return `<button class="map-node ${style}" data-map-select="${esc(node.id)}" ${active?'data-map-active':''} ${node.id===selected.id?'aria-current="true"':''}>
+  const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):'';
+  return `<button class="map-node ${style}" data-map-select="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''}>
     <span aria-hidden="true">${hierarchyMarks[level]}</span>
-    <span><small>${label}</small><strong>${esc(node.name)}</strong></span>
+    <span>${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong></span>
   </button>
   ${mapEditing?`<div class="map-inline-tools">
     <button data-edit="${esc(node.id)}" aria-label="${esc(node.name)}を編集">編集</button>
-    ${depth<LEVELS.length-1&&!task?`<button data-space-add="${esc(node.id)}" aria-label="${esc(node.name)}に${LEVELS[depth+1]}を追加">＋</button>`:''}
+    ${depth<LEVELS.length-1&&!task?`<button data-space-add="${esc(node.id)}" aria-label="${esc(node.name)}に目標やタスクを追加">＋</button>`:''}
   </div>`:''}`;
  };
- const overview=mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
-  tone:index%4,card:card(node,1,'',path[1]?.id===node.id)
- })),{radial:true,label:'宇宙全体の地図'});
- if(path.length<2)return overview;
- const children=visibleChildren(state,selected.id);
- const detailPath=children.length?path:path.slice(0,-1);
- if(detailPath.length<2)return overview;
- const parent=detailPath.at(-1),depth=detailPath.length-1;
- const detail=mapDiagram(card(parent,depth,'map-detail-root'),visibleChildren(state,parent.id).map(node=>({
-  tone,card:card(node,depth+1)
- })),{label:'選んだ枝の地図'});
- const trail=detailPath.slice(0,-1).map((node,index)=>`<button data-map-select="${esc(node.id)}">${index?esc(node.name):'全体'}</button>`).join('<span aria-hidden="true">›</span>');
- return `${overview}<section class="map-subview" aria-label="選んだ枝">
-  <nav class="map-trail" aria-label="マップの階層">${trail}<span aria-hidden="true">›</span><span>${esc(parent.name)}</span></nav>
-  ${detail}
+ if(path.length<2)return mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
+  tone:index%4,card:card(node,1)
+ })),{radial:true,label:'マインドマップ全体'});
+ const galaxy=path[1];
+ function branch(node,depth){
+  const children=visibleChildren(state,node.id);
+  return `<li>${card(node,depth)}${children.length?`<ul>${children.map(child=>branch(child,depth+1)).join('')}</ul>`:''}</li>`;
+ }
+ const children=visibleChildren(state,galaxy.id);
+ return `<section class="map-subview map-galaxy-view" aria-label="${esc(galaxy.name)}の全体図" data-map-tone="${tone}">
+  <button class="map-galaxy-back" data-map-select="${esc(root.id)}">← マップ全体に戻る</button>
+  <div class="map-galaxy-root">${card(galaxy,1,'map-detail-root')}</div>
+  ${children.length?`<ul class="map-galaxy-tree">${children.map(node=>branch(node,2)).join('')}</ul>`:
+   '<p class="map-galaxy-empty">まだ下位の目標やタスクはありません。</p>'}
  </section>`;
 }
 function mindMapPage(){
  const recorded=Boolean(state.records[today]?.mode);
  const growth=universeGrowth(state,today);
+ const inGalaxy=Boolean(selectedMapNode().parentId);
  return `<section class="mind-map" aria-labelledby="mind-map-title">
-  <div class="home-universe">
+  ${inGalaxy?'':`<div class="home-universe">
    <div class="home-universe-art" role="img" aria-label="記録とともに育つ自分の星">${planetArt(growth.days)}</div>
    ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
   </div>
   ${recorded?'':`<section class="mind-map-mode" aria-label="今日のモード">
    <h2>今日のモード</h2>
    <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button data-mode="${key}" data-date="${today}"><span aria-hidden="true">${MODES[key].icon}</span> ${MODES[key].label}</button>`).join('')}</div>
-  </section>`}
+  </section>`}`}
   <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1></header>
   <div class="mind-map-scroll">${personalMap()}</div>
   <footer class="mind-map-footer">${mapActions()}</footer>
@@ -519,19 +519,25 @@ async function recordModeChoice(button) {
 }
 function openMindMap(){
  if(guideSession||navigating)return;
+ mapSelection=null;
  view='tree';
  if(location.hash!=='#tree')location.hash='tree';
  render();
  $('.mind-map [aria-current]')?.scrollIntoView({block:'nearest'});
 }
 function selectMapNode(button){
+ const previous=nodePath(state,selectedMapNode().id)[1];
  mapSelection=button.dataset.mapSelect;
- $('.mind-map-scroll').innerHTML=personalMap();
- const detail=$('.mind-map .map-subview'),overview=$('.mind-map .map-diagram-overview');
- const selected=(detail||overview).querySelector('[aria-current="true"]')||overview.querySelector('[aria-current="true"]');
- selected?.focus({preventScroll:true});
- (detail||selected)?.scrollIntoView({block:'nearest'});
- $('.mind-map-footer').innerHTML=mapActions();
+ const galaxy=nodePath(state,selectedMapNode().id)[1];
+ if(galaxy?.id!==previous?.id)render();
+ else {
+  $('.mind-map-scroll').innerHTML=personalMap();
+  $('.mind-map-footer').innerHTML=mapActions();
+ }
+ const cards=Array.from(document.querySelectorAll('.mind-map-scroll .map-node[data-map-select]'));
+ const focusCard=!galaxy&&previous?cards.find(card=>card.dataset.mapSelect===previous.id):cards.find(card=>card.hasAttribute('aria-current'));
+ focusCard?.focus({preventScroll:true});
+ if(galaxy?.id===previous?.id)focusCard?.scrollIntoView({block:'nearest'});
 }
 function leafPanel(id,key=today){
  if(!state.nodes.some(n=>n.id===id))return;

@@ -523,3 +523,37 @@ body.birth-page, body.birth-active {
 .birth-statistics .weekly-period { display: flex; justify-content: center; }
 .birth-statistics .weekly-record, .birth-statistics .calendar-content .cosmic-calendar { min-height: 0; height: auto; }
 .birth-statistics .statistics-content { min-height: 0; height: auto; padding: 0; overflow: visible; }
+
+.birth-header .birth-music {
+  margin-left: 0;
+  color: #d4c8e7;
+  white-space: nowrap;
+}
+.birth-music::before {
+  content: "♫";
+  display: inline-block;
+  margin-right: 4px;
+  opacity: .55;
+}
+.birth-header .birth-music { display: inline-flex; align-items: center; }
+.birth-music[aria-pressed="true"]::before { opacity: 1; color: #edcdfc; }
+.birth-screen[data-stage="bang"][data-forming] .birth-origin {
+  animation: birth-sphere-form 1.7s cubic-bezier(.18,.62,.32,1) both;
+}
+@keyframes birth-sphere-form {
+  from { opacity: 0; scale: .38; }
+  45% { opacity: .72; }
+  to { opacity: 1; scale: 1; }
+}
+.birth-screen[data-stage="travel"] .birth-origin {
+  transform: translateY(-50%) scale(8.6);
+  transition: transform 1.8s cubic-bezier(.46,.06,.75,.62), top 1.55s ease-in-out;
+}
+.birth-screen[data-stage="travel"] .birth-landing-planet { transform: scale(.22); }
+.birth-screen[data-stage="travel"][data-approaching] .birth-origin { opacity: 0; }
+.birth-screen[data-stage="travel"][data-approaching] .birth-landing-planet,
+.birth-screen[data-stage="closing"] .birth-landing-planet {
+  opacity: 1;
+  transform: scale(1);
+}
+.birth-screen[data-stage="travel"][data-approaching] .birth-intro { opacity: 0; transition: opacity .4s; }

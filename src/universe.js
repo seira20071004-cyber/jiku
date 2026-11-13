@@ -431,12 +431,13 @@ export function createUniverse(host,{nodes,current,onSelect,onReady,onZoom,quali
   if(fromRings)outgoing.push(fromRings);
   if(toRings)incoming.push(toRings);
   incoming.forEach(entity=>fade(entity,0));
-  const duration=reduced?0:routeLength>1?730:movingIn?1300:1080;
+  const nearPlanet=frame.depth>=3||from.depth>=3;
+  const duration=reduced?0:nearPlanet?(routeLength>1?950:1560):routeLength>1?730:movingIn?1300:1080;
   let labelsReady=false;
   const arrived=await animateTravel(duration,raw=>{
-   const lateral=movingIn?smooth(raw/.86):smooth((raw-.1)/.9);
+   const lateral=nearPlanet?smooth(raw):movingIn?smooth(raw/.86):smooth((raw-.1)/.9);
    camera.position.set(T.MathUtils.lerp(start.x,destination.x,lateral),T.MathUtils.lerp(start.y,destination.y,lateral),T.MathUtils.lerp(start.z,destination.z,smooth(raw)));
-   const reveal=smooth((raw-.28)/.66),recede=1-smooth((raw-.16)/.7);
+   const reveal=smooth((raw-(nearPlanet?.43:.28))/(nearPlanet?.57:.66)),recede=1-smooth((raw-.16)/.7);
    if((from.depth>=2)!==(frame.depth>=2)){
     setGalaxyBackdrop(T.MathUtils.lerp(Number(from.depth>=2),Number(frame.depth>=2),smooth(raw)));
    }

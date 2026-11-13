@@ -1,7 +1,8 @@
 import {BANG_DURATION, GATHER_DURATION, IGNITION_DURATION, SPHERE_FORMATION_AT, startBirthSky} from './onboarding-sky.js';
-import {createExampleDraft, exampleMap, starterMap} from './example-map.js';
+import {exampleMap, starterMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 import {createPortalWarp, mountOriginPreview} from './origin-preview.js';
+import {createBirthMusic} from './birth-music.js';
 import {MODES, modesForLevel} from './model.js';
 
 const guestDraftKey = 'jiku:pending-universe';
@@ -14,7 +15,7 @@ const opening = {
   gaze: {prompt: '光を見つめてください。', duration: 4400, reducedDuration: 2800, next: 'gather'},
   gather: {prompt: 'もう少し、しっかり見つめてみて。', duration: GATHER_DURATION, reducedDuration: 2000, next: 'ignite'},
   ignite: {duration: IGNITION_DURATION, next: 'still'},
-  still: {duration: 1050, next: 'bang'}
+  still: {duration: 520, next: 'bang'}
 };
 
 const escapeMapText = text => text.replace(/[&<>"']/g, character =>
@@ -37,21 +38,7 @@ function draftChildren(nodes, depth = 1) {
 
 export function initialPersonalMap(draft) {
   if (draft.map) return draft.map;
-  if (draft.goal) {
-    const map = createExampleDraft();
-    const purpose = draft.reason || draft.values || map.name;
-    const goal = {name: draft.goal, purpose, kind: 'goal', children: []};
-    map.children.unshift({
-      name: draft.values || draft.reasonTwo || draft.reason || '大切にしたいこと',
-      purpose: draft.reasonTwo || draft.reason || draft.goal,
-      kind: 'goal',
-      children: draft.reasonTwo
-        ? [{name: draft.reason, purpose: draft.reasonTwo, kind: 'goal', children: [goal]}]
-        : [goal]
-    });
-    return map;
-  }
-  if (!draft.starter) return createExampleDraft();
+  if (!draft.starter) return {name: exampleMap.name, children: []};
   const defaultStarter = draft.name === exampleMap.name ? starterMap : {
     ...starterMap, galaxy: '目標に向けて始める', task: '今日できる一歩に10分取り組む'
   };
@@ -173,6 +160,7 @@ export function mountOnboarding(host, {
       </div>
       <header class="birth-header">
         <span class="birth-wordmark">Jiku<span>●</span></span>
+        <button type="button" class="birth-quiet birth-music" data-birth="music" aria-pressed="false">音楽</button>
         ${preview ? '<span class="birth-edition">初回体験プレビュー</span>' : ''}
         ${onClose ? '<button type="button" class="birth-quiet" data-birth="close">閉じる</button>' : ''}
         ${onSettings ? '<button type="button" class="birth-quiet" data-birth="settings" aria-label="Googleアカウントと設定">設定</button>' : ''}
@@ -194,6 +182,9 @@ export function mountOnboarding(host, {
   const conversation = screen.querySelector('.birth-conversation');
   const controls = screen.querySelector('.birth-controls');
   const note = screen.querySelector('.birth-error');
+  const musicButton = screen.querySelector('[data-birth="music"]');
+  const music = createBirthMusic();
+  musicButton.hidden = !music;
   const skip = screen.querySelector('[data-birth="skip"]');
   const persist = () => onDraft?.({...draft});
   function showError(message) {
@@ -373,7 +364,6 @@ export function mountOnboarding(host, {
       </div>`;
       return;
     }
-    if (draft.goal && !draft.map) openBranch = 0;
     draft.map = initialPersonalMap(draft);
     delete draft.starter;
     persist();
@@ -414,7 +404,10 @@ export function mountOnboarding(host, {
     controls.innerHTML = `<div class="birth-example birth-personal-map">
       ${mapDiagram(editNodeButton(map, '', '◎', 'map-root'), points, {radial: true, label: '自分のマインドマップ'})}
       <button type="button" class="birth-map-add" data-birth-add-node="" data-node-kind="goal">＋ 目標を追加</button>
-      <p class="birth-map-caption">枝を開いて、今日できるタスクをひとつ置いてみましょう。見本の目標は編集・削除できます。</p>
+      <p class="birth-map-caption">「＋ 目標を追加」から、あなたが大切にしたいことをひとつ置いてみましょう。</p>
+      ${draft.goal ? `<details class="birth-research"><summary>会話で答えたこと</summary><ul>
+        ${[draft.goal, draft.reason, draft.reasonTwo, draft.values].filter(Boolean).map(value => `<li>${escapeMapText(value)}</li>`).join('')}
+      </ul></details>` : ''}
       <div class="map-subview" id="birth-personal-detail" hidden></div>
       <div class="birth-node-editor" hidden></div>
       <button class="birth-primary" type="button" data-birth="generate">自分の星へ向かう <span aria-hidden="true">→</span></button>
@@ -446,7 +439,7 @@ export function mountOnboarding(host, {
       tone: openBranch % 4,
       card: branchCard(node, `${openBranch}.${index}`)
     }));
-    detail.innerHTML = `${mapDiagram(editNodeButton(branch, String(openBranch), '◉', 'map-detail-root'), points, {label: '銀河の枝'})}
+    detail.innerHTML = `${mapDiagram(editNodeButton(branch, String(openBranch), '◉', 'map-detail-root'), points, {label: '目標の枝'})}
       <div class="birth-map-add-actions">
         <button type="button" class="birth-map-add" data-birth-add-node="${openBranch}" data-node-kind="goal">＋ 目標を追加</button>
         <button type="button" class="birth-map-add" data-birth-add-node="${openBranch}" data-node-kind="action">＋ タスクを追加</button>
@@ -602,7 +595,6 @@ export function mountOnboarding(host, {
     };
     showSequence([
       ['あなたの星にたどり着きました。', 'birth-emphasis'],
-      ['マインドマップの枝は、銀河・恒星系・惑星など、この宇宙の目標の階層につながっています。', 'birth-reply'],
       ['ここには、目標に向かって進んだ記録を残せます。', 'birth-emphasis'],
       ['JIKUには、休む日・忙しい日・余裕がある日の3つのモードがあります。', 'birth-reply'],
       ['タスクごとに量とモードを設定しておけば、その日のペースを選ぶだけで、取り組んだ量を記録できます。', 'birth-reply']
@@ -618,7 +610,7 @@ export function mountOnboarding(host, {
           `<button type="button" class="birth-choice" data-demo-mode="${mode}" aria-pressed="${demoMode === mode}">${MODES[mode].label}</button>`
         ).join('')}</div>
         <div class="birth-demo-result" aria-live="polite">
-          ${demoMode ? `<p>${included ? `${escapeMapText(task.name)} · ${task.daily}分` : '選んだモードで統計を確認できます。'}</p>` : ''}
+          ${demoMode ? `<p>${included ? `${escapeMapText(task.name)} · ${task.daily}分` : task ? 'このタスクは、選んだモードには含まれません。' : 'タスクを追加すると、取り組んだ量も記録できます。'}</p>` : ''}
         </div>
       </div>
       ${demoMode ? `<p class="birth-map-caption">138件の実験をまとめた研究では、進捗の記録・確認が目標達成を後押ししました。</p>
@@ -686,6 +678,7 @@ export function mountOnboarding(host, {
     screen.toggleAttribute('data-chat', !choosing && !Object.hasOwn(opening, next) && next !== 'bang');
     screen.toggleAttribute('data-map', ['confirm', 'map', 'statistics'].includes(next));
     screen.toggleAttribute('data-landing', ['travel', 'arrival', 'closing', 'login'].includes(next));
+    if (next === 'travel') delete screen.dataset.approaching;
     if (choosing || next === 'gaze' || next === 'arrival') delete screen.dataset.forming;
     screen.toggleAttribute('data-demo-recorded', Boolean(draft.recordedMode));
     sky?.stage(next);
@@ -720,6 +713,7 @@ export function mountOnboarding(host, {
     }
     if (next === 'bang') {
       retireTurn();
+      music?.accent();
       formingTimer = setTimeout(() => {screen.dataset.forming = '';}, SPHERE_FORMATION_AT);
       timer = setTimeout(() => enter('example-choice'), BANG_DURATION);
       return;
@@ -738,8 +732,13 @@ export function mountOnboarding(host, {
         const start = performance.now();
         const fly = time => {
           const elapsed = time - start;
-          warp?.draw((elapsed - 650) / 1450, Math.min(1, (elapsed - 650) / 250, (2400 - elapsed) / 350));
-          if (elapsed < 2400) flightFrame = requestAnimationFrame(fly);
+          const warpStart = 1050, reveal = 1980, arrival = 3100;
+          if (elapsed >= warpStart) {
+            warp?.draw((elapsed - warpStart) / (arrival - warpStart),
+              Math.min(1, (elapsed - warpStart) / 340, (arrival - elapsed) / (arrival - reveal)));
+          }
+          if (elapsed >= reveal) screen.dataset.approaching = '';
+          if (elapsed < arrival) flightFrame = requestAnimationFrame(fly);
         };
         flightFrame = requestAnimationFrame(fly);
       }
@@ -748,7 +747,7 @@ export function mountOnboarding(host, {
         warp?.dispose();
         warp = null;
         enter('arrival', {focus});
-      }, motion.matches ? 0 : 2450);
+      }, motion.matches ? 0 : 3150);
     } else if (next === 'example-choice') showBirthLesson(focus);
     else if (next === 'focus') showFocusQuestion(focus, answer);
     else if (next === 'explain') explain(focus);
@@ -787,6 +786,10 @@ export function mountOnboarding(host, {
       return;
     }
     const action = button?.dataset.birth;
+    if (action === 'music') {
+      void music?.toggle().then(playing => musicButton.setAttribute('aria-pressed', String(playing)));
+      return;
+    }
     const choice = button?.dataset.choice;
     if (step === 'map' && button && !saving) {
       if (button.hasAttribute('data-birth-map-branch')) {
@@ -870,6 +873,6 @@ export function mountOnboarding(host, {
   return {dispose() {
     clearTimeout(timer); clearTimeout(formingTimer); events.abort();
     cancelAnimationFrame(flightFrame); warp?.dispose();
-    sky?.dispose(); disposeOrigin?.();
+    sky?.dispose(); disposeOrigin?.(); music?.dispose();
   }};
 }

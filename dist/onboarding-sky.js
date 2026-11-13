@@ -4,7 +4,7 @@ export const BANG_DURATION = 5000;
 export const GATHER_DURATION = 3600;
 export const IGNITION_DURATION = 3200;
 const BEAT_DURATION = 800;
-export const SPHERE_FORMATION_AT = 3630;
+export const SPHERE_FORMATION_AT = 3080;
 const clamp = value => Math.max(0, Math.min(1, value));
 const mix = (a, b, t) => a + (b - a) * t;
 const smooth = value => {
@@ -171,9 +171,9 @@ export function startBirthSky(canvas, origin, motion) {
 
     if (((gatheringLight || still) && !motion.matches) || expanding) {
       const gathering = stage === 'gather' ? smooth((time - entered) / GATHER_DURATION) : 1;
-      const settling = still ? smooth(elapsed / .38) : 0;
+      const settling = still ? smooth(elapsed / .48) : 0;
       const contraction = expanding ? 0 : 1 - settling;
-      const outgoing = smooth((burst - .11) / .40);
+      const outgoing = 1 - (1 - clamp((burst - .11) / .34)) ** 2.5;
       const flare = Math.sin(Math.PI * outgoing) * (1 - convergence);
       const tailProgress = smooth((burst - .55) / .39);
       const ignition = igniting ? clamp((time - entered) / IGNITION_DURATION) : Number(still);
@@ -188,14 +188,14 @@ export function startBirthSky(canvas, origin, motion) {
           beatEnvelope(phase, .015, .16, .35) + .6 * beatEnvelope(phase, .26, .42, .64)
         );
         const breathing = 1 + pulse * (.36 + particle.depth * .27);
-        const start = expanding ? scale * particle.radius * .38 * speed
+        const start = expanding ? scale * particle.radius * .61 * speed * outgoing
           : scale * particle.radius * .36 * (1 - gathering * .74) * contraction * breathing;
-        const finish = 0;
+        const finish = expanding ? sphereRadius * (.38 + particle.radius * .46) : 0;
         const angle = particle.angle + gathering * .8 + ignition * (.24 + particle.depth * .14) + outgoing * .4;
         const curl = .62 + particle.depth * .85;
         const sweep = angle + curl * convergence;
         const distance = mix(start, finish, convergence);
-        const stretch = mix(.77, .48, convergence);
+        const stretch = mix(.77, .89, convergence);
         const x = cx + Math.cos(sweep) * distance;
         const y = cy + Math.sin(sweep) * distance * stretch;
         const life = expanding
@@ -240,26 +240,26 @@ export function startBirthSky(canvas, origin, motion) {
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    if (expanding && burst > .72 && burst < .96) {
+    if (expanding && burst > .115 && burst < .48) {
       const reach = Math.hypot(Math.max(cx, width - cx), Math.max(cy, height - cy));
-      const wave = clamp((burst - .72) / .24);
-      const radius = Math.min(reach, sphereRadius * 2) * (.22 + wave * .78);
+      const wave = clamp((burst - .115) / .365);
+      const radius = Math.min(reach, scale * .74) * (.02 + wave * .98);
       ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = (1 - wave ** 1.55) * .97;
+      ctx.globalAlpha = smooth(wave / .08) * (1 - wave) * .76;
       glow(ctx, cx, cy, radius + 1, [
         [0, '#0000'], [.59, '#0000'], [.79, '#664fd633'], [.9, '#a976ff96'],
         [.948, '#e3cfffb8'], [.968, '#fff8eedd'], [.985, '#9ae5ff94'], [1, '#0000']
       ]);
-      const echo = smooth((burst - .76) / .20);
+      const echo = smooth((burst - .18) / .30);
       if (echo > 0 && echo < 1) {
         ctx.globalAlpha = .42 * (1 - echo);
         glow(ctx, cx, cy, radius * .75, [
           [0, '#0000'], [.75, '#0000'], [.91, '#9261d98c'], [.96, '#f6d4ffbd'], [1, '#0000']
         ]);
       }
-      const flash = smooth((burst - .72) / .038) * (1 - smooth((burst - .76) / .10));
-      ctx.globalAlpha = flash * .96;
-      glow(ctx, cx, cy, sphereRadius * (.40 + wave * .36), [
+      const flash = smooth((burst - .115) / .028) * (1 - smooth((burst - .143) / .095));
+      ctx.globalAlpha = flash * .69;
+      glow(ctx, cx, cy, sphereRadius * (.21 + wave * .77), [
         [0, '#fff6e7'], [.05, '#fff7e6'], [.14, '#eab5ffdf'], [.34, '#9a72f786'],
         [.64, '#679dff25'], [1, '#0000']
       ]);
