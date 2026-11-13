@@ -41,12 +41,11 @@ function extraRecordFields(metrics=[],amounts=[]){
 export function taskLevelFields(a,name='task-level'){const selected=taskLevel(a),options=[{value:'rest',title:'毎日取り組む',days:['rest','busy','full']},{value:'busy',title:'忙しい日も取り組む',days:['busy','full']},{value:'full',title:'余裕がある日だけ',days:['full']}];return `<fieldset class="task-schedule-config"><legend>どんな日に取り組みますか？</legend><p class="task-setting-caption">1つ選ぶと、対象の日が自動で決まります。</p><div class="task-schedule-options">${options.map(o=>`<label class="task-schedule-option"><input type="radio" required name="${esc(name)}" value="${o.value}" ${selected===o.value?'checked':''}><span class="task-schedule-copy"><strong>${o.title}</strong><span class="task-day-tags">${o.days.map(d=>`<span>${MODES[d].icon} ${MODES[d].label}</span>`).join('')}</span></span><span class="task-schedule-check" aria-hidden="true">✓</span></label>`).join('')}</div><p class="task-fixed-note">どの日も、設定した量は同じです。</p></fieldset>`}
 export function taskSettingsFields(s,id){
  const action=setting(s,id),event=isEventTask(action),m=timeMeasurement(action.measurement||{unit:'minutes'});
- return `<label>タスクの形式<select name="task-format"><option value="routine" ${event?'':'selected'}>繰り返すタスク</option><option value="event" ${event?'selected':''}>一度きりのイベント</option></select></label>
- <fieldset data-routine-fields ${event?'hidden disabled':''}>${quantitySettingsFields(m)}${taskLevelFields(action)}</fieldset>
- <fieldset data-event-fields ${event?'':'hidden disabled'}>
+ return `${event?`
+  <input type="hidden" name="task-format" value="event">
   <label>イベントの日付（任意）<input type="date" name="event-date" value="${esc(action.eventDate||'')}"></label>
   ${minuteInput('イベントに取り組む時間','event-minutes',m.dailyAmount)}
- </fieldset>
+ `:`${quantitySettingsFields(m)}${taskLevelFields(action)}`}
  <section class="task-extra-config">
   <h3>追加の記録（任意）</h3><p>ページ数、単語数、回数など、必要な単位を追加できます。</p>
   <div data-extra-list>${(m.extras||[]).filter(metric=>metric.dailyAmount!=null||metric.weeklyTarget!=null||metric.monthlyTarget!=null).map(metric=>extraMetricFields(metric,event)).join('')}</div>
@@ -147,37 +146,70 @@ function recentActivity(summary, events, start, end, today) {
  </section>`;
 }
 
-function activityChart(summary,start,end,today,monthly){
- const timeByDay=summary.groups.find(group=>group.dimension==='time')?.byDate||{};
- const peak=Math.max(0,...Object.values(timeByDay));
- const step=peak>0?10**Math.floor(Math.log10(peak/4)):1;
- const interval=Math.max(step,Math.ceil(peak/(4*step))*step);
- const ceiling=interval*4;
- const days=[];
- for(let date=start;date<=end;date=shiftDate(date,1)){
-  const day=Number(date.slice(8));
-  const future=date>today;
-  const time=timeByDay[date]||0;
-  const label=`${Number(date.slice(5,7))}月${day}日 · ${future?'これから':hoursText(time)}`;
-  const tick=monthly?(day===1||day%5===0?String(day):''):String(day);
-  days.push({date,label,time,tick,future});
+const analysisColors=['#c5a9ff','#7cb8ed','#77d9ba','#e6b37f','#e7a0c1','#8e88df'];
+
+export function analysisChart(state,{start,end,scope}){
+ const summary=quantitySummary(state,start,end,scope,false);
+ const groups=new Map();
+ function addTime({id,name,goalIds,goalPath,value}){
+  const index=(scope==='all'?0:goalIds.indexOf(scope))+1;
+  const groupId=goalIds[index]||id;
+  const label=state.nodes.find(node=>node.id===groupId)?.name||goalPath[index]||name;
+  const group=groups.get(groupId)||{label,value:0};
+  group.value+=value;
+  groups.set(groupId,group);
  }
- const initial=days.filter(day=>!day.future&&day.time>0).at(-1)||days.find(day=>day.date===today)||days.at(-1);
- return `<section class="activity-chart" aria-labelledby="activity-chart-title">
-  <header><h2 id="activity-chart-title">日ごとの活動時間</h2><output aria-live="polite">${peak?initial.label:'この期間は時間の記録がありません'}</output></header>
-  <div class="activity-chart-grid">
-   <div class="activity-chart-axis" aria-hidden="true">${[4,3,2,1,0].map(value=>`<span>${numberText(interval*value)}</span>`).join('')}</div>
-   <div class="activity-chart-plot" role="group" aria-label="日別の活動時間（時間）" style="--days:${days.length}">
-    ${days.map(day=>`<button type="button" class="activity-chart-day" data-chart-date="${day.date}"
-     aria-label="${day.label}" aria-pressed="${peak>0&&day===initial}" ${day.future?'disabled':''}>
-     <i aria-hidden="true" style="--bar-height:${day.time/ceiling*100}%"></i><span aria-hidden="true">${day.tick}</span>
-    </button>`).join('')}
+ for(const entry of summary.entries){
+  if(entry.dimension==='time'&&entry.value>0)addTime(entry);
+ }
+ for(const [date,logs] of Object.entries(state.logs)){
+  if(date<start||date>end)continue;
+  for(const [id,log] of Object.entries(logs)){
+   if(!log.eventCompleted||!log.eventMinutes)continue;
+   const ids=log.goalIds||goalIds(state,id);
+   if(scope==='all'||ids.includes(scope)){
+    addTime({id,name:log.name,goalIds:ids,goalPath:log.goalPath||ancestry(state,id),value:log.eventMinutes/60});
+   }
+  }
+ }
+ const sorted=[...groups.values()].sort((a,b)=>b.value-a.value);
+ const total=sorted.reduce((sum,group)=>sum+group.value,0);
+ const segments=sorted.slice(0,analysisColors.length);
+ if(sorted.length>analysisColors.length){
+  segments.splice(analysisColors.length-1,1,{
+   label:'その他',value:sorted.slice(analysisColors.length-1).reduce((sum,group)=>sum+group.value,0)
+  });
+ }
+ let offset=0;
+ const slices=segments.map(({label,value},index)=>{
+  const percent=value/total*100;
+  const color=analysisColors[index];
+  const stop=`${color} ${offset}% ${Math.min(100,offset+percent)}%`;
+  offset+=percent;
+  return {label,value,percent,color,stop};
+ });
+ const dateLabel=date=>date.split('-').map(Number).join('/');
+ const additional=summary.groups.filter(group=>group.dimension!=='time'&&group.total>0);
+ return `<section class="activity-chart analysis-chart" aria-labelledby="analysis-chart-title">
+  <header><h2 id="analysis-chart-title">活動時間の内訳</h2><span>${dateLabel(start)} 〜 ${dateLabel(end)}</span></header>
+  ${slices.length?`<div class="analysis-chart-content">
+   <div class="analysis-chart-ring" aria-label="合計 ${hoursText(total)}" role="img"
+    style="--chart-stops:${slices.map(slice=>slice.stop).join(',')}">
+    <strong>${hoursNumber(total)}<small>時間</small></strong>
    </div>
-  </div>
+   <ul>${slices.map(({label,value,percent,color})=>`<li>
+    <i aria-hidden="true" style="background:${color}"></i><span>${esc(label)}</span>
+    <span>${hoursText(value)}</span><strong>${numberText(Math.round(percent*10)/10)}%</strong>
+   </li>`).join('')}</ul>
+  </div>`:'<p class="analysis-empty">この期間には活動時間の記録がありません。</p>'}
+  ${additional.length?`<div class="period-extra-totals">${additional.map(group=>`<span>${numberText(group.total)}${esc(group.unit)}</span>`).join('')}</div>`:''}
+  ${sorted.length>analysisColors.length?`<details class="period-details">
+   <summary>すべての項目の内訳</summary><ul>${sorted.map(({label,value})=>`<li>${esc(label)} · ${hoursText(value)}</li>`).join('')}</ul>
+  </details>`:''}
  </section>`;
 }
 
-export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=false,chart=false}){
+export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=false}){
  const monthly=Boolean(month),period=quarter?'3か月':monthly?'月':'週';
  const targetLabel=quarter?'月間目標の合計':monthly?'月間目標':'週間目標';
  const firstMonth=quarter?monthOffset(month,-2):month;
@@ -221,7 +253,6 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=fal
  return `<section class="weekly-record" aria-label="${period}の記録">
   <header class="weekly-period">${readOnly?'':'<button class="week-arrow" data-quantity-period="-1" aria-label="前の期間">‹</button>'}<div><span>${start.slice(0,4)}年 · ${quarter?'3か月':'期間'}</span><h1>${monthly&&!quarter?Number(month.slice(5))+'月':`${short(start)} <i>—</i> ${short(end)}`}</h1></div>${readOnly?'':`<button class="week-arrow" data-quantity-period="1" aria-label="次の期間" ${isCurrent?'disabled':''}>›</button>`}</header>
   ${readOnly?'':`<div class="weekly-filter-row"><button class="weekly-goal-filter" data-do="choose-stats-goal"><span>表示する範囲</span><strong>${esc(goal?.name||'宇宙')}</strong><i>⌄</i></button>${!isCurrent?'<button class="text-button" data-reset-period>現在の期間へ</button>':''}</div>`}
-  ${chart?activityChart(summary,start,end,today,monthly):''}
   <section class="weekly-total-block period-overview" aria-label="目標の達成率">
    <h2>取り組んだ時間</h2>
    <div class="weekly-total-values"><div><strong>${hoursNumber(time)}</strong><span>時間</span></div></div>
@@ -233,7 +264,7 @@ export function weeklyPanel(s,{week,scope,today,month,quarter=false,readOnly=fal
     ${quarter?'<p>月ごとの記録から確認できる月間目標を合算しています。</p>':''}
    </div>
   </section>
-  ${chart?'':recentActivity(summary,events,start,end,today)}
+  ${recentActivity(summary,events,start,end,today)}
   <p class="weekly-source-note">期間中の記録をもとに自動で更新されます。</p>
   <details class="period-details" ${sections.length||events.length?'':'open'}>
    <summary>タスク別の内訳</summary>
