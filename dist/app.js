@@ -31,8 +31,8 @@ let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null
 let guideSession=null,guideTimer,mapPreviewReturn=null,onboardingResume=null;
 let mapSelection=null,mapEditing=false;
 function save(){if(guideSession||mapPreviewReturn||(guest&&!demoMode))return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
-const icon=(name)=>({home:'⌂',tree:'✧',calendar:'▦',stats:'◴',settings:'⚙'}[name]);
-const names={tree:'ホーム',stats:'統計'};
+const icon=name=>({tree:'✧',stats:'◴',projects:'☄',catchup:'↗'}[name]);
+const names={tree:'ホーム',stats:'統計',projects:'プロジェクト',catchup:'遅れを取り戻す'};
 const appAudio=createBirthMusic();
 let appAudioOn=false,appAudioChanging=false;
 function syncAudioButton(){
@@ -73,7 +73,7 @@ function render(){clearTimeout(guideTimer);
  document.body.classList.toggle('birth-active',Boolean(birthActive));
  if(birthActive){if(appAudioOn&&!appAudioChanging)void toggleAppAudio();if(treeScene){treeScene.dispose();treeScene=null}if(!onboardingScene)showOnboarding();return}
  if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){today=latest;selected=today;applyPending(state,today);save()}
- const page=view==='stats'?statsPage():guideSession?treePage():mindMapPage();
+ const page=guideSession?treePage():{tree:mindMapPage,stats:statsPage,projects:projectsPage,catchup:catchupPage}[view]();
  $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();bindAnalysisSlides();scheduleGuide();maybeAskReminderSetup()}
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
 function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n.id];return `<div class="action-row ${done?'done':''}"><button class="check ${done?'checked':''}" data-check="${esc(n.id)}" data-date="${key}" aria-label="${esc(n.name)}の実行記録" aria-pressed="${done}">${done?'✓':''}</button><div class="action-copy"><strong>${esc(n.name)}</strong><small>${esc(ancestry(state,n.id).slice(1,-1).join(' / ')||'自分の宇宙')}</small></div><span class="priority p${a.priority}">${['高','中','低'][a.priority]}</span><button class="edit-action" data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">⋯</button></div>`}
@@ -590,17 +590,16 @@ function paceWarningText(warning){
  const needed=numberText(Math.ceil(warning.needed*1000)/1000);
  return `${horizon}残り${warning.days}日 · 1日${needed}${esc(warning.unit)}が必要（予定 ${numberText(warning.daily)}${esc(warning.unit)}）`;
 }
-function paceWarningsPanel(){
+function catchupPage(){
  const warnings=taskPaceWarnings(state,today);
- if(!warnings.size)return '';
- return `<details class="home-pace-warnings">
-  <summary>このタスクが遅れています <span>${warnings.size}件</span></summary>
-  <p>確定した実績から計算します。</p>
-  <ul>${[...warnings].map(([id,warning])=>`<li>
-   <button type="button" data-record-leaf="${esc(id)}"><strong>${esc(state.nodes.find(node=>node.id===id).name)}</strong>
-    <small>${paceWarningText(warning)}</small></button>
-  </li>`).join('')}</ul>
- </details>`;
+ return `<section class="tab-page" aria-labelledby="catchup-title">
+  <h1 id="catchup-title">遅れを取り戻す</h1>
+  ${warnings.size?`<h2>このタスクが遅れています <span>${warnings.size}件</span></h2>
+   <ul class="journey-list">${[...warnings].map(([id,warning])=>`<li>
+    <button type="button" data-record-leaf="${esc(id)}"><strong>${esc(state.nodes.find(node=>node.id===id).name)}</strong>
+     <small>${paceWarningText(warning)}</small></button>
+   </li>`).join('')}</ul>`:'<p class="muted">今のところ、遅れの警告はありません。</p>'}
+ </section>`;
 }
 function mindMapPage(){
  const plan=state.records[today];
@@ -631,10 +630,8 @@ function mindMapPage(){
     `<h2>今日、残りの時間はどのペースでいけそう？</h2>
      <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button type="button" data-mode="${key}" data-date="${today}">${MODES[key].label}</button>`).join('')}</div>`}
   </section>
-  <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1>
-   <button type="button" class="journey-entry" data-do="journeys"><span aria-hidden="true">☄</span> 旅に出る</button>
-  </header>
-  ${paceWarningsPanel()}
+  <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1></header>
+  ${taskPaceWarnings(state,today).size?`<button class="text-button pace-shortcut" data-view="catchup">このタスクが遅れています →</button>`:''}
   <div class="mind-map-scroll">${personalMap()}</div>
   <footer class="mind-map-footer">${mapActions()}</footer>
  </section>`;
@@ -800,7 +797,7 @@ function handleMapImport(form,action){
   error.scrollIntoView({block:'nearest'});
  }
 }
-function journeys(){
+function projectsPage(){
  const events=state.nodes.filter(node=>nodeKind(state,node.id)==='action'&&isEventTask(setting(state,node.id)));
  const planned=[],history=[];
  for(const node of events){
@@ -812,28 +809,36 @@ function journeys(){
  const list=(items,empty)=>items.length
   ?`<ul class="journey-list">${items.map(({node,date})=>`<li><button type="button" data-journey-event="${esc(node.id)}"><strong>${esc(node.name)}</strong><span>${esc(date||'日付未定')} ›</span></button></li>`).join('')}</ul>`
   :`<p class="muted">${empty}</p>`;
- modal(`<div class="dialog-title"><h2>旅に出る</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
-  <button type="button" class="primary" data-do="new-journey">＋ 旅を計画する</button>
-  <div class="journey-sections"><section><h3>これからの旅</h3>${list(planned,'予定はありません。')}</section>
-  <section><h3>旅の履歴</h3>${list(history,'完了した旅がここに残ります。')}</section></div>`);
+ return `<section class="tab-page" aria-labelledby="projects-title">
+  <header><h1 id="projects-title">プロジェクト</h1>
+   <button type="button" class="primary" data-do="new-journey">＋ プロジェクトを追加</button></header>
+  <div class="journey-sections"><section><h2>これからのプロジェクト</h2>${list(planned,'予定はありません。')}</section>
+  <section><h2>完了したプロジェクト</h2>${list(history,'完了したプロジェクトがここに残ります。')}</section></div>
+ </section>`;
+}
+function journeys(){
+ close();
+ view='projects';
+ if(location.hash!=='#projects')location.hash='projects';
+ render();
 }
 function journeyForm(){
  const selected=selectedMapNode();
  const parentId=nodeKind(state,selected.id)==='goal'&&canPlace(state,'new',selected.id)?selected.id:selected.parentId;
  const options=state.nodes.filter(node=>nodeKind(state,node.id)==='goal'&&canPlace(state,'new',node.id));
  modal(`<form id="journey-form">
-  <div class="dialog-title"><h2>旅を計画する</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
-  <label>旅の名前<input name="name" required maxlength="80" placeholder="例：ハッカソンに参加する"></label>
-  <label>旅の目的<textarea name="description" required maxlength="1000" rows="2"></textarea></label>
+  <div class="dialog-title"><h2>プロジェクトを追加</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <label>プロジェクト名<input name="name" required maxlength="80" placeholder="例：ハッカソンに参加する"></label>
+  <label>プロジェクトの目的<textarea name="description" required maxlength="1000" rows="2"></textarea></label>
   <label>繋がっている上位目標<select name="parent" required>${options.map(node=>`<option value="${esc(node.id)}" ${node.id===parentId?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
   <label>日付（任意）<input name="event-date" type="date"></label>
   <label>取り組む予定の時間（分）<input name="event-minutes" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" required></label>
-  <div class="dialog-actions"><button type="button" class="text-button" data-do="journeys">‹ 旅の一覧</button><button type="submit" class="primary">旅を保存</button></div>
+  <div class="dialog-actions"><button type="button" class="text-button" data-do="journeys">‹ プロジェクト一覧</button><button type="submit" class="primary">保存する</button></div>
  </form>`);
 }
 function openJourneyEvent(id){
  modal(eventPanel(state,id,today,today));
- $('#dialog').insertAdjacentHTML('afterbegin','<button type="button" class="text-button journey-back" data-do="journeys">‹ 旅の一覧</button>');
+ $('#dialog').insertAdjacentHTML('afterbegin','<button type="button" class="text-button journey-back" data-do="journeys">‹ プロジェクト一覧</button>');
  const form=$('#event-form');
  if(form)form.dataset.journey='true';
 }
@@ -1385,9 +1390,8 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
     measurement:{unit:'minutes',dailyAmount:Number(data.get('event-minutes'))}});
    const points=earnEnergy('edit',today);
    if(!save()){state=previous;return}
-   render();
    journeys();
-   energyToast('旅を保存しました',points);
+   energyToast('プロジェクトを追加しました',points);
   }catch(error){state=previous;toast(error.message)}
   return;
  }
@@ -1402,7 +1406,7 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
   if(!fromJourney)close();
   render();
   if(fromJourney)journeys();
-  energyToast(fromJourney?'旅を完了しました':'イベントの完了を記録しました',points);
+  energyToast(fromJourney?'プロジェクトを完了しました':'イベントの完了を記録しました',points);
  }catch(error){state=previous;toast(error.message)}
 }if(e.target.id==='quantity-form'){
  const data=new FormData(e.target),previous=structuredClone(state);
@@ -1447,7 +1451,7 @@ document.addEventListener('change',async e=>{if(e.target.name==='print-scope'&&e
 function bindTree(){const host=$('.universe-stage');if(!host)return;try{treeScene=createUniverse(host,{nodes:state.nodes,auraStrength:universeGrowth(state,today).strength,current:showUniverseOrigin()?UNIVERSE_ORIGIN:currentSpace().id,onSelect:id=>{if(!guideSession)openNode(id)},onZoom:value=>{const label=$('[data-zoom-label]');if(label)label.textContent=value+'%'}})}catch(error){if(showUniverseOrigin()){host.innerHTML=`<button class="universe-origin-fallback" style="--fallback-growth:${universeGrowth(state,today).strength}" data-space-enter="${esc(currentSpace().id)}" aria-label="宇宙に入る"></button>`;return}host.innerHTML=`<div class="universe-fallback"><p>この端末では、目標一覧で宇宙を探索できます。</p>${visibleChildren(state,currentSpace().id).map(n=>`<button data-space-enter="${esc(n.id)}">✧ ${esc(n.name)} →</button>`).join('')}</div>`}}
 function applyLabelVisibility(){}
 $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}});
-window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar'||(h==='stats'&&view!=='stats'))statsTab='calendar';if(names[h]&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(names[location.hash.slice(1)])view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
+window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar'||(h==='stats'&&view!=='stats'))statsTab='calendar';if(Object.hasOwn(names,h)&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(Object.hasOwn(names,location.hash.slice(1)))view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
 else if(!onboardingPreview&&!storageLocked&&!needsLegacyImport&&state.universe?.firstSteps)startGuide();
 if(authReturn&&guestHandoff?.step==='login'&&guestHandoff.map&&!storageLocked){
  try{

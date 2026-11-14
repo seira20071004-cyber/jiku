@@ -729,11 +729,6 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 #dialog .task-extra-config { margin:12px 0 0; padding:0; border:0; }
 #dialog [data-extra-list]:not(:empty) { margin-top:10px; }
 .mind-map-header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.journey-entry {
- flex:none; min-height:36px; padding:5px 11px; border:1px solid #75628d;
- border-radius:20px; background:#1c1b30; color:#eadcf9; font-size:12px;
-}
-.journey-entry span { color:#bd9fee; margin-right:3px; }
 .journey-sections { display:grid; gap:14px; margin-top:14px; }
 .journey-list { list-style:none; margin:0; padding:0; }
 .journey-list button {
@@ -820,17 +815,6 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
  }
 }
 
-.home-pace-warnings {
- flex:none; margin:6px 0; padding:6px 10px; border:1px solid #d49a664f;
- border-radius:10px; color:#ffe0b9; background:#2a202e;
-}
-.home-pace-warnings summary { min-height:28px; padding-block:5px; cursor:pointer; font-size:12px; }
-.home-pace-warnings summary span { color:#e4b48c; margin-inline-start:5px; }
-.home-pace-warnings p { margin:2px 0 4px; color:#e2c8bc; font-size:11px; }
-.home-pace-warnings ul { max-height:22dvh; overflow:auto; list-style:none; margin:0; padding:0; }
-.home-pace-warnings li + li { border-top:1px solid #d49a6633; }
-.home-pace-warnings button { width:100%; min-height:42px; padding:5px 1px; color:inherit; text-align:start; }
-.home-pace-warnings button small { display:block; }
 .evening-actions { display:flex; flex-wrap:wrap; gap:8px; }
 .mind-map-mode .evening-actions button { flex:0 1 auto; min-height:38px; padding:5px 14px; }
 .evening-actions button:first-child { background:#49356a; color:#fff0ff; }
@@ -843,3 +827,14 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 .morning-task button { display:flex; justify-content:space-between; align-items:center; gap:12px; text-align:left; }
 .morning-task button small { color:#c9b7e3; }
 #reminder-form input[type="time"] { min-height:44px; color-scheme:dark; }
+
+.bottom-nav { grid-template-columns:repeat(4,minmax(0,110px)); gap:clamp(4px,3vw,24px); padding-inline:10px; }
+.bottom-nav .nav { min-width:0; }
+.bottom-nav .nav>strong { white-space:nowrap; letter-spacing:0; }
+.tab-page { width:min(100%,740px); margin-inline:auto; padding:clamp(12px,4vw,32px); }
+.tab-page header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; }
+.tab-page h1 { font-size:clamp(24px,5vw,34px); }
+.tab-page h2 { font-size:16px; }
+.tab-page .journey-list button:has(small) { display:grid; text-align:left; gap:5px; }
+.tab-page .journey-list small { color:#c1a9a8; }
+.pace-shortcut { color:#f1aaa5; align-self:flex-start; }
