@@ -6,9 +6,9 @@ import {createBirthMusic} from './birth-music.js';
 import {MODES, modesForLevel} from './model.js';
 
 const guestDraftKey = 'jiku:pending-universe';
-export function starArt(days = 0) {
-  return `<div class="home-planet" style="--star-light:${.28 + .62 * (1 - Math.exp(-days / 18))}" aria-hidden="true">
-    <div class="planet-globe system-star"></div>
+export function planetArt(days = 0) {
+  return `<div class="home-planet" style="--planet-light:${days ? .36 + .64 * (1 - Math.exp(-days / 18)) : .10}" aria-hidden="true">
+    <div class="planet-globe"><i class="planet-beacon"></i></div>
   </div>`;
 }
 const opening = {
@@ -180,11 +180,7 @@ export function mountOnboarding(host, {
       <div class="birth-sky" aria-hidden="true">
         <div class="birth-haze"></div><canvas class="birth-stars"></canvas><div class="birth-light"></div>
         <div class="birth-origin"><i class="birth-orb-fallback" aria-hidden="true"></i></div>
-        <div class="birth-landing-planet birth-landing-system" aria-hidden="true">
-          <i class="system-orbit"></i><i class="system-orbit"></i>
-          ${starArt()}
-          <i class="system-body"></i><i class="system-body"></i>
-        </div>
+        <div class="birth-landing-planet">${planetArt()}</div>
       </div>
       <header class="birth-header">
         <span class="birth-wordmark">Jiku<span>●</span></span>
@@ -471,7 +467,7 @@ export function mountOnboarding(host, {
       </ul></details>` : ''}
       <div class="map-subview" id="birth-personal-detail" hidden></div>
       <div class="birth-node-editor" hidden></div>
-      <button class="birth-primary" type="button" data-birth="generate">自分の恒星系へ向かう <span aria-hidden="true">→</span></button>
+      <button class="birth-primary" type="button" data-birth="generate">自分の星へ向かう <span aria-hidden="true">→</span></button>
     </div>`;
     renderPersonalBranch();
   }
@@ -655,7 +651,7 @@ export function mountOnboarding(host, {
       renderArrival();
     };
     showSequence([
-      ['あなたの恒星系にたどり着きました。', 'birth-emphasis'],
+      ['あなたの星にたどり着きました。', 'birth-emphasis'],
       ['ここには、目標に向かって進んだ記録を残せます。', 'birth-emphasis'],
       ['JIKUには、\n休む日・忙しい日・余裕がある日の3つのモードがあります。', 'birth-reply'],
       ['タスクごとに量とモードを設定しておけば、\nその日のペースを選ぶだけで、\n取り組んだ量を記録できます。', 'birth-reply']
@@ -697,7 +693,7 @@ export function mountOnboarding(host, {
       </div>
       <p class="birth-map-caption birth-report-caption" aria-live="polite"></p>
       <div class="birth-report-body view-stats"><div class="statistics-content"></div></div>
-      <button class="birth-primary" type="button" data-birth="show-closing">自分の恒星系に戻る →</button>
+      <button class="birth-primary" type="button" data-birth="show-closing">自分の星に戻る →</button>
     </div>`;
     updateReport(reportPeriod);
   }
@@ -751,7 +747,7 @@ export function mountOnboarding(host, {
       persist();
     }
     if (next === 'login') {
-      showQuestion('自分の恒星系を保存しましょう。', focus);
+      showQuestion('自分の星を保存しましょう。', focus);
       controls.innerHTML = `<div class="birth-example">
         ${preview ? '<button class="birth-primary" type="button" data-birth="preview-login">ログイン後の画面へ →</button>'
           : '<a class="birth-primary" href="/api/auth/google?onboarding=1">Googleでログイン →</a>'}
@@ -779,11 +775,11 @@ export function mountOnboarding(host, {
     if (next === 'departure') {
       showSequence([
         ['ありがとうございます。\nあなた自身の目標が、少しずつ形になりましたね。', 'birth-reply'],
-        ['では、あなたの恒星系へ向かいましょう。', 'birth-emphasis']
+        ['では、あなたの星へ向かいましょう。', 'birth-emphasis']
       ], shouldFocus => enter('travel', {focus: shouldFocus}), focus);
     } else if (next === 'travel') {
       retireTurn();
-      const travelCopy = message('p', 'あなたの恒星系へ向かいます。', 'birth-prompt');
+      const travelCopy = message('p', 'あなたの星へ向かいます。', 'birth-prompt');
       intro.append(travelCopy);
       if (!motion.matches) {
         warp = createPortalWarp(true);
