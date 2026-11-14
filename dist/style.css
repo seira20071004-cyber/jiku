@@ -774,25 +774,21 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 [data-import-preview] small { display:block; margin:3px 0; color:#d2c2e7; }
 #map-import-form [hidden] { display:none; }
 
-#jiku-print-output { display:none; }
-.map-print-preview {
- max-height:42dvh; overflow:auto; padding:clamp(12px,4vw,22px); border-radius:8px;
- background:#fff; color:#191924;
-}
-.map-print-document { max-width:100%; overflow-wrap:anywhere; }
-.map-print-document header { border-bottom:1px solid #8b8497; margin-bottom:12px; padding-bottom:9px; break-inside:avoid; }
-.map-print-document header time { margin-inline-start:8px; white-space:nowrap; }
-.map-print-document header h1 { font-size:1.5em; margin:6px 0; }
-.map-print-document p { line-height:1.45; margin:3px 0; white-space:pre-wrap; }
-.map-print-document ul { list-style:none; margin:0; padding-inline-start:12px; }
-.map-print-document .map-print-tree { padding:0; }
-.map-print-node { border-inline-start:1px solid #8b8497; margin:0 0 8px; padding:2px 0 2px 8px; break-inside:avoid; }
-.map-print-kind { color:#514760; font-size:.8em; padding-inline-end:6px; white-space:nowrap; }
-.map-print-details { color:#3f364a; font-size:.87em; }
+#jiku-print-output { position:fixed; top:0; left:-200vw; width:182mm; pointer-events:none; }
+.map-print-preview { max-height:52dvh; overflow:auto; padding:4px; border-radius:10px; }
+.map-print-document { overflow-wrap:anywhere; }
+.map-print-branches { display:grid; gap:10px; }
+.map-print-document .map-branch-row small { margin-top:3px; }
 @media print {
  @page { size:A4; margin:14mm; }
  html,body { height:auto !important; overflow:visible !important; background:#fff !important; color:#171720; }
  body:has(> #jiku-print-output) > :not(#jiku-print-output) { display:none !important; }
- body:has(> #jiku-print-output) { font-size:11pt; }
- #jiku-print-output { display:block; }
+ #jiku-print-output {
+  position:static; width:auto; print-color-adjust:exact; -webkit-print-color-adjust:exact;
+ }
+ .map-print-document .map-diagram { break-inside:avoid; }
+ .map-print-branches { display:block; }
+ .map-print-document .map-galaxy-view { margin-top:10px; }
+ .map-print-document .map-branch-header { break-after:avoid; }
+ .map-print-document .map-node { break-inside:avoid; }
 }

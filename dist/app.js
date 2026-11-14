@@ -559,24 +559,28 @@ function personalMap({selection=mapSelection,preview=false,addition=null}={}){
   tone:index%4,card:card(node,1,'',true)
  })),{radial:true,label:'マインドマップ全体'});
  if(!branchRoot)return overview+`<div id="${branchId}" hidden></div>`;
- function branch(node,depth){
-  if(node.insertion)return `<li>${card(node,depth,'map-branch-row')}</li>`;
+ return overview+mapBranchPanel(branchRoot,{childrenFor,card,branchId,tone});
+}
+function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
+ function branch(node,level){
+  if(node.insertion)return `<li>${card(node,level,'map-branch-row')}</li>`;
   const children=childrenFor(node.id);
   const kind=nodeKind(state,node.id)==='action'?'task':'goal';
   return `<li class="map-branch-${kind}">
-   ${card(node,depth,'map-branch-row')}
-   ${children.length?`<ul>${children.map(child=>branch(child,depth+1)).join('')}</ul>`:''}
+   ${card(node,level,'map-branch-row')}
+   ${children.length?`<ul>${children.map(child=>branch(child,level+1)).join('')}</ul>`:''}
   </li>`;
  }
- const children=childrenFor(branchRoot.id);
+ const children=childrenFor(root.id);
  const lanes=children.length>1?[children.filter((_,i)=>i%2===0),children.filter((_,i)=>i%2===1)]:[children];
- return `${overview}<section id="${branchId}" class="map-subview map-galaxy-view" aria-labelledby="${branchId}-name" data-map-tone="${tone}">
-  <header class="map-branch-header"><span aria-hidden="true">◉</span><h2 id="${branchId}-name">${esc(branchRoot.name)}</h2></header>
+ return `<section id="${branchId}" class="map-subview map-galaxy-view" aria-labelledby="${branchId}-name" data-map-tone="${tone}">
+  <header class="map-branch-header"><span aria-hidden="true">${hierarchyMarks[Math.min(depth,4)]}</span><h2 id="${branchId}-name">${esc(root.name)}</h2></header>
   ${children.length?`<div class="map-galaxy-tree ${lanes.length===1?'single-lane':''}">${lanes.map(nodes=>
-   `<ul class="map-branch-lane">${nodes.map(node=>branch(node,2)).join('')}</ul>`).join('')}</div>`:
+   `<ul class="map-branch-lane">${nodes.map(node=>branch(node,depth+1)).join('')}</ul>`).join('')}</div>`:
    '<p class="map-galaxy-empty">まだ下位の目標やタスクはありません。</p>'}
  </section>`;
 }
+
 function mindMapPage(){
  const recorded=Boolean(state.records[today]?.mode);
  const growth=universeGrowth(state,today);
@@ -600,45 +604,35 @@ function mindMapPage(){
 }
 
 function printableMap(root){
- const date=today.replaceAll('-','/');
- function branch(node){
+ const childrenFor=id=>visibleChildren(state,id);
+ const children=childrenFor(root.id),depth=nodeDepth(state,root.id);
+ const card=(node,level,style='')=>{
   const task=nodeKind(state,node.id)==='action';
-  const settings=task?setting(state,node.id):null;
-  const event=settings&&isEventTask(settings);
+  const config=task?setting(state,node.id):null;
+  const event=config&&isEventTask(config);
+  const measurement=config?.measurement;
   const completed=event&&eventCompletionDate(state,node.id);
-  const measure=settings?.measurement;
-  let details='';
-  if(event){
-   details=completed?`完了 ${completed}`:settings.eventDate?`予定 ${settings.eventDate}`:'日付未定';
-  }else if(measure){
-   const metrics=[measure,...(measure.extras||[])].map(metric=>{
-    const {label}=unitInfo(metric);
-    return [[metric.totalTarget,'全体'],[metric.weeklyTarget,'週'],[metric.dailyAmount,'1日']]
-     .filter(([value])=>value!=null).map(([value,period])=>period+' '+numberText(value)+label).join(' · ');
-   }).filter(Boolean);
-   if(measure.deadline)metrics.push('期限 '+measure.deadline);
-   metrics.push(settings.modes.includes('rest')?'毎日取り組む':settings.modes.includes('busy')?'忙しい日も':'余裕がある日だけ');
-   details=metrics.join(' ／ ');
-  }
-  const children=visibleChildren(state,node.id);
-  return `<li>
-   <div class="map-print-node">
-    <span class="map-print-kind">${event?'イベント':task?'タスク':'目標'}</span>
-    <strong>${esc(node.name)}</strong>
-    ${node.description?`<p>${esc(node.description)}</p>`:''}
-    ${details?`<p class="map-print-details">${esc(details)}</p>`:''}
-   </div>
-   ${children.length?`<ul>${children.map(branch).join('')}</ul>`:''}
-  </li>`;
- }
- const path=nodePath(state,root.id).slice(0,-1);
+  const quantities=(style==='map-branch-row'||!children.length)&&!event&&measurement
+   ?[measurement,...(measurement.extras||[])].filter(metric=>metric.dailyAmount!=null)
+     .map(metric=>numberText(metric.dailyAmount)+unitInfo(metric).label).join(' · '):'';
+  const date=event?(completed?'完了 '+completed:config.eventDate?'予定 '+config.eventDate:''):'';
+  const label=event?'イベント':task?'タスク':'';
+  return `<div class="map-node ${style}">
+   <span aria-hidden="true">${task?'✓':hierarchyMarks[Math.min(level,4)]}</span>
+   <span>${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong>
+    ${quantities?`<small>1日 ${esc(quantities)}</small>`:''}
+    ${date?`<small>${esc(date)}</small>`:''}
+   </span>
+  </div>`;
+ };
+ const overview=mapDiagram(card(root,depth,'map-root'),children.map((node,index)=>({
+  tone:index%4,card:card(node,depth+1)
+ })),{radial:true,label:'マインドマップ全体'});
+ const sections=children.map((node,index)=>childrenFor(node.id).length
+  ?mapBranchPanel(node,{childrenFor,card,branchId:'print-branch-'+index,tone:index%4,depth:depth+1}):'').join('');
  return `<article class="map-print-document">
-  <header><p>Jiku · マインドマップ <time datetime="${today}">${date}</time></p>
-   <h1>${esc(root.name)}</h1>
-   ${path.length?`<p>${esc(path.map(node=>node.name).join(' › '))}</p>`:''}
-   ${root.description?`<p>${esc(root.description)}</p>`:''}
-  </header>
-  <ul class="map-print-tree">${nodeKind(state,root.id)==='action'?branch(root):visibleChildren(state,root.id).map(branch).join('')}</ul>
+  ${overview}
+  ${sections?`<div class="map-print-branches">${sections}</div>`:''}
  </article>`;
 }
 function mapPrintDialog(){
@@ -657,8 +651,14 @@ function printMap(form){
  document.getElementById('jiku-print-output')?.remove();
  const sheet=document.createElement('div');
  sheet.id='jiku-print-output';
- sheet.append(form.querySelector('.map-print-document').cloneNode(true));
+ const id=form.elements.namedItem('print-scope').value;
+ const node=state.nodes.find(item=>item.id===id);
+ if(!node)return;
+ sheet.innerHTML=printableMap(node);
  document.body.append(sheet);
+ for(const branch of sheet.querySelectorAll('[id]'))branch.id='output-'+branch.id;
+ for(const branch of sheet.querySelectorAll('[aria-labelledby]'))branch.setAttribute('aria-labelledby','output-'+branch.getAttribute('aria-labelledby'));
+ for(const diagram of sheet.querySelectorAll('jiku-mind-map'))diagram.drawConnections();
  window.addEventListener('afterprint',()=>sheet.remove(),{once:true});
  window.print();
 }
