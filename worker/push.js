@@ -1,5 +1,6 @@
 const pushEncoder = new TextEncoder();
-const reminderTitle = '今日、残りの時間はどのペースでいけそう？';
+const reminderCopy={morning:'今日はどんな1日にする？',evening:'今日、残りの時間はどのペースでいけそう？'};
+const reminderWindow=45;
 const githubIssuer = 'https://token.actions.githubusercontent.com';
 const workflowRef = 'seira20071004-cyber/jiku/.github/workflows/jiku-reminder.yml@refs/heads/main';
 const pushB64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
@@ -39,7 +40,8 @@ async function encryptReminder(subscription,message){
   concatPush(pushEncoder.encode(JSON.stringify(message)),[2])));
  return concatPush(salt,[0,0,16,0,publicKey.length],publicKey,ciphertext);
 }
-async function sendReminder(subscription,env,origin,test=false){
+async function sendReminder(subscription,env,origin,kind){
+ const test=kind==='test';
  if(!validPushSubscription(subscription))return {ok:false,status:410};
  const audience=new URL(subscription.endpoint).origin;
  const key=await crypto.subtle.importKey('jwk',JSON.parse(env.JIKU_PUSH_PRIVATE_KEY),
@@ -48,10 +50,10 @@ async function sendReminder(subscription,env,origin,test=false){
  const unsigned=pushJSON({typ:'JWT',alg:'ES256'})+'.'+pushJSON(claims);
  const signature=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,pushEncoder.encode(unsigned));
  const body=await encryptReminder(subscription,test?{title:'Jikuのテスト通知',body:'通知を受け取れました。',test:true}:
-  {title:'Jiku',body:reminderTitle});
- return fetch(subscription.endpoint,{method:'POST',redirect:'error',headers:{
+  {title:'Jiku',body:reminderCopy[kind],kind});
+ return fetch(subscription.endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(8000),headers:{
   Authorization:'vapid t='+unsigned+'.'+pushB64(signature)+', k='+env.JIKU_PUSH_PUBLIC_KEY,
-  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream',TTL:test?'90':'3600',Urgency:'normal'
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream',TTL:test?'90':'1800',Urgency:'normal'
  },body});
 }
 async function verifyReminderJob(request,origin){
@@ -72,26 +74,44 @@ async function verifyReminderJob(request,origin){
   return crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,pushBytes(signature),pushEncoder.encode(header+'.'+body));
  }catch{return false}
 }
-async function dispatchReminders(env,origin){
- const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo'}).format(new Date());
- const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',hourCycle:'h23'}).format(new Date()));
- if(hour<18||hour>=20)return {outsideWindow:true,sent:0};
- const {results}=await env.DB.prepare('SELECT endpoint, subscription FROM jiku_push WHERE delivery_day IS NOT ? LIMIT 100').bind(day).all();
+export function reminderClock(now){
+ const jst=new Date(now.getTime()+9*60*60*1000);
+ return {day:jst.toISOString().slice(0,10),minute:jst.getUTCHours()*60+jst.getUTCMinutes()};
+}
+function validReminderMinute(value){
+ return Number.isInteger(value)&&value>=0&&value<24*60;
+}
+export async function dispatchReminders(env,origin,now=new Date()){
+ const {day,minute}=reminderClock(now);
+ const since=minute-reminderWindow+1;
+ const windows=[[day,Math.max(0,since),minute]];
+ if(since<0)windows.push([reminderClock(new Date(now.getTime()-86400000)).day,1440+since,1439]);
  let sent=0,failed=0;
- for(const row of results){
-  const claim=await env.DB.prepare('UPDATE jiku_push SET delivery_day=? WHERE endpoint=? AND delivery_day IS NOT ?')
-   .bind(day,row.endpoint,day).run();
-  if(!claim.meta.changes)continue;
-  try{
-   const response=await sendReminder(JSON.parse(row.subscription),env,origin);
-   if(response.ok){sent++;continue}
-   if([404,410].includes(response.status)){
-    await env.DB.prepare('DELETE FROM jiku_push WHERE endpoint=?').bind(row.endpoint).run();
-    continue;
+ for(const [kind,timeColumn,deliveryColumn] of [
+  ['morning','wake_minute','morning_delivery_day'],
+  ['evening','evening_minute','delivery_day']
+ ]){
+  for(const [deliveryDay,start,end] of windows){
+   const {results}=await env.DB.prepare(`SELECT endpoint, subscription FROM jiku_push
+   WHERE ${timeColumn} BETWEEN ? AND ? AND ${deliveryColumn} IS NOT ? LIMIT 100`).bind(start,end,deliveryDay).all();
+   for(const row of results){
+    const claim=await env.DB.prepare(`UPDATE jiku_push SET ${deliveryColumn}=? WHERE endpoint=?
+     AND ${timeColumn} BETWEEN ? AND ? AND ${deliveryColumn} IS NOT ?`)
+     .bind(deliveryDay,row.endpoint,start,end,deliveryDay).run();
+    if(!claim.meta.changes)continue;
+    try{
+     const response=await sendReminder(JSON.parse(row.subscription),env,origin,kind);
+     if(response.ok){sent++;continue}
+     if([404,410].includes(response.status)){
+      await env.DB.prepare('DELETE FROM jiku_push WHERE endpoint=?').bind(row.endpoint).run();
+      continue;
+     }
+    }catch{}
+    failed++;
+    await env.DB.prepare(`UPDATE jiku_push SET ${deliveryColumn}=NULL WHERE endpoint=? AND ${deliveryColumn}=?`)
+     .bind(row.endpoint,deliveryDay).run();
    }
-  }catch{}
-  failed++;
-  await env.DB.prepare('UPDATE jiku_push SET delivery_day=NULL WHERE endpoint=? AND delivery_day=?').bind(row.endpoint,day).run();
+  }
  }
  return {sent,failed};
 }
@@ -122,13 +142,20 @@ export async function pushRoute(request,env,origin,user){
   return response({ok:true});
  }
  if(path!=='/api/push/subscribe'||!validPushSubscription(body))return response({},400);
+ const times=body.times;
+ if(times&&(!validReminderMinute(times.wake)||!validReminderMinute(times.evening)))return response({},400);
  const existing=await env.DB.prepare('SELECT owner FROM jiku_push WHERE endpoint=?').bind(body.endpoint).first();
  if(existing&&existing.owner!==user.sub)return response({},409);
- const saved=await env.DB.prepare('INSERT INTO jiku_push (endpoint,owner,subscription) VALUES (?,?,?) ON CONFLICT(endpoint) DO UPDATE SET subscription=excluded.subscription WHERE owner=excluded.owner')
-  .bind(body.endpoint,user.sub,JSON.stringify({endpoint:body.endpoint,keys:body.keys})).run();
+ const saved=await env.DB.prepare(`INSERT INTO jiku_push (endpoint,owner,subscription,wake_minute,evening_minute)
+  VALUES (?,?,?,?,COALESCE(?,1080)) ON CONFLICT(endpoint) DO UPDATE SET subscription=excluded.subscription,
+  wake_minute=COALESCE(?,jiku_push.wake_minute),evening_minute=COALESCE(?,jiku_push.evening_minute)
+  WHERE owner=excluded.owner`)
+  .bind(body.endpoint,user.sub,JSON.stringify({endpoint:body.endpoint,keys:body.keys}),
+   times?.wake??null,times?.evening??null,times?.wake??null,times?.evening??null).run();
  if(!saved.meta.changes)return response({},409);
+ if(body.test===false)return response({ok:true});
  try{
-  const test=await sendReminder(body,env,origin,true);
+  const test=await sendReminder(body,env,origin,'test');
   if(test.ok)return response({ok:true,testSent:true});
   if([404,410].includes(test.status)){
    await env.DB.prepare('DELETE FROM jiku_push WHERE endpoint=? AND owner=?').bind(body.endpoint,user.sub).run();

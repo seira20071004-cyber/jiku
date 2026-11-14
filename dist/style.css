@@ -839,3 +839,7 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 .evening-tasks:empty { display:none; }
 .mind-map-mode .evening-tasks button { display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; gap:12px; }
 .evening-tasks button span:last-child { color:#c9b7e3; text-align:right; }
+
+.morning-task button { display:flex; justify-content:space-between; align-items:center; gap:12px; text-align:left; }
+.morning-task button small { color:#c9b7e3; }
+#reminder-form input[type="time"] { min-height:44px; color-scheme:dark; }

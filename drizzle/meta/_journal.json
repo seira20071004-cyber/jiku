@@ -1,1 +1,1 @@
-{"version":"7","dialect":"sqlite","entries":[{"idx":0,"version":"6","when":1794618000000,"tag":"0000_push_reminders","breakpoints":false}]}
+{"version":"7","dialect":"sqlite","entries":[{"idx":0,"version":"6","when":1794618000000,"tag":"0000_push_reminders","breakpoints":false},{"idx":1,"version":"6","when":1794618000001,"tag":"0001_reminder_times","breakpoints":true}]}

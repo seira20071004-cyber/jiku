@@ -22,6 +22,9 @@ const guest=googleSite&&!account;
 const demoMode=new URLSearchParams(location.search).get('demo')==='1';
 const personalStorageKey=guest?'jiku-guest':account?'jiku-v1:'+account.id:'jiku-v1';
 const storageKey=demoMode?personalStorageKey+':demo-v2':personalStorageKey;
+const reminderPreferenceKey=personalStorageKey+':reminder-times';
+const morningSelectionKey=storageKey+':morning-task';
+const endTimeLabels=Object.freeze({student:'授業や学校の予定は、普段何時ごろ終わりますか？',worker:'仕事は、普段何時ごろ終わりますか？',other:'日中の予定は、普段何時ごろ終わりますか？'});
 let needsLegacyImport=false,storageLocked=false;let state;try{const raw=guest&&!demoMode?null:localStorage.getItem(storageKey);needsLegacyImport=!demoMode&&!!account&&!raw&&!!localStorage.getItem('jiku-v1');state=raw?validate(JSON.parse(raw)):(demoMode?createDemoUniverse(dateKey()):freshUniverse());if(raw&&!state.universe){localStorage.setItem(storageKey+':before-universe',raw);state=migrateUniverse(state)}}catch{storageLocked=true;state=state||freshUniverse();setTimeout(()=>toast('保存データを保護しています。設定からバックアップを確認してください。'),300)}
 let treeScene=null,treeView=null,showGoalLabels=true,statsTab='calendar',statsWeeks=4,quantityScope='all',analysisSlide=0;
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
@@ -71,7 +74,7 @@ function render(){clearTimeout(guideTimer);
  if(birthActive){if(appAudioOn&&!appAudioChanging)void toggleAppAudio();if(treeScene){treeScene.dispose();treeScene=null}if(!onboardingScene)showOnboarding();return}
  if(treeScene){treeView=treeScene.getView();treeScene.dispose();treeScene=null}const latest=dateKey();if(today!==latest){today=latest;selected=today;applyPending(state,today);save()}
  const page=view==='stats'?statsPage():guideSession?treePage():mindMapPage();
- $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();bindAnalysisSlides();scheduleGuide()}
+ $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong></button>`).join('')}</nav>`;bindTree();bindAnalysisSlides();scheduleGuide();maybeAskReminderSetup()}
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
 function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n.id];return `<div class="action-row ${done?'done':''}"><button class="check ${done?'checked':''}" data-check="${esc(n.id)}" data-date="${key}" aria-label="${esc(n.name)}の実行記録" aria-pressed="${done}">${done?'✓':''}</button><div class="action-copy"><strong>${esc(n.name)}</strong><small>${esc(ancestry(state,n.id).slice(1,-1).join(' / ')||'自分の宇宙')}</small></div><span class="priority p${a.priority}">${['高','中','低'][a.priority]}</span><button class="edit-action" data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">⋯</button></div>`}
 let universeOutside=!state.universe?.firstSteps,navigating=false,onboardingScene=null;
@@ -188,6 +191,7 @@ function dismissGuide(){
  }
  view=guide.view;focus=guide.focus;universeOutside=guide.universeOutside;
  render();
+ openReminderLink();
 }
 
 function treePage(){return `<section class="universe-scene full-panel ${showUniverseOrigin()?'at-origin':''}" id="goal-tree" aria-label="自分の宇宙">
@@ -604,17 +608,21 @@ function mindMapPage(){
   .filter(item=>!plan.quantityExcluded?.includes(item.id)):[];
  const growth=universeGrowth(state,today);
  const energy=planetEnergy();
+ const morningTask=morningSelection();
  return `<section class="mind-map" aria-labelledby="mind-map-title">
   <div class="home-universe">
    <button type="button" class="home-universe-art" data-do="planet-pulse" aria-label="星を光らせる">${planetArt(growth.days)}${energy.colors.length?`<span class="planet-prize" style="--planet-prize:${planetPrizes[energy.colors.at(-1)].color}" aria-hidden="true"></span>`:''}</button>
    <button type="button" class="planet-energy-balance" data-do="planet-energy" aria-label="宇宙エネルギー ${numberText(energy.balance)}ポイント、ガチャを開く">✦ ${numberText(energy.balance)} <span>宇宙エネルギー</span></button>
    ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
   </div>
+  ${morningTask?`<section class="mind-map-mode morning-task" aria-label="今日のタスク">
+   <h2>今日のタスク</h2>
+   <button type="button" data-do="morning-choice">${esc(morningTask.name)} <small>${esc(taskAmount(setting(state,morningTask.id).measurement))}</small></button>
+  </section>`:''}
   <section class="mind-map-mode" aria-label="今日のペース">
    ${plan?.plannedMode&&!plan.eveningDone?`<h2>今日の予定 · ${MODES[plan.plannedMode].label}</h2>
     <ul class="evening-tasks">${plannedTasks.map(({id,name,setting:{measurement}})=>{
-     const amount=[measurement,...(measurement.extras||[])].filter(metric=>metric.dailyAmount!=null)
-      .map(metric=>numberText(metric.dailyAmount)+unitInfo(metric).label).join(' ・ ');
+     const amount=taskAmount(measurement);
      return `<li><button type="button" data-record-leaf="${esc(id)}"><span>${esc(name)}</span><span>${esc(amount)}</span></button></li>`;
     }).join('')}</ul>
     <div class="evening-actions"><button type="button" data-do="evening-done">✓ 達成</button>
@@ -970,62 +978,165 @@ function finishEvening(){
   energyToast(count?`${count}件の予定量を実績に記録しました`:'今日の実績を確定しました',points);
  }catch(error){state=previous;toast(error.message)}
 }
-async function reminderSettings(){
- modal(`<div class="dialog-title"><h2>夕方の通知</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
-  <p>毎日18時ごろ（日本時間）、今日のペースを聞きます。</p>
-  <p id="reminder-status" role="status">通知の状態を確認しています。</p>
-  <div class="dialog-actions"><button type="button" class="primary" data-do="enable-reminders" hidden>通知を有効にする・テスト</button>
-  <button type="button" class="text-button" data-do="disable-reminders" hidden>通知を解除</button></div>`);
- const status=$('#reminder-status');
- if(!matchMedia('(display-mode: standalone)').matches&&!navigator.standalone){
-  status.textContent='Safariの共有メニューから「ホーム画面に追加」し、そのアイコンからJikuを開いてください。';
+function readReminderPreferences(){
+ try{
+  const prefs=JSON.parse(localStorage.getItem(reminderPreferenceKey));
+  return prefs?.role&& !Object.hasOwn(endTimeLabels,prefs.role)?null:prefs;
+ }catch{return null;}
+}
+function openReminderLink(){
+ const link=new URL(location.href),morning=link.searchParams.has('morning');
+ if((!morning&&!link.searchParams.has('evening'))||onboardingScene||guideSession||$('#dialog').open)return;
+ link.searchParams.delete('morning');
+ link.searchParams.delete('evening');
+ history.replaceState(null,'',link);
+ if(morning)morningChoice();
+ else if(!state.records[today]?.eveningDone)modePicker();
+}
+function maybeAskReminderSetup(){
+ if(!account||demoMode||guideSession||mapPreviewReturn||storageLocked||readReminderPreferences()||$('#dialog').open)return;
+ const link=new URL(location.href);
+ if(link.searchParams.has('morning')||link.searchParams.has('evening')||needsLegacyImport)return;
+ if(maybeAskReminderSetup.shown)return;
+ maybeAskReminderSetup.shown=true;
+ void reminderSettings(true);
+}
+function taskAmount(m){
+ if(!m)return '';
+ return [m,...(m.extras||[])].filter(metric=>metric.dailyAmount!=null)
+  .map(metric=>numberText(metric.dailyAmount)+unitInfo(metric).label).join(' ・ ');
+}
+function morningTasks(){
+ return leaves(state).filter(n=>{
+  const task=setting(state,n.id);
+  return nodeKind(state,n.id)==='action'&&task.status==='active'&&
+   (!isEventTask(task)||(!eventCompletionDate(state,n.id)&&(!task.eventDate||task.eventDate===today)));
+ });
+}
+function morningSelection(){
+ try{
+  const selected=JSON.parse(localStorage.getItem(morningSelectionKey));
+  if(selected?.day===today)return morningTasks().find(task=>task.id===selected.id);
+ }catch{}
+}
+function morningChoice(taskId=morningSelection()?.id){
+ const tasks=morningTasks(),task=tasks.find(item=>item.id===taskId);
+ const heading=task?task.name:'今日はどんな1日にする？';
+ const amount=taskAmount(task&&setting(state,task.id).measurement);
+ modal(`<div class="dialog-title"><h2>${esc(heading)}</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  ${task?`${task.description?`<p class="space-description">${esc(task.description)}</p>`:''}${amount?`<strong>${esc(amount)}</strong>`:''}
+   <div class="dialog-actions"><button type="button" class="text-button" data-do="morning-change">選び直す</button><button type="button" class="primary" data-do="close">閉じる</button></div>`:
+   tasks.length?`<p>今日取り組みたいタスクを一つ選んでください。</p><div class="record-leaf-picker">${tasks.map(item=>
+    `<button type="button" data-morning-task="${esc(item.id)}"><strong>${esc(item.name)}</strong><span>→</span></button>`).join('')}</div>`:
+    '<p>マインドマップにタスクを追加すると、ここから選べます。</p>'}`);
+}
+function pickMorningTask(id){
+ if(!morningTasks().some(item=>item.id===id))return;
+ try{localStorage.setItem(morningSelectionKey,JSON.stringify({id,day:today}));}
+ catch{toast('今日のタスクを保存できませんでした。');return;}
+ render();
+ morningChoice(id);
+}
+const reminderMinute=value=>Number(value.slice(0,2))*60+Number(value.slice(3,5));
+async function reminderSettings(first=false){
+ const prefs=readReminderPreferences();
+ modal(`<form id="reminder-form">
+  <div class="dialog-title"><h2>${first?'あなたの普段の生活について':'朝・夕方の通知'}</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <label>普段どんな生活をしていますか？<select name="role" required>
+   <option value="" disabled ${!prefs?.role?'selected':''}>選んでください</option>
+   ${[['student','学生'],['worker','社会人'],['other','その他']].map(([value,label])=>`<option value="${value}" ${prefs?.role===value?'selected':''}>${label}</option>`).join('')}
+  </select></label>
+  <div id="reminder-fields" ${!prefs?.role?'hidden':''}>
+   <label>あなたの起床時間を教えてください<input type="time" name="wake" value="${esc(prefs?.wake||'07:00')}" required></label>
+   <label><span id="reminder-end-label">${endTimeLabels[prefs?.role]||endTimeLabels.other}</span><input type="time" name="evening" value="${esc(prefs?.evening||'18:00')}" required></label>
+   <p class="footnote">日本時間。朝は今日のタスク、夕方はその日のペースを聞きます。</p>
+  </div>
+  <p id="reminder-status" role="status"></p>
+  <div class="dialog-actions"><button type="submit" class="primary" data-do="enable-reminders">時刻を保存</button>
+   <button type="button" class="text-button" data-do="test-reminders" hidden>テスト通知</button>
+   <button type="button" class="text-button" data-do="disable-reminders" hidden>通知を解除</button>
+   ${first?'<button type="button" class="text-button" data-do="skip-reminders">あとで</button>':''}
+  </div></form>`);
+ const form=$('#reminder-form'),{role,wake,evening}=form.elements;
+ const status=$('#reminder-status'),fields=$('#reminder-fields');
+ const enable=form.querySelector('[data-do="enable-reminders"]');
+ const test=form.querySelector('[data-do="test-reminders"]');
+ const disable=form.querySelector('[data-do="disable-reminders"]');
+ const closeButton=form.querySelector('[data-do="close"]');
+ if(first)closeButton.dataset.do='skip-reminders';
+ const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+ let registration,key;
+ role.addEventListener('change',()=>{
+  fields.hidden=false;
+  form.querySelector('#reminder-end-label').textContent=endTimeLabels[role.value];
+ });
+ const saveTimes=()=>localStorage.setItem(reminderPreferenceKey,JSON.stringify({role:role.value,wake:wake.value,evening:evening.value}));
+ async function registerTimes(sendTest){
+  const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+  const response=await fetch('/api/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({...subscription.toJSON(),times:{wake:reminderMinute(wake.value),evening:reminderMinute(evening.value)},test:sendTest})});
+  if(!response.ok)throw Error('通知を登録できませんでした。');
+  const result=await response.json();
+  disable.hidden=false;
+  test.hidden=false;
+  enable.textContent='時刻を保存';
+  status.textContent=sendTest?(result.testSent?'テスト通知を送信しました。':'時刻を保存しました。テスト通知は送れませんでした。'):'通知時刻を保存しました。';
+ }
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(!form.reportValidity())return;
+  enable.disabled=true;
+  try{
+   saveTimes();
+   if(registration&&key)await registerTimes(false);
+   else if(!standalone)status.textContent='保存しました。通知はホーム画面に追加したJikuの設定で有効にできます。';
+   else status.textContent='時刻を保存しました。通知は端末の設定を確認してください。';
+   if(first&&(!standalone||registration&&key)){close();toast('通知時刻を保存しました。');}
+  }catch(error){
+   status.textContent=globalThis.Notification?.permission==='denied'?'iPhoneの設定からJikuの通知を許可してください。':error.message;
+  }finally{enable.disabled=false;}
+ });
+ test.addEventListener('click',async ()=>{
+  if(!form.reportValidity())return;
+  test.disabled=true;
+  try{saveTimes();await registerTimes(true);}catch(error){status.textContent=error.message;}
+  finally{test.disabled=false;}
+ });
+ disable.addEventListener('click',async ()=>{
+  disable.disabled=true;
+  try{
+   const subscription=await registration.pushManager.getSubscription();
+   if(subscription){
+    const response=await fetch('/api/push/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:subscription.endpoint})});
+    if(!response.ok)throw Error('通知を解除できませんでした。');
+    await subscription.unsubscribe();
+   }
+   status.textContent='この端末の通知を解除しました。';
+   disable.hidden=true;test.hidden=true;enable.textContent='時刻を保存して通知を有効にする';
+  }catch(error){status.textContent=error.message;}
+  finally{disable.disabled=false;}
+ });
+ if(!standalone){
+  status.textContent='通知を受け取るには、iPhoneのホーム画面に追加したJikuを開いてください。';
   return;
  }
- if(!('PushManager' in window)||!('serviceWorker' in navigator)){
-  status.textContent='通知に対応するiOS（16.4以降）で開いてください。';return;
+ if(!('PushManager' in window)||!('serviceWorker' in navigator)||!account){
+  status.textContent='通知を有効にするには、対応するiPhoneでGoogleログインしてください。';
+  return;
  }
- if(!account){
-  status.textContent='Googleログイン後、自分のJikuで設定してください。';return;
- }
+ enable.disabled=true;
  try{
-  const config=await fetch('/api/push/config').then(r=>r.json());
+  const config=await fetch('/api/push/config').then(response=>response.json());
   if(!config.publicKey){status.textContent='通知の配信を準備中です。';return;}
   await navigator.serviceWorker.register('/sw.js');
-  const registration=await navigator.serviceWorker.ready;
-  if(!status.isConnected)return;
+  registration=await navigator.serviceWorker.ready;
   const existing=await registration.pushManager.getSubscription();
-  status.textContent=existing?'この端末の通知を登録・テストできます。':'下のボタンを押すと通知を許可できます。';
-  const enable=$('[data-do="enable-reminders"]'),disable=$('[data-do="disable-reminders"]');
-  enable.hidden=false;
+  key=Uint8Array.from(atob(config.publicKey.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0));
+  enable.textContent=existing?'時刻を保存':'時刻を保存して通知を有効にする';
   disable.hidden=!existing;
-  enable.addEventListener('click',async ()=>{
-   enable.disabled=true;
-   try{
-    const key=Uint8Array.from(atob(config.publicKey.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0));
-    const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
-    const response=await fetch('/api/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription)});
-    if(!response.ok)throw Error('通知を登録できませんでした。');
-    const result=await response.json();
-    if(status.isConnected)status.textContent=result.testSent?'登録済みです。テスト通知を確認してください。':'登録済みです。テスト通知は送れませんでした。';
-    disable.hidden=false;
-   }catch(error){
-    status.textContent=Notification.permission==='denied'?'iPhoneの設定からJikuの通知を許可してください。':error.message;
-   }finally{enable.disabled=false}
-  });
-  disable.addEventListener('click',async ()=>{
-   disable.disabled=true;
-   try{
-    const subscription=await registration.pushManager.getSubscription();
-    if(subscription){
-     const response=await fetch('/api/push/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:subscription.endpoint})});
-     if(!response.ok)throw Error('通知を解除できませんでした。');
-     await subscription.unsubscribe();
-    }
-    status.textContent='この端末の通知を解除しました。';disable.hidden=true;
-   }catch(error){status.textContent=error.message;}
-   finally{disable.disabled=false;}
-  });
- }catch{status.textContent='通知設定を読み込めませんでした。'}
+  test.hidden=!existing;
+ }catch{status.textContent='通知設定を読み込めませんでした。';}
+ finally{enable.disabled=false;}
 }
 function openMindMap(){
  if(guideSession||navigating)return;
@@ -1104,7 +1215,7 @@ function editor(id,creationKind=null){const isNew=id==='new',parent=addParent||c
 }}
 function review(){const ws=weekStart(today),end=shiftDate(ws,6),s=stats(state,ws,end),r=state.reviews[ws]||{},effective=shiftDate(ws,7);modal(`<form id="review-form"><div class="dialog-title"><div><div class="eyebrow">WEEKLY REFLECTION</div><h2>今週の自分と、話そう。</h2></div><button type="button" data-do="close" class="round-button" aria-label="閉じる">×</button></div><p class="muted">${ws.replaceAll('-','/')} — ${end.replaceAll('-','/')}</p><div class="review-summary">${Object.entries(s.counts).map(([k,c])=>`<div><span style="color:${MODES[k].color}">${MODES[k].icon}</span><strong>${c}日</strong><small>${MODES[k].label}</small></div>`).join('')}</div><h3>今週、取り組んだタスク</h3><p class="muted">${s.logs.length} 回の実行記録</p>${Object.entries(s.logs.reduce((o,l)=>(o[l.name]=(o[l.name]||0)+1,o),{})).map(([n,c])=>`<p class="review-log">♧ ${esc(n)} <b>${c}回</b></p>`).join('')}<label>無理があったこと・気づいたこと<textarea name="note" rows="3" placeholder="今週の自分に、どんな言葉をかけたい？">${esc(r.note||'')}</textarea></label><label>来週、大切にしたいこと<textarea name="next" rows="2" placeholder="小さく、具体的な一歩を書いてみよう。">${esc(r.next||'')}</textarea></label><h3>来週のタスクプラン</h3><p class="footnote">${effective.replaceAll('-','/')}（月）から反映。過去の記録はそのまま残ります。</p>${leaves(state).filter(n=>nodeKind(state,n.id)==='action').map(n=>{const a=state.pending.find(p=>p.id===n.id&&p.effective===effective)?.setting||setting(state,n.id);return `<fieldset class="review-setting" data-review-node="${esc(n.id)}"><legend>${esc(n.name)}</legend>${taskLevelFields(a,'review-level-'+n.id)}</fieldset>`}).join('')}<div class="dialog-actions"><button class="primary">レビューを保存</button></div></form>`)}
 function switchDemo(enabled){const url=new URL(location.href);if(enabled)url.searchParams.set('demo','1');else url.searchParams.delete('demo');url.searchParams.delete('preview');location.assign(url)}
-function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">YOUR OWN UNIVERSE</div><h2>設定・バックアップ</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${account?`<div class="account-info"><div class="account-profile-photo">${accountAvatar()}</div><strong>${esc(account.name)}</strong><p>${esc(account.email)}</p>${!account.picture?'<a class="text-button" href="/api/auth/google">Googleのプロフィール画像を取得</a>':''}<form method="post" action="/api/auth/logout" data-native-submit><button class="text-button" type="submit">ログアウト</button></form></div>`:''}<p>データはこの端末・ブラウザ内に保存されます。端末間での同期はありません。ブラウザのデータを消す前にバックアップしてください。</p><button class="text-button" data-do="reminder-settings">夕方の通知 →</button><br><button class="text-button" data-do="open-demo">サンプルを開く →</button><br><button class="text-button" data-do="preview-onboarding">初めて開いたときの画面を見る →</button><br><button class="text-button" data-do="review">今週を振り返る →</button><div class="settings-actions"><button class="primary" data-do="export">↓ バックアップを書き出す</button><label class="import-button">↑ バックアップを読み込む<input type="file" id="import" accept="application/json,.json"></label></div><p class="footnote">読み込み時は現在のデータを置き換えます。先に現在のバックアップを保存することをおすすめします。日付は日本時間、週の始まりは月曜日です。</p><hr><p class="muted">Jiku v1.0 · 自分の軸を、日々のタスクへ。</p>`)}
+function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">YOUR OWN UNIVERSE</div><h2>設定・バックアップ</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${account?`<div class="account-info"><div class="account-profile-photo">${accountAvatar()}</div><strong>${esc(account.name)}</strong><p>${esc(account.email)}</p>${!account.picture?'<a class="text-button" href="/api/auth/google">Googleのプロフィール画像を取得</a>':''}<form method="post" action="/api/auth/logout" data-native-submit><button class="text-button" type="submit">ログアウト</button></form></div>`:''}<p>データはこの端末・ブラウザ内に保存されます。端末間での同期はありません。ブラウザのデータを消す前にバックアップしてください。</p><button class="text-button" data-do="reminder-settings">朝・夕方の通知 →</button><br><button class="text-button" data-do="open-demo">サンプルを開く →</button><br><button class="text-button" data-do="preview-onboarding">初めて開いたときの画面を見る →</button><br><button class="text-button" data-do="review">今週を振り返る →</button><div class="settings-actions"><button class="primary" data-do="export">↓ バックアップを書き出す</button><label class="import-button">↑ バックアップを読み込む<input type="file" id="import" accept="application/json,.json"></label></div><p class="footnote">読み込み時は現在のデータを置き換えます。先に現在のバックアップを保存することをおすすめします。日付は日本時間、週の始まりは月曜日です。</p><hr><p class="muted">Jiku v1.0 · 自分の軸を、日々のタスクへ。</p>`)}
 document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do],[data-view],[data-day],[data-focus],[data-map-back]');if(!b)return;const d=b.dataset;
  if(d.guide==='dismiss'){dismissGuide();return}
  if(b.hasAttribute('data-map-exit')){endMapPreview();return}
@@ -1112,6 +1223,10 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.do==='evening-done'){finishEvening();return}
  if(d.do==='change-evening'){modePicker();return}
  if(d.do==='reminder-settings'){void reminderSettings();return}
+ if(d.do==='skip-reminders'){try{localStorage.setItem(reminderPreferenceKey,'{}');}catch{}close();return}
+ if(d.do==='morning-choice'){morningChoice();return}
+ if(d.do==='morning-change'){morningChoice(null);return}
+ if(d.morningTask){pickMorningTask(d.morningTask);return}
  if(d.do==='analysis-conditions'){appAudio?.cue?.('navigate');analysisConditions();return}
  if(b.hasAttribute('data-toggle-time-plan')){
   const calculator=b.closest('[data-target-fields]').querySelector('.target-calculator');
@@ -1345,12 +1460,7 @@ if(authReturn&&guestHandoff?.step==='login'&&guestHandoff.map&&!storageLocked){
  }
 }
 render();
-const eveningLink=new URL(location.href);
-if(eveningLink.searchParams.has('evening')&&!onboardingScene){
- eveningLink.searchParams.delete('evening');
- history.replaceState(null,'',eveningLink);
- if(!state.records[today]?.eveningDone&&!$('#dialog').open)modePicker();
-}
+openReminderLink();
 if(!onboardingPreview&&!guideSession&&needsLegacyImport&&!guestHandoff?.map)offerLegacyImport();
 
 function offerLegacyImport(){modal(`<div class="dialog-title"><h2>以前の記録を引き継ぎますか？</h2></div><p>このブラウザでGoogleログイン前に使っていた記録が残っています。現在ログインしているあなたのアカウントへコピーできます。</p><p class="footnote">元の記録はそのまま残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">新しく始める</button><button id="copy-legacy" class="primary">記録を引き継ぐ</button></div>`);$('#copy-legacy').onclick=()=>{try{const old=localStorage.getItem('jiku-v1');localStorage.setItem(storageKey+':before-universe',old);state=migrateUniverse(validate(JSON.parse(old)));finishOnboardingReturn();onboardingScene?.dispose();onboardingScene=null;applyPending(state,today);save();close();render();toast('以前の記録を引き継ぎました')}catch{toast('以前の記録を読み込めませんでした。バックアップから読み込んでください。')}}}
