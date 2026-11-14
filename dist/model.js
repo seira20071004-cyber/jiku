@@ -51,6 +51,48 @@ export function timeMeasurement(m){
  const convert=amount=>amount==null?null:rounded(amount*unit.factor);
  return {unit:'minutes',deadline:m.deadline,dailyAmount:convert(m.dailyAmount),totalTarget:convert(m.totalTarget),weeklyTarget:convert(m.weeklyTarget),monthlyTarget:convert(m.monthlyTarget),extras:m.extras};
 }
+// A mode can populate planned quantities automatically. Only confirmed records count here.
+export function taskPaceWarnings(s,today){
+ const start=weekStart(today),end=shiftDate(start,6);
+ const totals=new Map();
+ for(const [date,logs] of Object.entries(s.logs)){
+  if(date>today)continue;
+  for(const [id,log] of Object.entries(logs)){
+   if(!log.quantity||log.source==='mode')continue;
+   if(!totals.has(id))totals.set(id,new Map());
+   const metrics=totals.get(id);
+   for(const quantity of [log.quantity,...(log.quantity.extras||[])]){
+    const {dimension}=unitInfo(quantity.measurement);
+    if(!metrics.has(dimension))metrics.set(dimension,[]);
+    metrics.get(dimension).push({date,base:quantity.base});
+   }
+  }
+ }
+ const warnings=new Map();
+ for(const node of leaves(s)){
+  const action=setting(s,node.id);
+  if(nodeKind(s,node.id)!=='action'||isEventTask(action)||action.status!=='active'||!action.measurement)continue;
+  const time=timeMeasurement(action.measurement);
+  for(const metric of [time,...(time.extras||[])]){
+   if(!(metric.dailyAmount>0))continue;
+   const unit=unitInfo(metric);
+   const entries=totals.get(node.id)?.get(unit.dimension)||[];
+   const periods=[{type:'week',target:metric.weeklyTarget,from:start,to:end}];
+   if(time.deadline&&time.deadline>=today)periods.push({type:'deadline',target:metric.totalTarget,from:null,to:time.deadline});
+   for(const period of periods){
+    if(!(period.target>0))continue;
+    const actual=entries.reduce((sum,entry)=>entry.date<=period.to&&(!period.from||entry.date>=period.from)?sum+entry.base/unit.factor:sum,0);
+    const days=(Date.parse(period.to)-Date.parse(today))/86400000+1;
+    const needed=Math.max(0,rounded(period.target-actual))/days;
+    const ratio=needed/metric.dailyAmount;
+    if(ratio>=2&&ratio>(warnings.get(node.id)?.ratio||0)){
+     warnings.set(node.id,{type:period.type,days,needed,ratio,daily:metric.dailyAmount,unit:unit.label});
+    }
+   }
+  }
+ }
+ return warnings;
+}
 export function taskRecordFields(s,key,id){
  const old=s.logs[key]?.[id]?.quantity;
  const preset=timeMeasurement(setting(s,id).measurement||{unit:'minutes'});

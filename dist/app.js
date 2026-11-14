@@ -7,7 +7,7 @@ import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,numberText,hoursText} from './quantity-view.js';
 import {createUniverse} from './universe.js';
 import {UNIVERSE_ORIGIN,LEVELS,nodePath,nodeDepth,visibleChildren,canPlace,freshUniverse,migrateUniverse,completeUniverse,reorderNode,writeGoal,boundedMonth,universeGrowth} from './universe-model.js';
-import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion} from './model.js';
+import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion,taskPaceWarnings} from './model.js';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let account=null,googleSite=document.documentElement.dataset.auth==='google';
 try{
@@ -581,6 +581,23 @@ function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
  </section>`;
 }
 
+function paceWarningText(warning){
+ const horizon=warning.type==='week'?'今週の目標まで':'達成期限まで';
+ const needed=numberText(Math.ceil(warning.needed*1000)/1000);
+ return `${horizon}残り${warning.days}日 · 1日${needed}${esc(warning.unit)}が必要（予定 ${numberText(warning.daily)}${esc(warning.unit)}）`;
+}
+function paceWarningsPanel(){
+ const warnings=taskPaceWarnings(state,today);
+ if(!warnings.size)return '';
+ return `<details class="home-pace-warnings">
+  <summary>このタスクが遅れています <span>${warnings.size}件</span></summary>
+  <p>確定した実績から計算します。</p>
+  <ul>${[...warnings].map(([id,warning])=>`<li>
+   <button type="button" data-record-leaf="${esc(id)}"><strong>${esc(state.nodes.find(node=>node.id===id).name)}</strong>
+    <small>${paceWarningText(warning)}</small></button>
+  </li>`).join('')}</ul>
+ </details>`;
+}
 function mindMapPage(){
  const recorded=Boolean(state.records[today]?.mode);
  const growth=universeGrowth(state,today);
@@ -598,6 +615,7 @@ function mindMapPage(){
   <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1>
    <button type="button" class="journey-entry" data-do="journeys"><span aria-hidden="true">☄</span> 旅に出る</button>
   </header>
+  ${paceWarningsPanel()}
   <div class="mind-map-scroll">${personalMap()}</div>
   <footer class="mind-map-footer">${mapActions()}</footer>
  </section>`;

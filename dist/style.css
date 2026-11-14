@@ -819,3 +819,15 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
   transform:scale(var(--map-paper-scale)); transform-origin:top center;
  }
 }
+
+.home-pace-warnings {
+ flex:none; margin:6px 0; padding:6px 10px; border:1px solid #d49a664f;
+ border-radius:10px; color:#ffe0b9; background:#2a202e;
+}
+.home-pace-warnings summary { min-height:28px; padding-block:5px; cursor:pointer; font-size:12px; }
+.home-pace-warnings summary span { color:#e4b48c; margin-inline-start:5px; }
+.home-pace-warnings p { margin:2px 0 4px; color:#e2c8bc; font-size:11px; }
+.home-pace-warnings ul { max-height:22dvh; overflow:auto; list-style:none; margin:0; padding:0; }
+.home-pace-warnings li + li { border-top:1px solid #d49a6633; }
+.home-pace-warnings button { width:100%; min-height:42px; padding:5px 1px; color:inherit; text-align:start; }
+.home-pace-warnings button small { display:block; }
