@@ -327,24 +327,16 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .map-inline-tools button { min-height:40px; min-width:40px; padding-inline:7px; border:1px solid #a68cce73; border-radius:9px; background:#201b33; font-size:12px; }
 
 .home-universe {
-  flex:none;
-  display:grid;
-  justify-items:center;
-  position:relative;
-  margin:-6px 0 14px;
-  background:radial-gradient(ellipse at center,#29214370 0%,transparent 63%);
+ flex:none; display:flex; align-items:center; justify-content:center; gap:12px;
+ margin:0 0 8px;
+ background:radial-gradient(ellipse at center,#29214365,transparent 68%);
 }
 .home-universe-art {
-  position:relative;
-  isolation:isolate;
-  width:min(100%,360px);
-  height:clamp(92px,21dvh,195px);
+ position:relative; isolation:isolate; flex:none; width:56px; height:52px; --planet-size:36px;
 }
-.home-universe-days { color:#c6b1ea; font-size:12px; margin-top:-4px; }
-@media (max-height:640px) {
-  .home-universe { margin-bottom:8px; }
-  .home-universe-art { height:86px; }
-}
+.home-star-meta { display:grid; justify-items:start; gap:2px; }
+.home-star-meta .planet-energy-balance { min-height:32px; padding-block:2px; text-align:left; }
+.home-universe-days { color:#c6b1ea; font-size:11px; }
 
 /* The same planet is visible on arrival and when returning to the map. */
 .home-planet {
@@ -522,26 +514,6 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .planet-energy-balance { color:#ecd8ff; font-size:12px; padding:4px 0 8px; }
 .planet-energy-balance span { margin-left:3px; color:#cebfdf; }
 .planet-prize { width:var(--planet-size,clamp(72px,17dvh,150px)); aspect-ratio:1; position:absolute; inset:50% auto auto 50%; transform:translate(-50%,-50%); border-radius:50%; box-shadow:0 0 28px var(--planet-prize); pointer-events:none; }
-
-.planet-tap-effect { position:absolute; inset:50% auto auto 50%; width:0; height:0; pointer-events:none; }
-.planet-wave {
- position:absolute; top:0; left:0; width:var(--planet-size,clamp(72px,17dvh,150px)); aspect-ratio:1;
- border:2px solid #d6c0ff; border-radius:50%; box-shadow:0 0 15px #b28aff;
- animation:planet-wave 730ms ease-out both;
-}
-.planet-wave.second { animation-delay:135ms; border-color:#a2e1fe; }
-.planet-spark {
- position:absolute; top:0; left:0; width:4px; height:4px; border-radius:50%;
- background:#f0e5ff; box-shadow:0 0 9px 2px #bda5ff; animation:planet-spark 680ms ease-out both;
-}
-@keyframes planet-wave {
- from { transform:translate(-50%,-50%) scale(.9); opacity:.9; }
- to { transform:translate(-50%,-50%) scale(1.9); opacity:0; }
-}
-@keyframes planet-spark {
- from { transform:rotate(var(--angle)) translateX(calc(var(--distance) * .48)); opacity:1; }
- to { transform:rotate(var(--angle)) translateX(calc(var(--distance) + 25px)); opacity:0; }
-}
 
 .view-stats .stats-dashboard .calendar-content .cosmic-calendar .day-cell.mode-full {
  background:radial-gradient(ellipse at 76% 80%,#edc4fe91,transparent 66%),linear-gradient(135deg,#6140ad,#865ce1);
@@ -870,3 +842,59 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
  display:grid; place-items:center; width:20px; height:20px;
  right:4px; bottom:4px; line-height:1;
 }
+
+.view-star .content { padding:0; overflow:auto; display:block; }
+.star-world { position:relative; width:min(100%,800px); min-height:100%; margin:auto; padding:12px clamp(14px,5vw,32px) 28px; }
+.star-world header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.star-world h1 { margin:0; font-size:clamp(25px,5vw,38px); color:#f4eaff; }
+.star-return { min-height:40px; color:#d9c6f7; }
+.star-landscape {
+ position:relative; isolation:isolate; height:clamp(144px,27dvh,250px); margin:12px 0 16px; overflow:hidden; border-radius:18px;
+ background:
+  radial-gradient(circle at 12% 15%,#f3ddff 0 1px,transparent 2px),
+  radial-gradient(circle at 38% 24%,#b4efed 0 1px,transparent 2px),
+  radial-gradient(circle at 69% 12%,#f5e6ff 0 1px,transparent 2px),
+  radial-gradient(circle at 88% 44%,#e8b4f9 0 1px,transparent 2px),
+  radial-gradient(ellipse at 73% 43%,#a958b663,transparent 52%),
+  radial-gradient(ellipse at 22% 73%,#326d8666,transparent 50%),#141027;
+ animation:star-world-arrival .48s ease-out both;
+}
+@keyframes star-world-arrival {
+ from { opacity:.22; transform:scale(.97); }
+ to { opacity:1; transform:scale(1); }
+}
+@media (prefers-reduced-motion:reduce) { .star-landscape { animation:none; } }
+.star-moon { position:absolute; inset:0 44% 22% 5%; --planet-size:clamp(52px,13dvh,104px); }
+.star-terrain {
+ position:absolute; inset:56% -12% -67%; border-radius:50%; border-top:2px solid #97edeb83;
+ background:radial-gradient(ellipse at 57% 1%,#52739b,#302653 26%,#191328 68%); box-shadow:0 -4px 40px #b89aff85;
+}
+.star-tower {
+ position:absolute; display:grid; align-content:space-evenly; justify-items:center; bottom:24%; left:68%;
+ width:22px; height:40%; border-radius:70% 70% 25% 25%; border:1px solid #bcffed;
+ background:linear-gradient(#7fe3dfbd,#385972); box-shadow:0 0 17px #a5f7e4;
+}
+.star-tower[data-level="2"] { width:28px; height:46%; }
+.star-tower[data-level="3"] { width:35px; height:54%; }
+.star-tower i { width:68%; height:3px; border-radius:50%; background:#d9fdeb; }
+.star-residents { position:absolute; display:flex; gap:12px; align-items:center; bottom:14%; left:21%; }
+.star-creature {
+ --creature:#aeece5;
+ position:relative; display:inline-block; width:29px; height:24px; flex:none; border-radius:56% 53% 45% 39%;
+ background:radial-gradient(circle at 29% 29%,white,var(--creature) 41%,#534277 95%); box-shadow:0 0 12px color-mix(in srgb,var(--creature) 66%,transparent);
+}
+.star-creature::before { content:""; position:absolute; top:47%; left:30%; width:3px; height:4px; border-radius:50%; background:#2b2141; box-shadow:8px 0 #2b2141; }
+.star-creature-mio { --creature:#f6bfe0; border-radius:40% 62% 43% 50%; }
+.star-creature-nova { --creature:#f6d896; border-radius:45% 45% 60% 60%; }
+.star-world-controls { display:grid; gap:16px; }
+.star-world-controls section { padding:14px; border:1px solid #b19bd93d; border-radius:14px; background:#171425; }
+.star-world-controls h2 { margin:0 0 8px; color:#f3e7ff; font-size:16px; }
+.star-world-controls p { margin:0 0 6px; color:#ddd1ee; font-size:13px; }
+.star-world-controls small { color:#cbb8e2; }
+.star-facility .primary { display:block; margin-top:10px; min-height:40px; }
+.star-friends ul { margin:0; padding:0; list-style:none; }
+.star-friends li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; padding:8px 0; }
+.star-friends li+li { border-top:1px solid #b19bd930; }
+.star-friends li p { margin:3px 0 0; font-size:11px; }
+.star-friends button { min-height:40px; padding-inline:7px; border:1px solid #9985bd60; border-radius:8px; color:#ead4ff; white-space:nowrap; }
+.star-world-controls button:disabled { opacity:.56; cursor:default; }

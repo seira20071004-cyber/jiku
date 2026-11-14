@@ -1,3 +1,4 @@
+import {facilityCosts,storageHours,starFriends,starWorldSnapshot,developStar} from './star-world.js';
 import {planningPrompt,jsonTemplate,previewMapImport} from './map-import.js';
 import {createBirthMusic} from './birth-music.js?v=3';
 import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,planetArt} from './onboarding.js';
@@ -31,6 +32,7 @@ let treeScene=null,treeView=null,showGoalLabels=true,statsTab='calendar',statsWe
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
 let guideSession=null,guideTimer,mapPreviewReturn=null,onboardingResume=null;
 let mapSelection=null,mapEditing=false;
+let starWorldTimer;
 function save(){if(guideSession||mapPreviewReturn||(guest&&!demoMode))return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 const icon=name=>({tree:'✧',stats:'◴',projects:'☄',catchup:'↗'}[name]);
 const names={tree:'ホーム',stats:'統計',projects:'プロジェクト',catchup:'遅れを取り戻す'};
@@ -79,7 +81,7 @@ function modal(html,{mapId=null,addition=null}={}){
 function close(){$('#dialog').close()}
 function heading(k,title,sub,extra=''){return `<div class="page-heading"><div><div class="eyebrow">${k}</div><h1>${title}</h1><p>${sub}</p></div>${extra}</div>`}
 function accountAvatar(){const picture=account?.picture;return `<span class="google-account-fallback" aria-hidden="true">G</span>${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer" data-account-photo>`:''}`}
-function render(){clearTimeout(guideTimer);
+function render(){clearTimeout(guideTimer);clearInterval(starWorldTimer);
  const birthActive=onboardingScene||onboardingPreview||
  (guest&&!demoMode&&!guideSession&&!mapPreviewReturn)||(!storageLocked&&!state.universe?.onboarded);
  document.body.classList.toggle('birth-active',Boolean(birthActive));
@@ -92,8 +94,10 @@ function render(){clearTimeout(guideTimer);
  }
  if(view!=='catchup'&&inUnderworld)leaveUnderworld();
  const progress=featureProgress(state,today);
- const page=guideSession?treePage():{tree:mindMapPage,stats:statsPage,projects:projectsPage,catchup:catchupPage}[view]();
- $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''} ${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?'aria-disabled="true"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong>${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?`<small>${featureDays[k]}日で解放</small>`:''}</button>`).join('')}</nav>`;bindTree();scheduleGuide();maybeAskReminderSetup()}
+ const page=guideSession?treePage():{tree:mindMapPage,stats:statsPage,projects:projectsPage,catchup:catchupPage,star:starWorldPage}[view]();
+ $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k||(view==='star'&&k==='tree')?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''} ${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?'aria-disabled="true"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong>${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?`<small>${featureDays[k]}日で解放</small>`:''}</button>`).join('')}</nav>`;bindTree();scheduleGuide();maybeAskReminderSetup();
+ if(view==='star'&&!guideSession)starWorldTimer=setInterval(updateStarWorld,1000);
+}
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
 function actionRow(n,key){const a=setting(state,n.id),done=!!state.logs[key]?.[n.id];return `<div class="action-row ${done?'done':''}"><button class="check ${done?'checked':''}" data-check="${esc(n.id)}" data-date="${key}" aria-label="${esc(n.name)}の実行記録" aria-pressed="${done}">${done?'✓':''}</button><div class="action-copy"><strong>${esc(n.name)}</strong><small>${esc(ancestry(state,n.id).slice(1,-1).join(' / ')||'自分の宇宙')}</small></div><span class="priority p${a.priority}">${['高','中','低'][a.priority]}</span><button class="edit-action" data-edit="${esc(n.id)}" aria-label="${esc(n.name)}を編集">⋯</button></div>`}
 let universeOutside=!state.universe?.firstSteps,navigating=false,onboardingScene=null;
@@ -658,9 +662,9 @@ function mindMapPage(){
  const morningTask=morningSelection();
  return `<section class="mind-map" aria-labelledby="mind-map-title">
   <div class="home-universe">
-   <button type="button" class="home-universe-art" data-do="planet-pulse" aria-label="星を光らせる">${planetArt(growth.days)}${energy.colors.length?`<span class="planet-prize" style="--planet-prize:${planetPrizes[energy.colors.at(-1)].color}" aria-hidden="true"></span>`:''}</button>
-   <button type="button" class="planet-energy-balance" data-do="planet-energy" aria-label="宇宙エネルギー ${numberText(energy.balance)}ポイント${featureUnlocked('gacha')?'、ガチャを開く':'、ガチャはマップ確定後、2日の記録で解放'}">✦ ${numberText(energy.balance)} <span>宇宙エネルギー</span>${featureUnlocked('gacha')?'':`<small>ガチャは2日で解放</small>`}</button>
-   ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
+   <button type="button" class="home-universe-art" data-do="open-star" aria-label="自分の星へ">${planetArt(growth.days)}${energy.colors.length?`<span class="planet-prize" style="--planet-prize:${planetPrizes[energy.colors.at(-1)].color}" aria-hidden="true"></span>`:''}</button>
+   <div class="home-star-meta"><button type="button" class="planet-energy-balance" data-do="planet-energy" aria-label="宇宙エネルギー ${numberText(energy.balance)}ポイント${featureUnlocked('gacha')?'、ガチャを開く':'、ガチャはマップ確定後、2日の記録で解放'}">✦ ${numberText(energy.balance)} <span>宇宙エネルギー</span>${featureUnlocked('gacha')?'':`<small>ガチャは2日で解放</small>`}</button>
+   ${growth.days?`<span class="home-universe-days">${growth.days}日記録</span>`:''}</div>
   </div>
   ${morningTask?`<section class="mind-map-mode morning-task" aria-label="今日のタスク">
    <h2>今日のタスク</h2>
@@ -934,29 +938,78 @@ function energyToast(message,points){
  appAudio?.cue?.('save');
  toast(points?`${message} · 宇宙エネルギー ＋${points}`:message);
 }
-function pulsePlanet(button){
- appAudio?.cue?.('star');
- const globe=button.querySelector('.planet-globe');
- if(!globe||!globe.animate)return;
- const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
- globe.getAnimations().filter(animation=>animation.id==='planet-pulse').forEach(animation=>animation.cancel());
- const pulse=globe.animate(reduced?[
-  {filter:'brightness(1)'},{filter:'brightness(1.25)'},{filter:'brightness(1)'}
- ]:[
-  {scale:1,filter:'brightness(1)'},{scale:1.08,filter:'brightness(1.5)',offset:.3},
-  {scale:1,filter:'brightness(1)'}
- ],{duration:650,easing:'ease-out',id:'planet-pulse'});
- if(reduced)return;
- button.querySelector('.planet-tap-effect')?.remove();
- const effect=document.createElement('span');
- effect.className='planet-tap-effect';
- effect.setAttribute('aria-hidden','true');
- effect.innerHTML='<i class="planet-wave"></i><i class="planet-wave second"></i>'+
-  Array.from({length:10},(_,index)=>`<i class="planet-spark" style="--angle:${index*36}deg;--distance:${index%2?86:108}px"></i>`).join('');
- button.append(effect);
- const remove=()=>effect.remove();
- effect.querySelector('.second').addEventListener('animationend',remove,{once:true});
- pulse.finished.catch(remove);
+function starWorldPage(){
+ const world=starWorldSnapshot(state.starWorld),energy=planetEnergy();
+ const cost=facilityCosts[world.level];
+ return `<section class="star-world" aria-labelledby="star-world-title">
+  <button type="button" class="text-button star-return" data-map-back>← マインドマップ</button>
+  <header><h1 id="star-world-title" tabindex="-1">自分の星</h1>
+   <button type="button" class="planet-energy-balance" data-do="planet-energy">✦ ${energy.balance} 宇宙エネルギー</button>
+  </header>
+  <div class="star-landscape" aria-hidden="true">
+   <div class="star-moon">${planetArt(universeGrowth(state,today).days)}</div>
+   <div class="star-terrain"></div>
+   ${world.level?`<div class="star-tower" data-level="${world.level}"><i></i><i></i><i></i></div>`:''}
+   <div class="star-residents">${world.friends.map(id=>`<i class="star-creature star-creature-${id}"></i>`).join('')}</div>
+  </div>
+  <div class="star-world-controls">
+   <section class="star-facility" aria-label="エネルギー施設">
+    <h2>エネルギー施設${world.level?' · Lv.'+world.level:''}</h2>
+    <p>${world.level?`星のエネルギー <strong data-star-stored>${world.stored}</strong> / ${world.level*storageHours} · 毎時＋${world.level}`:
+     '宇宙エネルギーで施設を建てると、星のエネルギーが貯まります。'}</p>
+    ${world.level?`<small data-star-next>${starProductionStatus(world)}</small>`:''}
+    <button type="button" class="primary" data-star-action="facility" ${cost===undefined||energy.balance<cost?'disabled':''}>
+     ${cost===undefined?'最大レベル':(world.level?'施設を強化':'施設を建てる')+' · 宇宙エネルギー '+cost}</button>
+   </section>
+   <section class="star-friends"><h2>星の仲間 <small>${world.friends.length} / ${starFriends.length}</small></h2>
+    <p>施設で貯めた星のエネルギーで迎えられます。</p>
+    <ul>${starFriends.map(friend=>`<li>
+     <i class="star-creature star-creature-${friend.id}" aria-hidden="true"></i>
+     <div><strong>${friend.name}</strong><p>${friend.description}</p></div>
+     <button type="button" data-star-action="friend" data-star-friend="${friend.id}" aria-label="${friend.name}を迎える · 星のエネルギー ${friend.cost}"
+      ${world.friends.includes(friend.id)||world.stored<friend.cost?'disabled':''}>
+      ${world.friends.includes(friend.id)?'この星にいる':'迎える · '+friend.cost}</button>
+    </li>`).join('')}</ul>
+   </section>
+  </div>
+ </section>`;
+}
+function starProductionStatus(world){
+ if(world.stored===world.level*storageHours)return '満タン · 48時間分まで貯められます';
+ const minutes=Math.max(1,Math.ceil((world.last+3600000-Date.now())/60000));
+ return `次の生産まで約${minutes}分 · アプリを閉じている間も生産`;
+}
+function updateStarWorld(){
+ const value=$('[data-star-stored]');
+ if(!value)return;
+ const world=starWorldSnapshot(state.starWorld);
+ value.textContent=world.stored;
+ $('[data-star-next]').textContent=starProductionStatus(world);
+ for(const button of document.querySelectorAll('[data-star-friend]')){
+  const friend=starFriends.find(item=>item.id===button.dataset.starFriend);
+  button.disabled=world.friends.includes(friend.id)||world.stored<friend.cost;
+ }
+}
+async function commitStarAction(action,friend){
+ const commit=()=>{
+  if(view!=='star'||storageLocked)return;
+  const previous=state;
+  try{
+   const raw=localStorage.getItem(storageKey);
+   if(raw)state=validate(JSON.parse(raw));
+   const energy=planetEnergy();
+   const result=developStar(state.starWorld,energy.balance,action,friend);
+   state={...state,starWorld:result.world,planetEnergy:{...energy,balance:result.balance}};
+   if(!save()){state=previous;return;}
+   const scroll=$('.view-star .content').scrollTop;
+   render();
+   $('.view-star .content').scrollTop=scroll;
+   appAudio?.cue?.('prize');
+   toast(action==='facility'?'エネルギー施設ができました。':starFriends.find(item=>item.id===friend).name+'が星の仲間になりました。');
+  }catch(error){state=previous;toast(error.message);}
+ };
+ if(navigator.locks?.request)await navigator.locks.request(storageKey+':star-world',commit);
+ else commit();
 }
 function showPlanetEnergy(prize){
  const energy=planetEnergy();
@@ -1351,7 +1404,11 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.do==='leave-underworld'){leaveUnderworld();render();$('[data-do="enter-underworld"]')?.focus();return}
  if(d.catchupPromise){catchupPromiseForm(d.catchupPromise);return}
  if(d.do==='app-audio'){void toggleAppAudio();return}
- if(d.do==='planet-pulse'){pulsePlanet(b);return}
+ if(d.do==='open-star'){
+  appAudio?.cue?.('star');view='star';location.hash='star';render();
+  $('#star-world-title')?.focus({preventScroll:true});return;
+ }
+ if(d.starAction){void commitStarAction(d.starAction,d.starFriend);return}
  if(d.do==='map-print'){mapPrintDialog();return}
  if(d.do==='map-import'){mapImportDialog();return}
  if(d.copyMapPrompt){
@@ -1554,7 +1611,7 @@ document.addEventListener('change',async e=>{if(e.target.name==='print-scope'&&e
 function bindTree(){const host=$('.universe-stage');if(!host)return;try{treeScene=createUniverse(host,{nodes:state.nodes,auraStrength:universeGrowth(state,today).strength,current:showUniverseOrigin()?UNIVERSE_ORIGIN:currentSpace().id,onSelect:id=>{if(!guideSession)openNode(id)},onZoom:value=>{const label=$('[data-zoom-label]');if(label)label.textContent=value+'%'}})}catch(error){if(showUniverseOrigin()){host.innerHTML=`<button class="universe-origin-fallback" style="--fallback-growth:${universeGrowth(state,today).strength}" data-space-enter="${esc(currentSpace().id)}" aria-label="宇宙に入る"></button>`;return}host.innerHTML=`<div class="universe-fallback"><p>この端末では、目標一覧で宇宙を探索できます。</p>${visibleChildren(state,currentSpace().id).map(n=>`<button data-space-enter="${esc(n.id)}">✧ ${esc(n.name)} →</button>`).join('')}</div>`}}
 function applyLabelVisibility(){}
 $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close()}});
-window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar'||(h==='stats'&&view!=='stats'))statsTab='calendar';if(Object.hasOwn(names,h)&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(Object.hasOwn(names,location.hash.slice(1)))view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
+window.addEventListener('hashchange',()=>{const raw=location.hash.slice(1),h=raw==='home'?'tree':raw==='calendar'?'stats':raw;if(raw==='calendar'||(h==='stats'&&view!=='stats'))statsTab='calendar';if((Object.hasOwn(names,h)||h==='star')&&(view!==h||raw==='calendar')){view=h;render()}});window.addEventListener('focus',()=>{if(dateKey()!==today)render()});if(Object.hasOwn(names,location.hash.slice(1))||location.hash==='#star')view=location.hash.slice(1);if(location.hash==='#home')history.replaceState(null,'','#tree');if(location.hash==='#calendar'){view='stats';statsTab='calendar';history.replaceState(null,'','#stats')}if(new URLSearchParams(location.search).get('preview')==='guide')startGuide(true);
 else if(!onboardingPreview&&!storageLocked&&!needsLegacyImport&&state.universe?.firstSteps)startGuide();
 if(authReturn&&guestHandoff?.step==='login'&&guestHandoff.map&&!storageLocked){
  try{
