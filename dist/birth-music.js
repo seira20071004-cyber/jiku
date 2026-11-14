@@ -1,4 +1,5 @@
 const chords = [[48, 55, 62, 64], [45, 52, 59, 60], [41, 48, 55, 57], [43, 50, 57, 62]];
+const underworldChords = [[33, 45, 51, 56], [32, 44, 50, 55], [30, 42, 49, 54], [32, 44, 47, 53]];
 const frequency = note => 440 * 2 ** ((note - 69) / 12);
 
 const cues = {
@@ -12,12 +13,13 @@ export function createBirthMusic() {
   const Audio = globalThis.AudioContext || globalThis.webkitAudioContext;
   if (!Audio) return null;
 
-  let context, volume, interval, nextChord, chordIndex = 0, playing = false, disposed = false;
+  let context, volume, interval, nextChord, chordIndex = 0, playing = false, disposed = false, underworld = false;
 
-  function tone(note, start, duration, level) {
+  function tone(note, start, duration, level, type = 'sine') {
     const voice = context.createOscillator();
     const envelope = context.createGain();
     voice.frequency.value = frequency(note);
+    voice.type = type;
     envelope.gain.setValueAtTime(0, start);
     envelope.gain.linearRampToValueAtTime(level, start + duration * .22);
     envelope.gain.exponentialRampToValueAtTime(.0001, start + duration);
@@ -31,6 +33,15 @@ export function createBirthMusic() {
     const now = context.currentTime;
     nextChord = Math.max(now + .05, nextChord);
     if (nextChord > now + .35) return;
+    if (underworld) {
+      underworldChords[chordIndex].forEach((note, index) => {
+        tone(note, nextChord + index * .18, 2.6, index === 0 ? .29 : .09, 'triangle');
+      });
+      tone(underworldChords[chordIndex][0] - 5, nextChord + 1.35, .62, .23);
+      chordIndex = (chordIndex + 1) % underworldChords.length;
+      nextChord += 2.8;
+      return;
+    }
     chords[chordIndex].forEach((note, index) => {
       tone(note, nextChord + index * .28, 6.7, index === 0 ? .22 : .12);
     });
@@ -39,6 +50,14 @@ export function createBirthMusic() {
   }
 
   return {
+    setUnderworld(active) {
+      if (underworld === active) return;
+      underworld = active;
+      chordIndex = 0;
+      if (!playing) return;
+      nextChord = context.currentTime + .05;
+      schedule();
+    },
     async toggle() {
       if (disposed) return false;
       if (playing) {

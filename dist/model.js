@@ -17,7 +17,17 @@ export function plan(s,mode){return leaves(s).filter(n=>{const a=setting(s,n.id)
 export function toggleLog(s,key,n){s.logs[key]??={};if(s.logs[key][n.id]){delete s.logs[key][n.id];return}const a=setting(s,n.id);s.logs[key][n.id]={name:n.name,setting:structuredClone(a),goalPath:ancestry(s,n.id),recordedAt:new Date().toISOString()};if(a.type==='once')s.settings[n.id]={...a,status:'completed'}}
 export function ancestry(s,id){const path=[];let n=s.nodes.find(n=>n.id===id);while(n){path.unshift(n.name);n=s.nodes.find(p=>p.id===n.parentId)}return path}
 export function stats(s,start,end){const counts={full:0,busy:0,rest:0,none:0};Object.entries(s.records).forEach(([k,r])=>{if(k>=start&&k<=end&&counts[r.mode]!==undefined)counts[r.mode]++});const logs=Object.entries(s.logs).filter(([k])=>k>=start&&k<=end).flatMap(([,v])=>Object.values(v));return {counts,days:Object.values(counts).reduce((a,b)=>a+b,0),logs}}
-export function validate(s){if(!s||s.version!==1||!Array.isArray(s.nodes)||!s.settings||!s.records||!s.logs||!s.reviews||!Array.isArray(s.pending))throw Error('対応していないデータ形式です');if(s.nodes.length<1||s.nodes.length>1000||s.nodes.filter(n=>n.parentId===null).length!==1||new Set(s.nodes.map(n=>n.id)).size!==s.nodes.length)throw Error('木の構造が正しくありません');for(const n of s.nodes){if(typeof n.id!=='string'||typeof n.name!=='string'||!n.name.trim())throw Error('目標の形式が正しくありません');const seen=new Set([n.id]);let p=n.parentId;while(p!==null){if(seen.has(p))throw Error('木が循環しています');seen.add(p);const parent=s.nodes.find(x=>x.id===p);if(!parent)throw Error('親目標が見つかりません');p=parent.parentId}}const check=a=>{if(!a||![0,1,2].includes(a.priority)||!['continuous','once'].includes(a.type)||!['active','paused','completed'].includes(a.status)||!Array.isArray(a.modes)||a.modes.some(m=>!['full','busy','rest'].includes(m)))throw Error('行動設定が正しくありません');if(a.measurement)validateMeasurement(a.measurement);if(isEventTask(a))validateEventDate(a.eventDate)};Object.values(s.settings).forEach(check);s.pending.forEach(p=>{check(p.setting);if(typeof p.id!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(p.effective))throw Error('予約設定が正しくありません')});for(const [k,r] of Object.entries(s.records)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!MODES[r.mode])throw Error('記録が正しくありません');if((r.plannedMode!=null&&!['full','busy','rest'].includes(r.plannedMode))||(r.eveningDone!=null&&typeof r.eveningDone!=='boolean'))throw Error('今日の予定が正しくありません');if(r.quantityMenu){if(!Array.isArray(r.quantityMenu)||r.quantityMenu.length>1000)throw Error('モードの量の設定が正しくありません');for(const item of r.quantityMenu){if(!item||typeof item.id!=='string'||typeof item.name!=='string'||!Array.isArray(item.goalIds)||!item.goalIds.every(x=>typeof x==='string')||!Array.isArray(item.goalPath)||!item.goalPath.every(x=>typeof x==='string'))throw Error('モードの履歴が正しくありません');check(item.setting)}}if(r.quantityExcluded&&(!Array.isArray(r.quantityExcluded)||!r.quantityExcluded.every(x=>typeof x==='string')))throw Error('記録の調整が正しくありません')}for(const [k,logs] of Object.entries(s.logs)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!logs||typeof logs!=='object'||Object.values(logs).some(l=>!l||typeof l.name!=='string'))throw Error('実行記録が正しくありません');for(const l of Object.values(logs)){if(l.quantity){validateQuantityValue(l.quantity);validateExtraQuantities(l.quantity.extras)}if(l.eventMinutes!=null)validateDuration(l.eventMinutes);validateExtraQuantities(l.eventQuantities);if(l.goalIds&&(!Array.isArray(l.goalIds)||l.goalIds.some(id=>typeof id!=='string')))throw Error('目標の履歴が正しくありません')}}return s}
+function validateCatchupPromises(promises){
+ if(promises==null)return;
+ if(typeof promises!=='object'||Array.isArray(promises)||Object.keys(promises).length>1000)throw Error('取り戻す期限の記録が正しくありません');
+ for(const promise of Object.values(promises)){
+  if(!promise||!validDateKey(promise.start)||!validDateKey(promise.deadline)||promise.deadline<promise.start||
+   !Number.isFinite(promise.target)||promise.target<=0||!Number.isFinite(promise.baseline)||promise.baseline<0||
+   !Number.isFinite(promise.factor)||promise.factor<=0||typeof promise.dimension!=='string'||
+   typeof promise.unit!=='string'||promise.unit.length>12)throw Error('取り戻す期限の記録が正しくありません');
+ }
+}
+export function validate(s){if(!s||s.version!==1||!Array.isArray(s.nodes)||!s.settings||!s.records||!s.logs||!s.reviews||!Array.isArray(s.pending))throw Error('対応していないデータ形式です');validateCatchupPromises(s.catchupPromises);if(s.nodes.length<1||s.nodes.length>1000||s.nodes.filter(n=>n.parentId===null).length!==1||new Set(s.nodes.map(n=>n.id)).size!==s.nodes.length)throw Error('木の構造が正しくありません');for(const n of s.nodes){if(typeof n.id!=='string'||typeof n.name!=='string'||!n.name.trim())throw Error('目標の形式が正しくありません');const seen=new Set([n.id]);let p=n.parentId;while(p!==null){if(seen.has(p))throw Error('木が循環しています');seen.add(p);const parent=s.nodes.find(x=>x.id===p);if(!parent)throw Error('親目標が見つかりません');p=parent.parentId}}const check=a=>{if(!a||![0,1,2].includes(a.priority)||!['continuous','once'].includes(a.type)||!['active','paused','completed'].includes(a.status)||!Array.isArray(a.modes)||a.modes.some(m=>!['full','busy','rest'].includes(m)))throw Error('行動設定が正しくありません');if(a.measurement)validateMeasurement(a.measurement);if(isEventTask(a))validateEventDate(a.eventDate)};Object.values(s.settings).forEach(check);s.pending.forEach(p=>{check(p.setting);if(typeof p.id!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(p.effective))throw Error('予約設定が正しくありません')});for(const [k,r] of Object.entries(s.records)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!MODES[r.mode])throw Error('記録が正しくありません');if((r.plannedMode!=null&&!['full','busy','rest'].includes(r.plannedMode))||(r.eveningDone!=null&&typeof r.eveningDone!=='boolean'))throw Error('今日の予定が正しくありません');if(r.quantityMenu){if(!Array.isArray(r.quantityMenu)||r.quantityMenu.length>1000)throw Error('モードの量の設定が正しくありません');for(const item of r.quantityMenu){if(!item||typeof item.id!=='string'||typeof item.name!=='string'||!Array.isArray(item.goalIds)||!item.goalIds.every(x=>typeof x==='string')||!Array.isArray(item.goalPath)||!item.goalPath.every(x=>typeof x==='string'))throw Error('モードの履歴が正しくありません');check(item.setting)}}if(r.quantityExcluded&&(!Array.isArray(r.quantityExcluded)||!r.quantityExcluded.every(x=>typeof x==='string')))throw Error('記録の調整が正しくありません')}for(const [k,logs] of Object.entries(s.logs)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!logs||typeof logs!=='object'||Object.values(logs).some(l=>!l||typeof l.name!=='string'))throw Error('実行記録が正しくありません');for(const l of Object.values(logs)){if(l.quantity){validateQuantityValue(l.quantity);validateExtraQuantities(l.quantity.extras)}if(l.eventMinutes!=null)validateDuration(l.eventMinutes);validateExtraQuantities(l.eventQuantities);if(l.goalIds&&(!Array.isArray(l.goalIds)||l.goalIds.some(id=>typeof id!=='string')))throw Error('目標の履歴が正しくありません')}}return s}
 
 export const UNITS={pages:{label:'ページ',dimension:'pages',factor:1},hours:{label:'時間',dimension:'time',factor:60},minutes:{label:'分',dimension:'time',factor:1},count:{label:'回',dimension:'count',factor:1},questions:{label:'問',dimension:'questions',factor:1},words:{label:'単語',dimension:'words',factor:1},items:{label:'個',dimension:'items',factor:1}};
 export const rounded=n=>Math.round((n+Number.EPSILON)*1e6)/1e6;
@@ -51,9 +61,7 @@ export function timeMeasurement(m){
  const convert=amount=>amount==null?null:rounded(amount*unit.factor);
  return {unit:'minutes',deadline:m.deadline,dailyAmount:convert(m.dailyAmount),totalTarget:convert(m.totalTarget),weeklyTarget:convert(m.weeklyTarget),monthlyTarget:convert(m.monthlyTarget),extras:m.extras};
 }
-// A mode can populate planned quantities automatically. Only confirmed records count here.
-export function taskPaceWarnings(s,today){
- const start=weekStart(today),end=shiftDate(start,6);
+function confirmedTaskQuantities(s,today){
  const totals=new Map();
  for(const [date,logs] of Object.entries(s.logs)){
   if(date>today)continue;
@@ -68,7 +76,12 @@ export function taskPaceWarnings(s,today){
    }
   }
  }
- const warnings=new Map();
+ return totals;
+}
+// A mode can populate planned quantities automatically. Only confirmed records count here.
+export function taskPaceWarnings(s,today,{details=false}={}){
+ const start=weekStart(today),end=shiftDate(start,6);
+ const totals=confirmedTaskQuantities(s,today),warnings=new Map();
  for(const node of leaves(s)){
   const action=setting(s,node.id);
   if(nodeKind(s,node.id)!=='action'||isEventTask(action)||action.status!=='active'||!action.measurement)continue;
@@ -86,12 +99,41 @@ export function taskPaceWarnings(s,today){
     const needed=Math.max(0,rounded(period.target-actual))/days;
     const ratio=needed/metric.dailyAmount;
     if(ratio>=2&&ratio>(warnings.get(node.id)?.ratio||0)){
-     warnings.set(node.id,{type:period.type,days,needed,ratio,daily:metric.dailyAmount,unit:unit.label});
+     warnings.set(node.id,{type:period.type,days,needed,ratio,daily:metric.dailyAmount,unit:unit.label,
+      ...(details?{remaining:rounded(needed*days),dimension:unit.dimension,factor:unit.factor,suggestedDay:period.to}:{})});
     }
    }
   }
  }
  return warnings;
+}
+export function catchupTasks(s,today){
+ const tasks=taskPaceWarnings(s,today,{details:true});
+ const promises=Object.entries(s.catchupPromises||{});
+ if(!promises.length)return tasks;
+ const totals=confirmedTaskQuantities(s,today);
+ for(const [id,promise] of promises){
+  const node=s.nodes.find(node=>node.id===id);
+  if(!node||nodeKind(s,id)!=='action'||setting(s,id).status!=='active'||isEventTask(setting(s,id)))continue;
+  const entries=totals.get(id)?.get(promise.dimension)||[];
+  const actual=entries.reduce((sum,entry)=>entry.date>=promise.start?sum+entry.base:sum,0);
+  const remaining=rounded(promise.target-(actual-promise.baseline)/promise.factor);
+  if(remaining>0)tasks.set(id,{...tasks.get(id),promise,remaining,unit:promise.unit});
+ }
+ return tasks;
+}
+export function saveCatchupPromise(s,today,id,deadline){
+ if(!validDateKey(deadline)||deadline<today)throw Error('今日以降の日付を選んでください。');
+ const task=catchupTasks(s,today).get(id);
+ if(!task)throw Error('このタスクの遅れは解消しました。');
+ if(task.promise){
+  s.catchupPromises[id]={...task.promise,deadline};
+  return;
+ }
+ const entries=confirmedTaskQuantities(s,today).get(id)?.get(task.dimension)||[];
+ const baseline=entries.reduce((sum,entry)=>entry.date===today?sum+entry.base:sum,0);
+ s.catchupPromises={...s.catchupPromises,[id]:{start:today,deadline,target:task.remaining,baseline,
+  dimension:task.dimension,factor:task.factor,unit:task.unit}};
 }
 export function taskRecordFields(s,key,id){
  const old=s.logs[key]?.[id]?.quantity;

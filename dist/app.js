@@ -1,5 +1,5 @@
 import {planningPrompt,jsonTemplate,previewMapImport} from './map-import.js';
-import {createBirthMusic} from './birth-music.js?v=2';
+import {createBirthMusic} from './birth-music.js?v=3';
 import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,planetArt} from './onboarding.js';
 import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
@@ -7,7 +7,7 @@ import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,numberText,hoursText} from './quantity-view.js';
 import {createUniverse} from './universe.js';
 import {UNIVERSE_ORIGIN,LEVELS,nodePath,nodeDepth,visibleChildren,canPlace,freshUniverse,migrateUniverse,completeUniverse,reorderNode,writeGoal,boundedMonth,universeGrowth} from './universe-model.js';
-import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion,taskPaceWarnings,saveEveningPlan,completeEveningPlan,modeItems} from './model.js';
+import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion,catchupTasks,saveCatchupPromise,saveEveningPlan,completeEveningPlan,modeItems} from './model.js';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let account=null,googleSite=document.documentElement.dataset.auth==='google';
 try{
@@ -35,6 +35,7 @@ const icon=name=>({tree:'✧',stats:'◴',projects:'☄',catchup:'↗'}[name]);
 const names={tree:'ホーム',stats:'統計',projects:'プロジェクト',catchup:'遅れを取り戻す'};
 const appAudio=createBirthMusic();
 let appAudioOn=false,appAudioChanging=false;
+let inUnderworld=false,underworldAudioStarted=false;
 function syncAudioButton(){
  const button=$('[data-do="app-audio"]');
  button?.setAttribute('aria-pressed',String(appAudioOn));
@@ -68,6 +69,7 @@ function close(){$('#dialog').close()}
 function heading(k,title,sub,extra=''){return `<div class="page-heading"><div><div class="eyebrow">${k}</div><h1>${title}</h1><p>${sub}</p></div>${extra}</div>`}
 function accountAvatar(){const picture=account?.picture;return `<span class="google-account-fallback" aria-hidden="true">G</span>${picture?`<img src="${esc(picture)}" alt="" referrerpolicy="no-referrer" data-account-photo>`:''}`}
 function render(){clearTimeout(guideTimer);
+ if(view!=='catchup'&&inUnderworld)leaveUnderworld();
  const birthActive=onboardingScene||onboardingPreview||
  (guest&&!demoMode&&!guideSession&&!mapPreviewReturn)||(!storageLocked&&!state.universe?.onboarded);
  document.body.classList.toggle('birth-active',Boolean(birthActive));
@@ -588,21 +590,76 @@ function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
  </section>`;
 }
 
-function paceWarningText(warning){
- const horizon=warning.type==='week'?'今週の目標まで':'達成期限まで';
- const needed=numberText(Math.ceil(warning.needed*1000)/1000);
- return `${horizon}残り${warning.days}日 · 1日${needed}${esc(warning.unit)}が必要（予定 ${numberText(warning.daily)}${esc(warning.unit)}）`;
+function leaveUnderworld(){
+ inUnderworld=false;
+ appAudio?.setUnderworld(false);
+ if(underworldAudioStarted&&appAudioOn&&!appAudioChanging)void toggleAppAudio();
+ underworldAudioStarted=false;
+}
+async function enterUnderworld(){
+ inUnderworld=true;
+ appAudio?.setUnderworld(true);
+ const wasPlaying=appAudioOn;
+ const start=wasPlaying?null:toggleAppAudio();
+ render();
+ $('#catchup-title')?.focus({preventScroll:true});
+ if(start){
+  await start;
+  if(!inUnderworld){if(appAudioOn)void toggleAppAudio();return;}
+  underworldAudioStarted=appAudioOn;
+ }
 }
 function catchupPage(){
- const warnings=taskPaceWarnings(state,today);
- return `<section class="tab-page" aria-labelledby="catchup-title">
-  <h1 id="catchup-title">遅れを取り戻す</h1>
-  ${warnings.size?`<h2>このタスクが遅れています <span>${warnings.size}件</span></h2>
-   <ul class="journey-list">${[...warnings].map(([id,warning])=>`<li>
-    <button type="button" data-record-leaf="${esc(id)}"><strong>${esc(state.nodes.find(node=>node.id===id).name)}</strong>
-     <small>${paceWarningText(warning)}</small></button>
-   </li>`).join('')}</ul>`:'<p class="muted">今のところ、遅れの警告はありません。</p>'}
+ const tasks=catchupTasks(state,today);
+ if(!tasks.size){
+  if(inUnderworld)leaveUnderworld();
+  return `<section class="catchup-scene heaven" aria-labelledby="catchup-title">
+   <div class="catchup-landscape" aria-hidden="true"><div class="heaven-halo"></div></div>
+   <div class="catchup-story"><h1 id="catchup-title" tabindex="-1">ようこそ、天国へ</h1>
+    <p>取り戻すタスクはありません。</p></div>
+  </section>`;
+ }
+ if(!inUnderworld)return `<section class="catchup-scene underworld-gate" aria-labelledby="catchup-title">
+  <div class="catchup-landscape" aria-hidden="true"><div class="underworld-arch"></div></div>
+  <div class="catchup-story"><h1 id="catchup-title">地獄の入口</h1>
+   <p>取り戻すタスクが <strong>${tasks.size}件</strong> あります。</p>
+   <button class="primary" type="button" data-do="enter-underworld">門を開く <span aria-hidden="true">→</span></button>
+  </div>
  </section>`;
+ return `<section class="catchup-scene underworld-court" aria-labelledby="catchup-title">
+  <button class="text-button catchup-exit" type="button" data-do="leave-underworld">← 地獄の入口へ</button>
+  <header class="enma-verdict">
+   <span class="enma-seal" aria-hidden="true">閻</span>
+   <h1 id="catchup-title" tabindex="-1">閻魔の間</h1>
+   <p class="enma-line">「こら、先延ばしのツケが来ておるぞ。<br>いつまでにやり遂げるか、わしに約束せい！」</p>
+  </header>
+  <ul class="catchup-list">${[...tasks].map(([id,task])=>{
+   const name=state.nodes.find(node=>node.id===id).name;
+   const deadline=task.promise?.deadline;
+   const days=deadline?(Date.parse(deadline)-Date.parse(today))/86400000+1:task.days;
+   const daily=days>0?numberText(Math.ceil(task.remaining/days*1000)/1000)+esc(task.unit):'';
+   return `<li>
+    <div class="catchup-task-heading"><h2>${esc(name)}</h2>
+     <span>残り <strong>${numberText(task.remaining)}${esc(task.unit)}</strong></span></div>
+    <p>${deadline?`約束の日 <time datetime="${esc(deadline)}">${esc(deadline).replaceAll('-','/')}</time>${days<=0?' · 期限を過ぎています':''}`:
+     task.type==='week'?'今週の目標':'達成期限までの目標'}${daily?` · 1日 ${daily}が目安`:''}</p>
+    <div class="catchup-task-actions"><button type="button" class="primary" data-catchup-promise="${esc(id)}">${deadline?'約束を変更':'期限を約束する'}</button>
+     <button type="button" class="text-button" data-record-leaf="${esc(id)}">取り組んだ量を記録</button></div>
+   </li>`;
+  }).join('')}</ul>
+ </section>`;
+}
+function catchupPromiseForm(id){
+ const task=catchupTasks(state,today).get(id);
+ if(!task)return;
+ const name=state.nodes.find(node=>node.id===id).name;
+ const suggested=task.promise?.deadline||task.suggestedDay||today;
+ modal(`<form id="catchup-promise-form" data-id="${esc(id)}">
+  <div class="dialog-title"><h2>閻魔との約束</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <p>${esc(name)} · 残り ${numberText(task.remaining)}${esc(task.unit)}</p>
+  <label>いつまでに取り戻しますか？<input type="date" name="deadline" min="${today}" value="${esc(suggested>=today?suggested:today)}" required></label>
+  <div class="dialog-actions"><button class="primary" type="submit">この日までに取り戻す</button></div>
+ </form>`);
 }
 function mindMapPage(){
  const plan=state.records[today];
@@ -1288,6 +1345,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   buttons.find(button=>button.dataset.analysisItem===d.analysisItem)?.focus({preventScroll:true});
   return;
  }
+ if(d.do==='enter-underworld'){void enterUnderworld();return}
+ if(d.do==='leave-underworld'){leaveUnderworld();render();$('[data-do="enter-underworld"]')?.focus();return}
+ if(d.catchupPromise){catchupPromiseForm(d.catchupPromise);return}
  if(d.do==='app-audio'){void toggleAppAudio();return}
  if(d.do==='planet-pulse'){pulsePlanet(b);return}
  if(d.do==='map-print'){mapPrintDialog();return}
@@ -1385,6 +1445,19 @@ document.addEventListener('dblclick',event=>{
 });
 document.addEventListener('error',e=>{if(e.target.matches?.('[data-account-photo]'))e.target.remove()},true);
 document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-submit'))return;e.preventDefault();
+ if(e.target.id==='catchup-promise-form'){
+  const previous=structuredClone(state);
+  const id=e.target.dataset.id;
+  try{
+   saveCatchupPromise(state,today,id,new FormData(e.target).get('deadline'));
+   if(!save()){state=previous;return;}
+   close();
+   render();
+   [...document.querySelectorAll('[data-catchup-promise]')].find(button=>button.dataset.catchupPromise===id)?.focus();
+   toast('閻魔と約束しました。');
+  }catch(error){toast(error.message);}
+  return;
+ }
  if(e.target.matches('.stats-analysis-filters')){
   const filters=new FormData(e.target);
   statsWeeks=Number(filters.get('stats-weeks'));
