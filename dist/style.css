@@ -333,68 +333,66 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .home-universe-art {
   position:relative;
   isolation:isolate;
-  width:min(100%,360px);
-  height:clamp(92px,21dvh,195px);
 }
 .home-universe-days { color:#c6b1ea; font-size:12px; margin-top:-4px; }
 @media (max-height:640px) {
   .home-universe { margin-bottom:8px; }
-  .home-universe-art { height:86px; }
+
 }
 
-/* The same planet is visible on arrival and when returning to the map. */
+/* The home and arrival scenes share the same central star. */
 .home-planet {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
+ position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;
 }
-.planet-globe {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  width: var(--planet-size, clamp(72px, 17dvh, 150px));
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background:
-    radial-gradient(ellipse at 30% 14%, #c9f6ffa0, transparent 47%),
-    radial-gradient(ellipse at 67% 39%, #524283c9, transparent 45%),
-    linear-gradient(145deg, #82c8e4, #416b88 38%, #201e44 62%, #070b23 82%);
-  box-shadow: inset 1px 1px 4px #b8eeff, 0 0 18px #79b9e05e, 0 0 46px #605ab44d;
+.home-system {
+ position:relative; isolation:isolate; width:min(100%,460px);
+ height:clamp(96px,22dvh,198px);
+ --planet-size:clamp(38px,10dvh,88px);
+ background:
+  radial-gradient(circle at 12% 19%,#d4dcff9e 0 1px,transparent 2px),
+  radial-gradient(circle at 84% 22%,#c5b5f6a0 0 1px,transparent 2px),
+  radial-gradient(circle at 77% 76%,#f2c8b780 0 1px,transparent 2px),
+  radial-gradient(circle at 34% 25%,#a7bef780 0 1px,transparent 2px),
+  radial-gradient(ellipse at center,#79588c2b 0%,transparent 73%);
 }
-.planet-globe::before {
-  content: "";
-  position: absolute;
-  inset: -6%;
-  rotate: -26deg;
-  background:
-    radial-gradient(ellipse at 18% 37%, #9fd6caaa 0 13%, transparent 15%),
-    radial-gradient(ellipse at 42% 24%, #abd8cab3 0 12%, transparent 14%),
-    radial-gradient(ellipse at 52% 40%, #649fc0e6 0 9%, transparent 13%),
-    radial-gradient(ellipse at 70% 60%, #6c639ba0 0 15%, transparent 18%),
-    repeating-linear-gradient(177deg, #d1e6f112, #d7eaff00 9%, #c4eff34f 16%, #d7eaff00 20%);
-  filter: blur(2px);
+.home-system .home-universe-art {
+ position:absolute; width:calc(var(--planet-size) + 8px); height:calc(var(--planet-size) + 8px);
+ left:50%; top:50%; translate:-50% -50%;
 }
-.planet-globe::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 28% 15%, transparent 29%, #06092232 58%, #04061de6 90%);
+.system-star {
+ position:relative; width:var(--planet-size); aspect-ratio:1; border-radius:50%;
+ background:radial-gradient(circle at 36% 31%,#fffce9 0%,#fff1be 22%,#ffc56e 49%,#da7649 73%,#703743 98%);
+ box-shadow:0 0 15px #ffd091ad,0 0 44px rgb(255 164 95 / var(--star-light)),inset -6px -8px 16px #b44a3870;
 }
-.planet-beacon {
-  position: absolute;
-  z-index: 1;
-  top: 57%;
-  left: 62%;
-  width: 4%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #fff2c7;
-  box-shadow: 0 0 7px 2px #ffca80, 0 0 24px 6px #f68b76a0;
-  opacity: var(--planet-light, 0);
-  transition: opacity .6s ease, box-shadow .6s ease;
+.system-star::before {
+ content:""; position:absolute; inset:5%; border-radius:inherit; opacity:.32;
+ background:repeating-radial-gradient(ellipse at 34% 42%,transparent 0 3px,#fff1bc7a 4px,transparent 6px 9px);
 }
+.system-orbit {
+ position:absolute; inset:20% 10%; border:1px solid #d3bcf453; border-radius:50%;
+ rotate:-8deg; pointer-events:none;
+}
+.system-orbit:nth-child(2) { inset:29% 23%; border-color:#edc7f05e; }
+.system-body {
+ position:absolute; left:var(--body-x); top:var(--body-y); translate:-50% -50%;
+ display:grid; place-items:center; width:44px; height:44px; border-radius:50%; padding:0;
+ --body-color:#9eaefd;
+}
+.system-body::after {
+ content:""; width:var(--body-size,14px); aspect-ratio:1; border-radius:50%;
+ background:radial-gradient(circle at 28% 22%,#fff8e4,var(--body-color) 39%,#19162e 89%);
+ box-shadow:0 0 12px color-mix(in srgb,var(--body-color) 48%,transparent);
+}
+.system-body:is(:hover,:focus-visible)::after { box-shadow:0 0 17px var(--body-color); }
+.system-body[data-map-tone="0"] { --body-color:#8dd6b2; --body-size:13px; }
+.system-body[data-map-tone="1"] { --body-color:#a6b6ff; --body-size:20px; }
+.system-body[data-map-tone="2"] { --body-color:#ec9ec2; --body-size:11px; }
+.system-body[data-map-tone="3"] { --body-color:#eec284; --body-size:25px; }
+.system-body[data-map-tone="4"] { --body-color:#79d4ee; --body-size:10px; }
+.birth-landing-system { width:min(100%,570px); margin-inline:auto; --planet-size:clamp(50px,12dvh,112px); }
+.birth-landing-system .system-body:nth-last-child(2) { --body-x:28%; --body-y:59%; --body-color:#8dd6b2; }
+.birth-landing-system .system-body:last-child { --body-x:86%; --body-y:35%; --body-color:#eec284; --body-size:22px; }
+.birth-screen[data-demo-recorded] .system-star { --star-light:.9; }
 .mind-map-mode.is-absorbing { opacity:.32; transition:opacity .28s ease; }
 .mode-absorption-light {
   position:fixed;

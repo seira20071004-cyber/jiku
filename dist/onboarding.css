@@ -488,13 +488,11 @@ body.birth-page, body.birth-active {
   position: absolute;
   inset: 8% 0 auto;
   height: 28%;
-  --planet-size: min(40vw, 21svh, 170px);
   opacity: 0;
   transform: scale(.86);
   transition: opacity .9s, transform 1.4s cubic-bezier(.2,.65,.3,1);
 }
 .birth-screen:is([data-stage="arrival"], [data-stage="login"]) .birth-landing-planet { opacity: 1; transform: scale(1); }
-.birth-screen[data-demo-recorded] .planet-beacon { opacity: 1; box-shadow: 0 0 10px 4px #ffd194, 0 0 28px 9px #ff8f68a0; }
 .birth-map-caption, .birth-arrival p {
   margin: 0;
   color: #ddd4eb;

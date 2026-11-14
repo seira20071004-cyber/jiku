@@ -1,6 +1,6 @@
 import {planningPrompt,jsonTemplate,previewMapImport} from './map-import.js';
 import {createBirthMusic} from './birth-music.js?v=3';
-import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,planetArt} from './onboarding.js';
+import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,starArt} from './onboarding.js';
 import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 import {createDemoUniverse} from './demo.js';
@@ -645,6 +645,22 @@ function catchupPromiseForm(id){
   <div class="dialog-actions"><button class="primary" type="submit">この日までに取り戻す</button></div>
  </form>`);
 }
+const systemPositions=[[27,54],[71,65],[15,36],[88,44],[40,76]];
+function homeStarSystem(days,energy){
+ const root=state.nodes.find(node=>node.parentId===null);
+ const planets=visibleChildren(state,root.id).slice(0,systemPositions.length);
+ return `<div class="home-system" role="group" aria-label="自分の恒星系">
+  <i class="system-orbit" aria-hidden="true"></i><i class="system-orbit" aria-hidden="true"></i>
+  <button type="button" class="home-universe-art" data-do="planet-pulse" aria-label="恒星を光らせる">${starArt(days)}
+   ${energy.colors.length?`<span class="planet-prize" style="--planet-prize:${planetPrizes[energy.colors.at(-1)].color}" aria-hidden="true"></span>`:''}
+  </button>
+  ${planets.map((node,index)=>{
+   const [x,y]=systemPositions[index];
+   return `<button type="button" class="system-body" data-system-goal="${esc(node.id)}" data-map-tone="${index}"
+    aria-label="${esc(node.name)}をマインドマップで見る" title="${esc(node.name)}" style="--body-x:${x}%;--body-y:${y}%"></button>`;
+  }).join('')}
+ </div>`;
+}
 function mindMapPage(){
  const plan=state.records[today];
  const plannedTasks=plan?.plannedMode?modeItems(plan.quantityMenu||[],plan.plannedMode)
@@ -654,7 +670,7 @@ function mindMapPage(){
  const morningTask=morningSelection();
  return `<section class="mind-map" aria-labelledby="mind-map-title">
   <div class="home-universe">
-   <button type="button" class="home-universe-art" data-do="planet-pulse" aria-label="星を光らせる">${planetArt(growth.days)}${energy.colors.length?`<span class="planet-prize" style="--planet-prize:${planetPrizes[energy.colors.at(-1)].color}" aria-hidden="true"></span>`:''}</button>
+   ${homeStarSystem(growth.days,energy)}
    <button type="button" class="planet-energy-balance" data-do="planet-energy" aria-label="宇宙エネルギー ${numberText(energy.balance)}ポイント${featureUnlocked('gacha')?'、ガチャを開く':'、ガチャはマップ確定後、2日の記録で解放'}">✦ ${numberText(energy.balance)} <span>宇宙エネルギー</span>${featureUnlocked('gacha')?'':`<small>ガチャは2日で解放</small>`}</button>
    ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
   </div>
@@ -1201,11 +1217,10 @@ function openMindMap(){
  render();
  $('.mind-map [aria-current]')?.scrollIntoView({block:'nearest'});
 }
-function selectMapNode(button){
+function selectMapNode(button,nodeId=button.dataset.mapSelect){
  const scroll=$('.mind-map-scroll');
- const fromOverview=button.closest('.map-diagram-overview');
+ const fromOverview=button.hasAttribute('data-system-goal')||button.closest('.map-diagram-overview');
  const wasExpanded=button.getAttribute('aria-expanded')==='true';
- const nodeId=button.dataset.mapSelect;
  mapSelection=wasExpanded?null:nodeId;
  const scrollTop=scroll.scrollTop;
  scroll.innerHTML=personalMap();
@@ -1342,6 +1357,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.do==='leave-underworld'){leaveUnderworld();render();$('[data-do="enter-underworld"]')?.focus();return}
  if(d.catchupPromise){catchupPromiseForm(d.catchupPromise);return}
  if(d.do==='app-audio'){void toggleAppAudio();return}
+ if(d.systemGoal){appAudio?.cue?.('navigate');selectMapNode(b,d.systemGoal);return}
  if(d.do==='planet-pulse'){pulsePlanet(b);return}
  if(d.do==='map-print'){mapPrintDialog();return}
  if(d.do==='map-import'){mapImportDialog();return}
