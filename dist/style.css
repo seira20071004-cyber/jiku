@@ -541,8 +541,7 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 }
 .analysis-slide { flex:0 0 100%; min-width:0; scroll-snap-align:start; padding:2px 0 8px; }
 .analysis-pagination { display:flex; justify-content:center; gap:6px; margin-top:8px; }
-.analysis-pagination i { width:6px; height:6px; border-radius:50%; background:#534964; }
-.analysis-pagination .active { background:#d5bafe; }
+.analysis-pagination i { width:6px; height:6px; border-radius:50%; }
 
 .analysis-parent { min-height:36px; margin:0 0 8px; padding:0; text-align:left; color:#d3baff; }
 .analysis-slide h3 { margin:0 0 9px; font-size:15px; overflow-wrap:anywhere; }
@@ -837,3 +836,27 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 .tab-page h2 { font-size:16px; }
 .tab-page .journey-list button:has(small) { display:grid; text-align:left; gap:5px; }
 .tab-page .journey-list small { color:#c1a9a8; }
+
+.analysis-pagination { gap:0; }
+.analysis-pagination button { display:grid; place-items:center; width:32px; height:22px; padding:0; }
+.analysis-pagination button i { background:#655978; }
+.analysis-pagination button.active i { background:#d5bafe; }
+.achievement-columns {
+ display:flex; overflow-x:auto; align-items:stretch; scrollbar-width:thin;
+ overscroll-behavior-inline:contain;
+}
+.achievement-column { flex:1 0 clamp(245px,35vw,355px); min-width:0; padding:6px 14px; }
+.achievement-column + .achievement-column { border-inline-start:1px solid #75668c80; }
+.achievement-column:first-child { padding-inline-start:0; }
+.achievement-column .analysis-parent { float:inline-start; margin:0 9px 0 0; min-height:0; }
+.achievement-card[aria-expanded="true"] { outline:1px solid #af98dd78; outline-offset:-1px; }
+.achievement-column-enter { animation:achievement-enter 250ms ease-out both; }
+@keyframes achievement-enter {
+ from { transform:translateX(28px); opacity:.2; }
+ to { transform:translateX(0); opacity:1; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .achievement-column-enter { animation:none; }
+}
+.rate-reached { --rate-color:#a2bbff; }
+.rate-surpassed { --rate-color:#89e77f; }

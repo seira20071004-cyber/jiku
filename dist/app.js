@@ -414,7 +414,7 @@ function analysisConditions(){
 function bindAnalysisSlides(){
  const slides=$('.analysis-slides');
  if(!slides)return;
- const pages=[...slides.children],dots=[...document.querySelectorAll('.analysis-pagination i')];
+ const pages=[...slides.children],tabs=[...document.querySelectorAll('.analysis-pagination button')];
  const sync=index=>{
   const next=Math.max(0,Math.min(pages.length-1,index));
   if(next!==analysisSlide)appAudio?.cue?.('navigate');
@@ -422,13 +422,15 @@ function bindAnalysisSlides(){
   for(const [i,page] of pages.entries()){
    if(i!==analysisSlide&&page.contains(document.activeElement))slides.focus({preventScroll:true});
    page.inert=i!==analysisSlide;
-   dots[i].classList.toggle('active',i===analysisSlide);
+   tabs[i].classList.toggle('active',i===analysisSlide);
+   tabs[i].setAttribute('aria-pressed',String(i===analysisSlide));
   }
  };
  const goTo=index=>slides.scrollTo({
   left:index*slides.clientWidth,
   behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'
  });
+ tabs.forEach((button,index)=>button.addEventListener('click',()=>goTo(index)));
  slides.scrollLeft=analysisSlide*slides.clientWidth;
  sync(analysisSlide);
  slides.addEventListener('keydown',event=>{
@@ -443,6 +445,7 @@ function bindAnalysisSlides(){
  let drag=null;
  slides.addEventListener('pointerdown',event=>{
   if(event.pointerType!=='mouse'||event.button!==0||event.target.closest('button')||
+   (event.target.closest('.achievement-columns')?.scrollWidth>slides.clientWidth)||
    (event.target.closest('.trend-plot')?.scrollWidth>slides.clientWidth))return;
   drag={x:event.clientX,index:analysisSlide};
   slides.setPointerCapture(event.pointerId);
@@ -521,7 +524,7 @@ function mapActions(){
  return `<div class="mind-map-tools">
   ${nodeKind(state,node.id)==='action'?`<button data-space-detail="${esc(node.id)}">タスクの詳細</button>`:''}
   ${mapEditing?'<button type="button" data-do="map-import">AIで作成・取り込み</button>':''}
-  <button type="button" data-do="map-print">印刷・PDF</button>
+  <button type="button" data-do="map-print">PDF</button>
   <button data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
  </div>`;
 }
@@ -540,7 +543,7 @@ function personalMap({selection=mapSelection,preview=false,addition=null}={}){
  };
  const galaxies=childrenFor(root.id);
  const branchRoot=path[1];
- const tone=galaxies.findIndex(node=>node.id===branchRoot?.id)%4;
+ const tone=galaxies.findIndex(node=>node.id===branchRoot?.id) % 5;
  const card=(node,depth,style='',overview=false)=>{
   if(node.insertion){
    const label=addition.kind==='action'?'新しいタスク':'新しい目標';
@@ -560,7 +563,7 @@ function personalMap({selection=mapSelection,preview=false,addition=null}={}){
   </div>`:''}`;
  };
  const overview=mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
-  tone:index%4,card:card(node,1,'',true)
+  tone:index % 5,card:card(node,1,'',true)
  })),{radial:true,label:'マインドマップ全体'});
  if(!branchRoot)return overview+`<div id="${branchId}" hidden></div>`;
  return overview+mapBranchPanel(branchRoot,{childrenFor,card,branchId,tone});
@@ -667,7 +670,7 @@ function printableMap(root){
   </li>`).join('')}</ul>`;
  }
  const overview=mapDiagram(card(root,depth,'map-root'),children.map((node,index)=>({
-  tone:index%4,card:card(node,depth+1,'map-print-branch-root')+descendantsOf(node,depth+2)
+  tone:index % 5,card:card(node,depth+1,'map-print-branch-root')+descendantsOf(node,depth+2)
  })),{radial:true,label:'マインドマップ全体'});
  return `<article class="map-print-document">${overview}</article>`;
 }
@@ -686,7 +689,7 @@ function mapPrintDialog(){
   </select></label>
   <p>A4縦・1ページ。枝が多いときは、印刷する範囲を絞ると文字を大きくできます。</p>
   <div class="map-print-preview" tabindex="0" aria-label="印刷プレビュー">${printableMap(root)}</div>
-  <div class="dialog-actions"><button type="submit" class="primary">印刷・PDF保存</button></div>
+  <div class="dialog-actions"><button type="submit" class="primary">PDFを保存</button></div>
  </form>`);
  centerPrintPreview($('.map-print-preview'));
 }
@@ -1258,20 +1261,31 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   }catch(error){output.textContent=error.message;apply.hidden=true;}
   return;
  }
+ if(d.achievementItem||d.achievementBack){
+  const previous=$('.achievement-columns'),position=previous.scrollLeft;
+  const parent=b.closest('[data-achievement-column]').dataset.achievementColumn;
+  const opening=d.achievementItem&&b.getAttribute('aria-expanded')!=='true';
+  const next=opening?d.achievementItem:(d.achievementBack||parent);
+  quantityScope=reportScope(next);
+  appAudio?.cue?.('navigate');
+  render();
+  const columns=$('.achievement-columns'),column=columns.lastElementChild;
+  columns.scrollLeft=position;
+  if(opening)column.classList.add('achievement-column-enter');
+  const focus=opening?column.querySelector('h3'):[...column.querySelectorAll('[data-achievement-item]')]
+   .find(button=>button.dataset.achievementItem===(d.achievementBack?parent:d.achievementItem))||column.querySelector('h3');
+  focus.focus({preventScroll:true});
+  focus.scrollIntoView({block:'nearest',inline:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+  return;
+ }
  if(d.analysisItem){
   appAudio?.cue?.('navigate');
-  const fromCards=b.closest('.achievement-panel');
   quantityScope=reportScope(d.analysisItem);
   const table=$('.hierarchy-table-wrap'),position=table&&[table.scrollLeft,table.scrollTop];
   render();
   if(position)$('.hierarchy-table-wrap')?.scrollTo(...position);
-  if(fromCards){
-   const panel=$('.achievement-panel');
-   (panel.querySelector('.analysis-parent')||panel.querySelector('h3')).focus({preventScroll:true});
-  }else{
-   const buttons=[...document.querySelectorAll('.hierarchy-table [data-analysis-item]')];
-   buttons.find(button=>button.dataset.analysisItem===d.analysisItem)?.focus({preventScroll:true});
-  }
+  const buttons=[...document.querySelectorAll('.hierarchy-table [data-analysis-item]')];
+  buttons.find(button=>button.dataset.analysisItem===d.analysisItem)?.focus({preventScroll:true});
   return;
  }
  if(d.do==='app-audio'){void toggleAppAudio();return}
@@ -1343,7 +1357,10 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  }
  if(b.hasAttribute('data-remove-extra')){b.closest('[data-extra-metric]').remove();return}
  if(d.spaceEnter){enterSpace(d.spaceEnter);return}if(d.spaceGo){close();enterSpace(d.spaceGo);return}if(d.legacyDetail){legacyDetail(d.legacyDetail);return}if(d.spaceAdd){creationDraft=null;chooseCreationType(d.spaceAdd);return}if(d.createKind){editor('new',d.createKind);return}if(b.hasAttribute('data-create-back')){const form=b.closest('form');creationDraft={...creationDraft,...Object.fromEntries(new FormData(form)),extras:readExtraSettings(form)};chooseCreationType(addParent||currentSpace().id);return}if(d.spaceDetail){spaceDetail(d.spaceDetail);return}if(d.spaceStats){quantityScope=d.spaceStats;analysisSlide=0;statsTab='graph';view='stats';location.hash='stats';close();render();return}if(d.spaceReorder){const previous=structuredClone(state);reorderNode(state,d.spaceReorder,Number(d.direction));const points=JSON.stringify(state.nodes)!==JSON.stringify(previous.nodes)?earnEnergy('edit',today):0;if(!save()){state=previous;return}render();spaceList();if(points)energyToast('表示順を変更しました',points);return}if(d.openPreset)openPreset(d.openPreset);if(b.hasAttribute('data-configure-leaves')){close();view='tree';location.hash='tree';render();toast('タスクを押して、タスクの固定量を設定してください')}if(d.recordLeaf)leafPanel(d.recordLeaf,d.logDate||today);if(d.pickLeaf)chooseLeaf(d.pickLeaf);if(d.quantityDay)dayEditor(d.quantityDay);if(d.addQuantity){const input=$('#quantity-form [name=record-minutes]');if(input)input.value=String(Math.round(((Number(input.value)||0)+Number(d.addQuantity))*1000000)/1000000)}if(d.removeQuantity){modal(`<h2>この日の量の記録を削除しますか？</h2><div class="dialog-actions"><button class="text-button" data-do="close">キャンセル</button><button class="primary danger-bg" data-confirm-remove-quantity="${esc(d.removeQuantity)}" data-log-date="${d.logDate}">削除する</button></div>`)}if(d.confirmRemoveQuantity){removeQuantity(state,d.logDate,d.confirmRemoveQuantity);save();close();render();toast('この日の記録を削除しました')}if(b.hasAttribute('data-scroll-tree')){$('#goal-tree')?.scrollIntoView({behavior:'smooth',block:'start'})}if(d.statTab){
-  if(d.statTab!==statsTab)appAudio?.cue?.('navigate');
+  if(d.statTab!==statsTab){
+   appAudio?.cue?.('navigate');
+   if(d.statTab==='graph')analysisSlide=0;
+  }
   statsTab=d.statTab;
   render();
   $(`[data-stat-tab="${statsTab}"]`)?.focus({preventScroll:true});

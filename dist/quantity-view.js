@@ -226,6 +226,7 @@ function completedDayShare(from,to,today){
 }
 export function achievementTone(actual,target,due=target){
  if(actual===null||!(target>0))return '';
+ if(actual/target>=1.2-1e-10)return 'rate-surpassed';
  if(actual>=target)return 'rate-reached';
  if(!(due>0))return '';
  const pace=actual/due;
@@ -309,21 +310,27 @@ function hierarchyChart(root,current,tone){
   </div>`;
 }
 
-function achievementCards(item,parent,tone){
- const card=(row,summary=false)=>{
+function achievementCards(current,items,tone){
+ const path=[current];
+ while(path[0].parentId)path.unshift(items.get(path[0].parentId));
+ const card=(row,expanded=false,summary=false)=>{
   const rate=percent(row.actual,row.target),difference=row.actual-row.target;
   const tag=summary?'div':'button';
-  return `<${tag} class="achievement-card ${tone(row)}" ${summary?'':`type="button" data-analysis-item="${esc(row.id)}"`}>
-   <strong>${summary?'この目標の達成率':esc(row.name)}</strong>
+  return `<${tag} class="achievement-card ${tone(row)}" ${summary?'':`type="button" data-achievement-item="${esc(row.id)}" aria-expanded="${expanded}"`}>
+   <strong>${esc(row.name)}</strong>
    <span class="achievement-ring" style="--progress:${Math.min(100,rate||0)}%"><b>${percentText(row.actual,row.target)}</b></span>
    <span>${hoursText(row.actual)} / ${row.target?hoursText(row.target):'目標未設定'}</span>
    ${row.target?`<small>${difference>=0?'+':'−'}${hoursText(Math.abs(difference))}</small>`:''}
   </${tag}>`;
  };
  return `<div class="achievement-panel">
-  ${parent?`<button class="analysis-parent text-button" type="button" data-analysis-item="${esc(parent.id)}">‹ ${esc(parent.name)}へ戻る</button>`:''}
-  <h3 tabindex="-1">${esc(item.name)}の目標別達成率</h3>
-  <div class="achievement-cards">${(item.children.length?item.children:[item]).map(row=>card(row,row===item)).join('')}</div>
+  <div class="achievement-columns">
+   ${path.map((item,index)=>`<section class="achievement-column" data-achievement-column="${esc(item.id)}" aria-labelledby="achievement-title-${index}">
+    ${index?`<button class="analysis-parent text-button" type="button" data-achievement-back="${esc(path[index-1].id)}" aria-label="${esc(path[index-1].name)}へ戻る">←</button>`:''}
+    <h3 id="achievement-title-${index}" tabindex="-1">${esc(item.name)}</h3>
+    <div class="achievement-cards">${(item.children.length?item.children:[item]).map(row=>card(row,row===path[index+1],row===item)).join('')}</div>
+   </section>`).join('')}
+  </div>
  </div>`;
 }
 
@@ -336,11 +343,13 @@ export function analysisChart(state,{start,end,scope,weeks}){
  return `<section class="activity-chart analysis-chart" aria-label="目標の達成度">
   <header><time datetime="${start}">${start.replaceAll('-','/')}</time><span>〜</span><time datetime="${end}">${end.replaceAll('-','/')}</time></header>
   <div class="analysis-slides" tabindex="0" aria-label="達成度。左右にスワイプ、または矢印キーで切り替え">
+   <section class="analysis-slide" aria-label="円グラフ">${achievementCards(current,items,tone)}</section>
    <section class="analysis-slide" aria-label="推移">${trendChart(current,periods,dueTargets(current))}</section>
    <section class="analysis-slide analysis-rates" aria-label="達成率">${hierarchyChart(root,current,tone)}</section>
-   <section class="analysis-slide" aria-label="目標別">${achievementCards(current,items.get(current.parentId),tone)}</section>
   </div>
-  <div class="analysis-pagination" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="analysis-pagination" aria-label="グラフの切り替え">
+   ${['円グラフ','推移','達成率'].map(label=>`<button type="button" aria-label="${label}"><i aria-hidden="true"></i></button>`).join('')}
+  </div>
  </section>`;
 }
 

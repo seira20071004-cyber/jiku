@@ -26,6 +26,12 @@ test('階層を合計し、超過と不足が累計で相殺される',()=>{
  assert.equal(items.get(goal).actual,2);
  assert.deepEqual(items.get(task).weekly,[{actual:1.2,target:1},{actual:.8,target:1}]);
  const chart=analysisChart(state,{...period,scope:task});
+ assert(chart.indexOf('aria-label="円グラフ"')<chart.indexOf('aria-label="推移"'));
+ const columns=[...chart.matchAll(/data-achievement-column="([^"]+)"/g)].map(match=>match[1]);
+ assert.deepEqual(columns,[root.id,goal,task]);
+ assert.match(chart,/class="trend-value rate-surpassed"[^>]*>120%/);
+ assert.equal(achievementTone(119.99,100),'rate-reached');
+ assert.equal(achievementTone(120,100),'rate-surpassed');
  assert.match(chart,/11\/1の週、達成率120%、累計120%/);
  assert.match(chart,/11\/8の週、達成率80%、累計100%/);
  assert.match(chart,/class="trend-value "[^>]*>80%/);

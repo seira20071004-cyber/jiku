@@ -160,3 +160,9 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
   .map-branch-lane > li { padding:3px; }
   .map-galaxy-tree .map-branch-row > [aria-hidden] { display:none; }
 }
+
+.map-diagram [data-map-tone="4"],
+.map-galaxy-view[data-map-tone="4"] { --map-tone:#79d4ee; }
+.map-point > .map-node:not(:hover, [aria-current="true"]) {
+  background:color-mix(in srgb,var(--map-tone) 17%,#15182b);
+}
