@@ -21,7 +21,8 @@ function registerDiagram() {
       const svg = this.querySelector('svg');
       const x = hub.left - bounds.left + hub.width / 2;
       const connections = Array.from(this.querySelectorAll('[data-map-point]'), point => {
-        const rect = point.firstElementChild.getBoundingClientRect();
+        const card = point.querySelector(':scope > .map-node') || point.firstElementChild;
+        const rect = card.getBoundingClientRect();
         const upper = rect.top < hub.top;
         const startY = (upper ? hub.top : hub.bottom) - bounds.top;
         const endY = (upper ? rect.bottom : rect.top) - bounds.top;

@@ -777,18 +777,45 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 #jiku-print-output { position:fixed; top:0; left:-200vw; width:182mm; pointer-events:none; }
 .map-print-preview { max-height:52dvh; overflow:auto; padding:4px; border-radius:10px; }
 .map-print-document { overflow-wrap:anywhere; }
-.map-print-branches { display:grid; gap:10px; }
-.map-print-document .map-branch-row small { margin-top:3px; }
+.map-print-document .map-band { width:100%; column-gap:clamp(9px,4%,24px); }
+.map-print-document .map-point { display:flex; flex-direction:column; justify-content:flex-start; }
+.map-print-document .map-band:has(+ .map-hub) .map-point { flex-direction:column-reverse; }
+.map-print-document .map-node { min-height:34px; padding:4px 6px; }
+.map-print-document .map-root { min-height:58px; }
+.map-print-document .map-node > span { min-width:0; }
+.map-print-document .map-node small { margin:0; }
+.map-print-document .map-branch-row { justify-content:flex-start; text-align:left; border-radius:9px; }
+.map-print-links {
+ display:flex; flex-direction:column; gap:5px; position:relative;
+ list-style:none; margin:0; padding:7px 0 0 12px;
+}
+.map-print-links > li { position:relative; min-width:0; }
+.map-print-links > li::before,.map-print-links > li::after {
+ content:""; position:absolute; pointer-events:none; left:-8px; width:8px;
+ border-color:var(--map-tone); border-style:solid; border-width:0;
+}
+.map-print-links > li::before { top:-7px; height:24px; border-left-width:1px; border-bottom-width:1px; }
+.map-print-links > li:not(:last-child)::after { top:17px; bottom:-7px; border-left-width:1px; }
+.map-print-links::before {
+ content:""; position:absolute; left:4px; top:0; width:16px; border-top:1px solid var(--map-tone);
+}
+.map-print-document .map-band:has(+ .map-hub) .map-print-links { flex-direction:column-reverse; padding-block:0 7px; }
+.map-print-document .map-band:has(+ .map-hub) .map-print-links > li { display:flex; flex-direction:column-reverse; }
+.map-print-document .map-band:has(+ .map-hub) .map-print-links > li::before {
+ top:auto; bottom:-7px; border-top-width:1px; border-bottom-width:0;
+}
+.map-print-document .map-band:has(+ .map-hub) .map-print-links > li:not(:last-child)::after { top:-7px; bottom:17px; }
+.map-print-document .map-band:has(+ .map-hub) .map-print-links::before { top:auto; bottom:0; }
 @media print {
- @page { size:A4; margin:14mm; }
+ @page { size:A4 portrait; margin:14mm; }
  html,body { height:auto !important; overflow:visible !important; background:#fff !important; color:#171720; }
  body:has(> #jiku-print-output) > :not(#jiku-print-output) { display:none !important; }
  #jiku-print-output {
-  position:static; width:auto; print-color-adjust:exact; -webkit-print-color-adjust:exact;
+  position:relative; top:auto; left:auto; height:var(--map-paper-height); overflow:clip;
+  print-color-adjust:exact; -webkit-print-color-adjust:exact;
  }
- .map-print-document .map-diagram { break-inside:avoid; }
- .map-print-branches { display:block; }
- .map-print-document .map-galaxy-view { margin-top:10px; }
- .map-print-document .map-branch-header { break-after:avoid; }
- .map-print-document .map-node { break-inside:avoid; }
+ #jiku-print-output .map-print-document {
+  position:absolute; inset:0 0 auto; break-inside:avoid;
+  transform:scale(var(--map-paper-scale)); transform-origin:top center;
+ }
 }

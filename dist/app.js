@@ -625,15 +625,24 @@ function printableMap(root){
    </span>
   </div>`;
  };
+ function descendantsOf(node,level){
+  const children=childrenFor(node.id);
+  if(!children.length)return '';
+  return `<ul class="map-print-links">${children.map(child=>`<li>
+   ${card(child,level,'map-branch-row')}
+   ${descendantsOf(child,level+1)}
+  </li>`).join('')}</ul>`;
+ }
  const overview=mapDiagram(card(root,depth,'map-root'),children.map((node,index)=>({
-  tone:index%4,card:card(node,depth+1)
+  tone:index%4,card:card(node,depth+1,'map-print-branch-root')+descendantsOf(node,depth+2)
  })),{radial:true,label:'マインドマップ全体'});
- const sections=children.map((node,index)=>childrenFor(node.id).length
-  ?mapBranchPanel(node,{childrenFor,card,branchId:'print-branch-'+index,tone:index%4,depth:depth+1}):'').join('');
- return `<article class="map-print-document">
-  ${overview}
-  ${sections?`<div class="map-print-branches">${sections}</div>`:''}
- </article>`;
+ return `<article class="map-print-document">${overview}</article>`;
+}
+
+function centerPrintPreview(preview){
+ const center=preview.querySelector('.map-root').getBoundingClientRect();
+ const viewport=preview.getBoundingClientRect();
+ preview.scrollTop+=center.top+center.height/2-viewport.top-viewport.height/2;
 }
 function mapPrintDialog(){
  const root=state.nodes.find(node=>node.parentId===null),selected=selectedMapNode();
@@ -642,24 +651,32 @@ function mapPrintDialog(){
   <label>印刷する範囲<select name="print-scope"><option value="${esc(root.id)}">マップ全体</option>
    ${selected.id!==root.id?`<option value="${esc(selected.id)}">${esc(selected.name)}</option>`:''}
   </select></label>
-  <p>印刷画面で、プリンターかPDF保存を選べます。</p>
+  <p>A4縦・1ページ。枝が多いときは、印刷する範囲を絞ると文字を大きくできます。</p>
   <div class="map-print-preview" tabindex="0" aria-label="印刷プレビュー">${printableMap(root)}</div>
   <div class="dialog-actions"><button type="submit" class="primary">印刷・PDF保存</button></div>
  </form>`);
+ centerPrintPreview($('.map-print-preview'));
 }
 function printMap(form){
  document.getElementById('jiku-print-output')?.remove();
  const sheet=document.createElement('div');
  sheet.id='jiku-print-output';
+ sheet.setAttribute('aria-hidden','true');
  const id=form.elements.namedItem('print-scope').value;
  const node=state.nodes.find(item=>item.id===id);
  if(!node)return;
  sheet.innerHTML=printableMap(node);
  document.body.append(sheet);
- for(const branch of sheet.querySelectorAll('[id]'))branch.id='output-'+branch.id;
- for(const branch of sheet.querySelectorAll('[aria-labelledby]'))branch.setAttribute('aria-labelledby','output-'+branch.getAttribute('aria-labelledby'));
- for(const diagram of sheet.querySelectorAll('jiku-mind-map'))diagram.drawConnections();
- window.addEventListener('afterprint',()=>sheet.remove(),{once:true});
+ const diagram=sheet.querySelector('jiku-mind-map');
+ diagram.drawConnections();
+ const height=diagram.getBoundingClientRect().height;
+ // Fit inside the A4 printable height (297 mm less two 14 mm margins).
+ const available=268*96/25.4;
+ const scale=Math.min(1,available/height);
+ sheet.style.setProperty('--map-paper-scale',String(scale));
+ sheet.style.setProperty('--map-paper-height',`${height*scale}px`);
+ const cleanup=()=>sheet.remove();
+ window.addEventListener('afterprint',cleanup,{once:true});
  window.print();
 }
 function mapImportDialog(){
@@ -1192,7 +1209,11 @@ document.addEventListener('input',event=>{
 });
 document.addEventListener('change',async e=>{if(e.target.name==='print-scope'&&e.target.form?.id==='map-print-form'){
  const node=state.nodes.find(node=>node.id===e.target.value);
- if(node)e.target.form.querySelector('.map-print-preview').innerHTML=printableMap(node);
+ if(node){
+  const preview=e.target.form.querySelector('.map-print-preview');
+  preview.innerHTML=printableMap(node);
+  centerPrintPreview(preview);
+ }
  return;
  }if(e.target.name==='node-kind'){
  const form=e.target.closest('form'),box=form.querySelector('.goal-action-fields'),active=e.target.value==='action';
