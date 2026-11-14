@@ -631,7 +631,6 @@ function mindMapPage(){
      <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button type="button" data-mode="${key}" data-date="${today}">${MODES[key].label}</button>`).join('')}</div>`}
   </section>
   <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1></header>
-  ${taskPaceWarnings(state,today).size?`<button class="text-button pace-shortcut" data-view="catchup">このタスクが遅れています →</button>`:''}
   <div class="mind-map-scroll">${personalMap()}</div>
   <footer class="mind-map-footer">${mapActions()}</footer>
  </section>`;

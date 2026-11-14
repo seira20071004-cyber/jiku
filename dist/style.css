@@ -837,4 +837,3 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 .tab-page h2 { font-size:16px; }
 .tab-page .journey-list button:has(small) { display:grid; text-align:left; gap:5px; }
 .tab-page .journey-list small { color:#c1a9a8; }
-.pace-shortcut { color:#f1aaa5; align-self:flex-start; }
