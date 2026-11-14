@@ -247,7 +247,7 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
   padding:clamp(14px,3vw,26px) clamp(14px,4vw,32px) 10px;
 }
 .mind-map-header h1 {
-  margin:0 0 12px;
+  margin:0;
   color:#f3ecff;
   font-size:clamp(20px,4vw,27px);
 }
@@ -281,6 +281,10 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 }
 .mind-map-tools { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
 .mind-map-tools button { min-height:35px; padding-inline:8px; color:#c8bce6; font-size:12px; }
+.mind-map-header { margin-bottom:6px; }
+.mind-map-header .mind-map-tools { flex:none; flex-wrap:nowrap; }
+.mind-map-header .mind-map-tools button { min-height:44px; min-width:44px; }
+.mind-map-footer:not(:has(.map-confirm, button)) { display:none; }
 .space-map-back { display:none; }
 .at-origin .space-map-back {
   display:block;

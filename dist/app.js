@@ -513,8 +513,6 @@ function mapActions(){
  return `<div class="mind-map-tools">
   ${nodeKind(state,node.id)==='action'?`<button data-space-detail="${esc(node.id)}">タスクの詳細</button>`:''}
   ${mapEditing?'<button type="button" data-do="map-import">AIで作成・取り込み</button>':''}
-  <button type="button" data-do="map-print">PDF</button>
-  <button data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
  </div>`;
 }
 function personalMap({selection=mapSelection,preview=false,analysis=false,addition=null}={}){
@@ -693,7 +691,12 @@ function mindMapPage(){
     `<h2>今日、残りの時間はどのペースでいけそう？</h2>
      <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button type="button" data-mode="${key}" data-date="${today}">${MODES[key].label}</button>`).join('')}</div>`}
   </section>
-  <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1></header>
+  <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1>
+   <div class="mind-map-tools" role="group" aria-label="マインドマップの操作">
+    <button type="button" data-do="map-print">PDF</button>
+    <button type="button" data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
+   </div>
+  </header>
   <div class="mind-map-scroll">${personalMap()}</div>
   <footer class="mind-map-footer">
    ${state.universe?.mapConfirmed===true?'':`<div class="map-confirm">
