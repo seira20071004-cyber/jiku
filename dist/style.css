@@ -461,7 +461,7 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
   grid-template-rows: 22px repeat(var(--weeks), clamp(48px, 8dvh, 74px));
   gap: clamp(4px, 1.25vw, 9px);
 }
-.view-stats .stats-dashboard .calendar-content .cosmic-calendar .day-cell > span {
+.view-stats .stats-dashboard .calendar-content .cosmic-calendar .day-cell > .calendar-day-number {
   top: 6px;
   left: 6px;
   font-size: clamp(13px, 3vw, 18px);
@@ -471,7 +471,7 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
   bottom: 4px;
   font-size: clamp(12px, 3vw, 18px);
 }
-.stats-dashboard .cosmic-calendar .quantity-calendar-dot { bottom: 6px; left: 7px; }
+
 .calendar-mode-card { margin-top: 8px; color:#e9e0f3; }
 .activity-chart { color:#f1ebfa; }
 .calendar-mode-content { margin-top: 8px; }
@@ -850,11 +850,23 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .trend-legend .analysis-reference-key { --trend-color:#b2a9c6; }
 
 .stats-dashboard .month-heading .calendar-month-actions { display:flex; align-items:center; gap:8px; }
-.calendar-month-actions .calendar-current-month {
- min-height:38px; padding:0 12px; color:#f1e5ff; border:1px solid #ab91df57;
- border-radius:9px; background:#29213f; white-space:nowrap; font-size:12px;
+.calendar-month-actions .round-button {
+ display:grid; place-items:center; width:40px; height:40px; padding:0 0 3px; line-height:1;
 }
+.calendar-month-actions .round-button:disabled { opacity:.4; cursor:default; }
 .map-inline-tools button,.mind-map-tools [data-map-edit-mode],.day-quantity-row [data-record-leaf] {
  color:#f4eaff; background:#2c2345; border-color:#b49be268;
 }
 .mind-map-tools [data-map-edit-mode][aria-pressed="true"] { background:#513b79; }
+
+
+.cosmic-calendar .day-cell > .calendar-day-marks {
+ position:absolute; inset:auto auto 8px 7px; display:flex; gap:4px; align-items:center;
+}
+.cosmic-calendar .calendar-day-marks > b {
+ position:static; width:5px; height:5px; flex:none; transform:none; border-radius:50%;
+}
+.view-stats .stats-dashboard .calendar-content .cosmic-calendar .day-cell > i {
+ display:grid; place-items:center; width:20px; height:20px;
+ right:4px; bottom:4px; line-height:1;
+}
