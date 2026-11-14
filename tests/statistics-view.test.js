@@ -10,7 +10,7 @@ import {recordMode,modeDistribution} from '../dist/model.js';
 test('記録なしと何もしなかった日は同じモード・割合にまとめ、未来を数えず記録を変更しない',()=>{const s=seed();s.records={'2026-11-02':{mode:'full'},'2026-11-03':{mode:'none'},'2026-11-04':{mode:'busy'},'2026-11-05':{mode:'rest'},'2026-11-10':{mode:'full'}};const before=JSON.stringify(s);assert.equal(recordMode(s,'2026-11-03'),'none');assert.equal(recordMode(s,'2026-11-06'),'none');assert.deepEqual(modeDistribution(s,'2026-11-02','2026-11-15','2026-11-09'),{counts:{full:1,busy:1,rest:1,none:5},days:8});assert.deepEqual(modeDistribution(s,'2026-11-10','2026-11-15','2026-11-09'),{counts:{full:0,busy:0,rest:0,none:0},days:0});assert.equal(JSON.stringify(s),before)});
 
 import {analysisData,analysisChart,achievementTone} from '../dist/quantity-view.js';
-import {freshUniverse,writeGoal} from '../dist/universe-model.js';
+import {freshUniverse,writeGoal,featureDays,featureProgress,canConfirmMap} from '../dist/universe-model.js';
 import {setTaskRecord} from '../dist/model.js';
 test('階層を合計し、超過と不足が累計で相殺される',()=>{
  const state=freshUniverse();
@@ -26,16 +26,16 @@ test('階層を合計し、超過と不足が累計で相殺される',()=>{
  assert.equal(items.get(goal).actual,2);
  assert.deepEqual(items.get(task).weekly,[{actual:1.2,target:1},{actual:.8,target:1}]);
  const chart=analysisChart(state,{...period,scope:task});
- assert(chart.indexOf('aria-label="円グラフ"')<chart.indexOf('aria-label="推移"'));
- const columns=[...chart.matchAll(/data-achievement-column="([^"]+)"/g)].map(match=>match[1]);
- assert.deepEqual(columns,[root.id,goal,task]);
- assert.match(chart,/class="trend-value rate-surpassed"[^>]*>120%/);
+ assert(chart.indexOf('achievement-ring')<chart.indexOf('analysis-trend'));
+ assert.match(chart,/11\/7まで、実績1.2時間、期間内の累計達成率120%/);
+ assert.match(chart,/11\/14まで、実績0.8時間、期間内の累計達成率100%/);
+ assert.match(chart,/class="rate-surpassed" cx=/);
+ assert.doesNotMatch(chart,/<table/);
+ const overview=analysisChart(state,{...period,scope:task,overview:true});
+ assert.match(overview,new RegExp(root.name));
+ assert.doesNotMatch(overview,/analysis-trend/);
  assert.equal(achievementTone(119.99,100),'rate-reached');
  assert.equal(achievementTone(120,100),'rate-surpassed');
- assert.match(chart,/11\/1の週、達成率120%、累計120%/);
- assert.match(chart,/11\/8の週、達成率80%、累計100%/);
- assert.match(chart,/class="trend-value "[^>]*>80%/);
- assert.match(analysisChart(state,{...period,end:'2026-11-15',scope:task}),/class="trend-value rate-mid"[^>]*>80%/);
  assert.deepEqual([null,50,51,80,81,101].map(rate=>achievementTone(rate,100)),
   ['', 'rate-low', 'rate-mid', 'rate-mid', '', 'rate-reached']);
 });
@@ -46,7 +46,24 @@ test('週の開始直後は50%未満でも順調な進捗を警告しない',()=
   measurement:{unit:'minutes',dailyAmount:30,weeklyTarget:120},mode:'rest'});
  setTaskRecord(state,'2026-11-16',task,30,[],'2026-11-17');
  const view=end=>analysisChart(state,{start:'2026-11-16',end,scope:task,weeks:1});
- assert.match(view('2026-11-17'),/class="trend-value "[^>]*>25%/);
- assert.match(view('2026-11-20'),/class="trend-value rate-low"[^>]*>25%/);
+ assert.match(view('2026-11-17'),/class="achievement-card analysis-summary "[^>]*>/);
+ assert.match(view('2026-11-20'),/class="achievement-card analysis-summary rate-low"[^>]*>/);
  assert.equal(achievementTone(0,100,0),'');
+});
+
+test('解放にはマップの確定が必要で、予定や重複した記録は日数に加算しない',()=>{
+ const s=freshUniverse(),today='2026-11-17';
+ assert.equal(canConfirmMap(s),false);
+ const task=writeGoal(s,{name:'読書',purpose:'本を読む',parentId:'root',kind:'action',
+  measurement:{unit:'minutes',dailyAmount:20,weeklyTarget:60},mode:'rest'});
+ assert.equal(canConfirmMap(s),true);
+ s.records['2026-11-15']={mode:'none',plannedMode:'rest'};
+ s.records['2026-11-16']={mode:'rest',eveningDone:true};
+ setTaskRecord(s,'2026-11-16',task,20,[],today);
+ setTaskRecord(s,today,task,20,[],today);
+ s.records['2026-11-18']={mode:'rest'};
+ assert.deepEqual(featureProgress(s,today),{confirmed:false,days:2});
+ s.universe.mapConfirmed=true;
+ assert.deepEqual(featureProgress(s,today),{confirmed:true,days:2});
+ assert.deepEqual(featureDays,{gacha:2,stats:3,catchup:4,projects:5});
 });

@@ -30,14 +30,26 @@ const growthNames=[
  '生まれたて','最初の銀河','ほのかな光','光の輪','星の息吹','星雲の芽吹き',
  '星雲のゆらぎ','星雲の広がり','深まるオーラ','光の潮流','銀河の輝き','光彩の宇宙'
 ];
-export function universeGrowth(s,today=dateKey()){
- const root=s.nodes.find(node=>node.parentId===null);
- const hasGalaxy=s.nodes.some(node=>node.parentId===root.id);
+export function recordedDayCount(s,today=dateKey()){
  const dates=new Set([...Object.keys(s.records),...Object.keys(s.logs)]);
  let days=0;
  for(const day of dates){
   if(day<=today&&validDateKey(day)&&(recordMode(s,day)!=='none'||Object.keys(s.logs[day]||{}).length))days++;
  }
+ return days;
+}
+export const featureDays=Object.freeze({gacha:2,stats:3,catchup:4,projects:5});
+export function featureProgress(s,today=dateKey()){
+ return {confirmed:s.universe?.mapConfirmed===true,days:recordedDayCount(s,today)};
+}
+export function canConfirmMap(s){
+ return s.nodes.some(node=>nodeKind(s,node.id)==='action'&&!isEventTask(setting(s,node.id))&&
+  setting(s,node.id).status==='active'&&setting(s,node.id).measurement?.dailyAmount>0);
+}
+export function universeGrowth(s,today=dateKey()){
+ const root=s.nodes.find(node=>node.parentId===null);
+ const hasGalaxy=s.nodes.some(node=>node.parentId===root.id);
+ const days=recordedDayCount(s,today);
  const milestone=growthDays.findIndex(threshold=>days<threshold);
  const level=hasGalaxy?(milestone===-1?growthDays.length+1:milestone+1):0;
  return {level,days,strength:level/(growthNames.length-1),name:growthNames[level],nextDay:hasGalaxy&&milestone!==-1?growthDays[milestone]:null};
