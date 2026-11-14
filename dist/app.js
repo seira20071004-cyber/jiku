@@ -7,7 +7,7 @@ import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,numberText,hoursText} from './quantity-view.js';
 import {createUniverse} from './universe.js';
 import {UNIVERSE_ORIGIN,LEVELS,nodePath,nodeDepth,visibleChildren,canPlace,freshUniverse,migrateUniverse,completeUniverse,reorderNode,writeGoal,boundedMonth,universeGrowth} from './universe-model.js';
-import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion,taskPaceWarnings} from './model.js';
+import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion,taskPaceWarnings,saveEveningPlan,completeEveningPlan,modeItems} from './model.js';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let account=null,googleSite=document.documentElement.dataset.auth==='google';
 try{
@@ -599,7 +599,9 @@ function paceWarningsPanel(){
  </details>`;
 }
 function mindMapPage(){
- const recorded=Boolean(state.records[today]?.mode);
+ const plan=state.records[today];
+ const plannedTasks=plan?.plannedMode?modeItems(plan.quantityMenu||[],plan.plannedMode)
+  .filter(item=>!plan.quantityExcluded?.includes(item.id)):[];
  const growth=universeGrowth(state,today);
  const energy=planetEnergy();
  return `<section class="mind-map" aria-labelledby="mind-map-title">
@@ -608,10 +610,19 @@ function mindMapPage(){
    <button type="button" class="planet-energy-balance" data-do="planet-energy" aria-label="宇宙エネルギー ${numberText(energy.balance)}ポイント、ガチャを開く">✦ ${numberText(energy.balance)} <span>宇宙エネルギー</span></button>
    ${growth.days?`<span class="home-universe-days">これまでに ${growth.days} 日記録</span>`:''}
   </div>
-  ${recorded?'':`<section class="mind-map-mode" aria-label="今日のモード">
-   <h2>今日のモード</h2>
-   <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button data-mode="${key}" data-date="${today}"><span aria-hidden="true">${MODES[key].icon}</span> ${MODES[key].label}</button>`).join('')}</div>
-  </section>`}
+  <section class="mind-map-mode" aria-label="今日のペース">
+   ${plan?.plannedMode&&!plan.eveningDone?`<h2>今日の予定 · ${MODES[plan.plannedMode].label}</h2>
+    <ul class="evening-tasks">${plannedTasks.map(({id,name,setting:{measurement}})=>{
+     const amount=[measurement,...(measurement.extras||[])].filter(metric=>metric.dailyAmount!=null)
+      .map(metric=>numberText(metric.dailyAmount)+unitInfo(metric).label).join(' ・ ');
+     return `<li><button type="button" data-record-leaf="${esc(id)}"><span>${esc(name)}</span><span>${esc(amount)}</span></button></li>`;
+    }).join('')}</ul>
+    <div class="evening-actions"><button type="button" data-do="evening-done">✓ 達成</button>
+    <button type="button" data-do="change-evening">選び直す</button></div>`:
+    plan?.eveningDone?'':
+    `<h2>今日、残りの時間はどのペースでいけそう？</h2>
+     <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button type="button" data-mode="${key}" data-date="${today}">${MODES[key].label}</button>`).join('')}</div>`}
+  </section>
   <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1>
    <button type="button" class="journey-entry" data-do="journeys"><span aria-hidden="true">☄</span> 旅に出る</button>
   </header>
@@ -930,8 +941,11 @@ async function recordModeChoice(button) {
  const previous=structuredClone(state);
  let count,points;
  try {
-  count=applyMode(state,date,mode,today);
-  points=mode!=='none'?earnEnergy('record',date):0;
+  if(date===today&&mode!=='none'&&!state.records[date]?.eveningDone)saveEveningPlan(state,date,mode);
+  else {
+   count=applyMode(state,date,mode,today);
+   points=mode!=='none'?earnEnergy('record',date):0;
+  }
   if(!save()){state=previous;return}
  } catch(error) {
   state=previous;
@@ -942,7 +956,76 @@ async function recordModeChoice(button) {
  if(!button.isConnected)return;
  render();
  close();
- energyToast(count?`${count}個のタスクの固定量を反映しました`:'モードを保存しました',points);
+ if(date===today&&mode!=='none'&&!state.records[date]?.eveningDone)toast('今日の予定を選びました。できたら「達成」を押してください。');
+ else energyToast(count?`${count}個のタスクの固定量を反映しました`:'モードを保存しました',points);
+}
+function finishEvening(){
+ const previous=structuredClone(state);
+ try{
+  const count=completeEveningPlan(state,today);
+  const hasActual=Object.values(state.logs[today]||{}).some(log=>log.quantity||log.eventCompleted);
+  const points=hasActual?earnEnergy('record',today):0;
+  if(!save()){state=previous;return}
+  render();
+  energyToast(count?`${count}件の予定量を実績に記録しました`:'今日の実績を確定しました',points);
+ }catch(error){state=previous;toast(error.message)}
+}
+async function reminderSettings(){
+ modal(`<div class="dialog-title"><h2>夕方の通知</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <p>毎日18時ごろ（日本時間）、今日のペースを聞きます。</p>
+  <p id="reminder-status" role="status">通知の状態を確認しています。</p>
+  <div class="dialog-actions"><button type="button" class="primary" data-do="enable-reminders" hidden>通知を有効にする・テスト</button>
+  <button type="button" class="text-button" data-do="disable-reminders" hidden>通知を解除</button></div>`);
+ const status=$('#reminder-status');
+ if(!matchMedia('(display-mode: standalone)').matches&&!navigator.standalone){
+  status.textContent='Safariの共有メニューから「ホーム画面に追加」し、そのアイコンからJikuを開いてください。';
+  return;
+ }
+ if(!('PushManager' in window)||!('serviceWorker' in navigator)){
+  status.textContent='通知に対応するiOS（16.4以降）で開いてください。';return;
+ }
+ if(!account){
+  status.textContent='Googleログイン後、自分のJikuで設定してください。';return;
+ }
+ try{
+  const config=await fetch('/api/push/config').then(r=>r.json());
+  if(!config.publicKey){status.textContent='通知の配信を準備中です。';return;}
+  await navigator.serviceWorker.register('/sw.js');
+  const registration=await navigator.serviceWorker.ready;
+  if(!status.isConnected)return;
+  const existing=await registration.pushManager.getSubscription();
+  status.textContent=existing?'この端末の通知を登録・テストできます。':'下のボタンを押すと通知を許可できます。';
+  const enable=$('[data-do="enable-reminders"]'),disable=$('[data-do="disable-reminders"]');
+  enable.hidden=false;
+  disable.hidden=!existing;
+  enable.addEventListener('click',async ()=>{
+   enable.disabled=true;
+   try{
+    const key=Uint8Array.from(atob(config.publicKey.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0));
+    const subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+    const response=await fetch('/api/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(subscription)});
+    if(!response.ok)throw Error('通知を登録できませんでした。');
+    const result=await response.json();
+    if(status.isConnected)status.textContent=result.testSent?'登録済みです。テスト通知を確認してください。':'登録済みです。テスト通知は送れませんでした。';
+    disable.hidden=false;
+   }catch(error){
+    status.textContent=Notification.permission==='denied'?'iPhoneの設定からJikuの通知を許可してください。':error.message;
+   }finally{enable.disabled=false}
+  });
+  disable.addEventListener('click',async ()=>{
+   disable.disabled=true;
+   try{
+    const subscription=await registration.pushManager.getSubscription();
+    if(subscription){
+     const response=await fetch('/api/push/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:subscription.endpoint})});
+     if(!response.ok)throw Error('通知を解除できませんでした。');
+     await subscription.unsubscribe();
+    }
+    status.textContent='この端末の通知を解除しました。';disable.hidden=true;
+   }catch(error){status.textContent=error.message;}
+   finally{disable.disabled=false;}
+  });
+ }catch{status.textContent='通知設定を読み込めませんでした。'}
 }
 function openMindMap(){
  if(guideSession||navigating)return;
@@ -1003,7 +1086,6 @@ function readTaskSettings(form){
 function readExtraAmounts(data){
  return data.getAll('record-extra').map(value=>value===''?null:Number(value));
 }
-function refreshTodayMode(){if(state.records[today]?.mode)applyMode(state,today,state.records[today].mode,today)}
 function chooseLeaf(key){const available=leaves(state).filter(n=>nodeKind(state,n.id)==='action'&&!isEventTask(setting(state,n.id))).filter(n=>statsTab==='calendar'||quantityScope==='all'||descendants(state,quantityScope).has(n.id));modal(`<div class="dialog-title"><h2>タスクを選ぶ</h2><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><div class="record-leaf-picker">${available.map(n=>`<button data-record-leaf="${esc(n.id)}" data-log-date="${key}"><span>♧</span>${esc(n.name)}<i>＋</i></button>`).join('')||'<p class="muted">この目標にはタスクがありません。</p>'}</div>`)}
 let addParent=null,creationDraft=null;
 function chooseCreationType(parent){addParent=parent;const depth=nodeDepth(state,parent)+1;if(depth>4){toast('目標は宇宙から衛星までの5階層です');return}const label=LEVELS[depth];modal(`<div class="dialog-title"><h2>${label}を追加</h2><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><div class="creation-type-options"><button data-create-kind="goal"><span class="creation-type-icon">✧</span><strong>目標</strong><small>達成したいこと。<br>あとから細かく分解できます。</small><span class="creation-type-arrow">→</span></button><button data-create-kind="action"><span class="creation-type-icon">✓</span><strong>タスク</strong><small>目標に向けて取り組む行動。</small><span class="creation-type-arrow">→</span></button></div>`,{mapId:view==='tree'&&!guideSession?parent:null})}
@@ -1022,11 +1104,14 @@ function editor(id,creationKind=null){const isNew=id==='new',parent=addParent||c
 }}
 function review(){const ws=weekStart(today),end=shiftDate(ws,6),s=stats(state,ws,end),r=state.reviews[ws]||{},effective=shiftDate(ws,7);modal(`<form id="review-form"><div class="dialog-title"><div><div class="eyebrow">WEEKLY REFLECTION</div><h2>今週の自分と、話そう。</h2></div><button type="button" data-do="close" class="round-button" aria-label="閉じる">×</button></div><p class="muted">${ws.replaceAll('-','/')} — ${end.replaceAll('-','/')}</p><div class="review-summary">${Object.entries(s.counts).map(([k,c])=>`<div><span style="color:${MODES[k].color}">${MODES[k].icon}</span><strong>${c}日</strong><small>${MODES[k].label}</small></div>`).join('')}</div><h3>今週、取り組んだタスク</h3><p class="muted">${s.logs.length} 回の実行記録</p>${Object.entries(s.logs.reduce((o,l)=>(o[l.name]=(o[l.name]||0)+1,o),{})).map(([n,c])=>`<p class="review-log">♧ ${esc(n)} <b>${c}回</b></p>`).join('')}<label>無理があったこと・気づいたこと<textarea name="note" rows="3" placeholder="今週の自分に、どんな言葉をかけたい？">${esc(r.note||'')}</textarea></label><label>来週、大切にしたいこと<textarea name="next" rows="2" placeholder="小さく、具体的な一歩を書いてみよう。">${esc(r.next||'')}</textarea></label><h3>来週のタスクプラン</h3><p class="footnote">${effective.replaceAll('-','/')}（月）から反映。過去の記録はそのまま残ります。</p>${leaves(state).filter(n=>nodeKind(state,n.id)==='action').map(n=>{const a=state.pending.find(p=>p.id===n.id&&p.effective===effective)?.setting||setting(state,n.id);return `<fieldset class="review-setting" data-review-node="${esc(n.id)}"><legend>${esc(n.name)}</legend>${taskLevelFields(a,'review-level-'+n.id)}</fieldset>`}).join('')}<div class="dialog-actions"><button class="primary">レビューを保存</button></div></form>`)}
 function switchDemo(enabled){const url=new URL(location.href);if(enabled)url.searchParams.set('demo','1');else url.searchParams.delete('demo');url.searchParams.delete('preview');location.assign(url)}
-function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">YOUR OWN UNIVERSE</div><h2>設定・バックアップ</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${account?`<div class="account-info"><div class="account-profile-photo">${accountAvatar()}</div><strong>${esc(account.name)}</strong><p>${esc(account.email)}</p>${!account.picture?'<a class="text-button" href="/api/auth/google">Googleのプロフィール画像を取得</a>':''}<form method="post" action="/api/auth/logout" data-native-submit><button class="text-button" type="submit">ログアウト</button></form></div>`:''}<p>データはこの端末・ブラウザ内に保存されます。端末間での同期はありません。ブラウザのデータを消す前にバックアップしてください。</p><button class="text-button" data-do="open-demo">サンプルを開く →</button><br><button class="text-button" data-do="preview-onboarding">初めて開いたときの画面を見る →</button><br><button class="text-button" data-do="review">今週を振り返る →</button><div class="settings-actions"><button class="primary" data-do="export">↓ バックアップを書き出す</button><label class="import-button">↑ バックアップを読み込む<input type="file" id="import" accept="application/json,.json"></label></div><p class="footnote">読み込み時は現在のデータを置き換えます。先に現在のバックアップを保存することをおすすめします。日付は日本時間、週の始まりは月曜日です。</p><hr><p class="muted">Jiku v1.0 · 自分の軸を、日々のタスクへ。</p>`)}
+function settings(){modal(`<div class="dialog-title"><div><div class="eyebrow">YOUR OWN UNIVERSE</div><h2>設定・バックアップ</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>${account?`<div class="account-info"><div class="account-profile-photo">${accountAvatar()}</div><strong>${esc(account.name)}</strong><p>${esc(account.email)}</p>${!account.picture?'<a class="text-button" href="/api/auth/google">Googleのプロフィール画像を取得</a>':''}<form method="post" action="/api/auth/logout" data-native-submit><button class="text-button" type="submit">ログアウト</button></form></div>`:''}<p>データはこの端末・ブラウザ内に保存されます。端末間での同期はありません。ブラウザのデータを消す前にバックアップしてください。</p><button class="text-button" data-do="reminder-settings">夕方の通知 →</button><br><button class="text-button" data-do="open-demo">サンプルを開く →</button><br><button class="text-button" data-do="preview-onboarding">初めて開いたときの画面を見る →</button><br><button class="text-button" data-do="review">今週を振り返る →</button><div class="settings-actions"><button class="primary" data-do="export">↓ バックアップを書き出す</button><label class="import-button">↑ バックアップを読み込む<input type="file" id="import" accept="application/json,.json"></label></div><p class="footnote">読み込み時は現在のデータを置き換えます。先に現在のバックアップを保存することをおすすめします。日付は日本時間、週の始まりは月曜日です。</p><hr><p class="muted">Jiku v1.0 · 自分の軸を、日々のタスクへ。</p>`)}
 document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do],[data-view],[data-day],[data-focus],[data-map-back]');if(!b)return;const d=b.dataset;
  if(d.guide==='dismiss'){dismissGuide();return}
  if(b.hasAttribute('data-map-exit')){endMapPreview();return}
  if(b.hasAttribute('data-map-back')||d.view==='tree'){e.preventDefault();appAudio?.cue?.('navigate');openMindMap();return}
+ if(d.do==='evening-done'){finishEvening();return}
+ if(d.do==='change-evening'){modePicker();return}
+ if(d.do==='reminder-settings'){void reminderSettings();return}
  if(d.do==='analysis-conditions'){appAudio?.cue?.('navigate');analysisConditions();return}
  if(b.hasAttribute('data-toggle-time-plan')){
   const calculator=b.closest('[data-target-fields]').querySelector('.target-calculator');
@@ -1191,7 +1276,7 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
   }catch(error){state=previous;toast(error.message)}
   return;
  }
- if(e.target.id==='node-form'){const f=new FormData(e.target),id=e.target.dataset.id,previous=structuredClone(state);try{const kind=f.get('node-kind')||'goal',newId=writeGoal(state,{id,name:f.get('name'),purpose:f.get('description'),parentId:id==='new'?(addParent||currentSpace().id):state.nodes.find(n=>n.id===id)?.parentId,kind,...(kind==='action'?readTaskSettings(e.target):{}),symbolName:f.has('symbol-name')?f.get('symbol-name'):undefined});const changed=JSON.stringify(state.nodes)!==JSON.stringify(previous.nodes)||JSON.stringify(state.settings)!==JSON.stringify(previous.settings);const points=changed?earnEnergy('edit',today):0;refreshTodayMode();if(!save()){state=previous;return}if(id==='new')mapSelection=newId;close();render();if(id==='new')treeScene?.birth(newId);energyToast(id==='new'?(kind==='action'?'タスクを追加しました':'目標を追加しました'):(kind==='action'?'タスクを更新しました':'目標を更新しました'),points)}catch(err){state=previous;toast(err.message)}}if(e.target.id==='event-form'){
+ if(e.target.id==='node-form'){const f=new FormData(e.target),id=e.target.dataset.id,previous=structuredClone(state);try{const kind=f.get('node-kind')||'goal',newId=writeGoal(state,{id,name:f.get('name'),purpose:f.get('description'),parentId:id==='new'?(addParent||currentSpace().id):state.nodes.find(n=>n.id===id)?.parentId,kind,...(kind==='action'?readTaskSettings(e.target):{}),symbolName:f.has('symbol-name')?f.get('symbol-name'):undefined});const changed=JSON.stringify(state.nodes)!==JSON.stringify(previous.nodes)||JSON.stringify(state.settings)!==JSON.stringify(previous.settings);const points=changed?earnEnergy('edit',today):0;if(!save()){state=previous;return}if(id==='new')mapSelection=newId;close();render();if(id==='new')treeScene?.birth(newId);energyToast(id==='new'?(kind==='action'?'タスクを追加しました':'目標を追加しました'):(kind==='action'?'タスクを更新しました':'目標を更新しました'),points)}catch(err){state=previous;toast(err.message)}}if(e.target.id==='event-form'){
  const previous=structuredClone(state),id=e.target.dataset.id;
  try{
   const data=new FormData(e.target);
@@ -1259,6 +1344,13 @@ if(authReturn&&guestHandoff?.step==='login'&&guestHandoff.map&&!storageLocked){
   setTimeout(()=>toast('宇宙を保存できませんでした。もう一度お試しください。'),0);
  }
 }
-render();if(!onboardingPreview&&!guideSession&&needsLegacyImport&&!guestHandoff?.map)offerLegacyImport();
+render();
+const eveningLink=new URL(location.href);
+if(eveningLink.searchParams.has('evening')&&!onboardingScene){
+ eveningLink.searchParams.delete('evening');
+ history.replaceState(null,'',eveningLink);
+ if(!state.records[today]?.eveningDone&&!$('#dialog').open)modePicker();
+}
+if(!onboardingPreview&&!guideSession&&needsLegacyImport&&!guestHandoff?.map)offerLegacyImport();
 
 function offerLegacyImport(){modal(`<div class="dialog-title"><h2>以前の記録を引き継ぎますか？</h2></div><p>このブラウザでGoogleログイン前に使っていた記録が残っています。現在ログインしているあなたのアカウントへコピーできます。</p><p class="footnote">元の記録はそのまま残ります。</p><div class="dialog-actions"><button class="text-button" data-do="close">新しく始める</button><button id="copy-legacy" class="primary">記録を引き継ぐ</button></div>`);$('#copy-legacy').onclick=()=>{try{const old=localStorage.getItem('jiku-v1');localStorage.setItem(storageKey+':before-universe',old);state=migrateUniverse(validate(JSON.parse(old)));finishOnboardingReturn();onboardingScene?.dispose();onboardingScene=null;applyPending(state,today);save();close();render();toast('以前の記録を引き継ぎました')}catch{toast('以前の記録を読み込めませんでした。バックアップから読み込んでください。')}}}

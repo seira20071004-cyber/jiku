@@ -10,12 +10,14 @@ const types={
 };
 const assets={};
 for(const name of [
-  'index.html','style.css','app.js','onboarding.js','onboarding-sky.js','birth-music.js','origin-framing.js','origin-preview.js','onboarding.css',
+  'index.html','sw.js','style.css','app.js','onboarding.js','onboarding-sky.js','birth-music.js','origin-framing.js','origin-preview.js','onboarding.css',
   'model.js','quantity-view.js','tree3d.js','universe.js','universe-model.js','demo.js','example-map.js','mind-map.js','mind-map.css','map-import.js','three-LICENSE.txt',
   'manifest.webmanifest','icons/jiku.svg','icons/jiku-180.png','icons/jiku-192.png','icons/jiku-512.png'
 ]){
   const extension=name.split('.').pop();
   assets['/'+name]={body:await readFile('dist/'+name,extension==='png'?'base64':'utf8'),type:types[extension]};
 }
-const auth=await readFile('worker/auth.js','utf8'),entry=(await readFile('worker/index.js','utf8')).replace(/^import .*;\n/,'');
-await mkdir('dist/server',{recursive:true});await writeFile('dist/server/index.js','const ASSET_MAP='+JSON.stringify(assets)+';\n'+auth+'\n'+entry);
+const auth=await readFile('worker/auth.js','utf8');
+const push=await readFile('worker/push.js','utf8');
+const entry=(await readFile('worker/index.js','utf8')).replace(/^import .*;\n/gm,'');
+await mkdir('dist/server',{recursive:true});await writeFile('dist/server/index.js','const ASSET_MAP='+JSON.stringify(assets)+';\n'+auth+'\n'+push+'\n'+entry);

@@ -1,0 +1,25 @@
+name: Jiku evening reminders
+on:
+  schedule:
+    - cron: '7,37 9 * * *'
+    - cron: '7 10 * * *'
+  workflow_dispatch:
+permissions:
+  id-token: write
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Send due Jiku reminders
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint=https://jiku-life-tree.seira20071004.chatgpt.site/api/push/dispatch
+          token="$(
+            curl -fsS -G \
+              -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              --data-urlencode "audience=${endpoint}" "${ACTIONS_ID_TOKEN_REQUEST_URL}" |
+              jq -er .value
+          )"
+          curl -fsS --max-time 100 -X POST -H "Authorization: Bearer ${token}" "${endpoint}"

@@ -1,9 +1,10 @@
+import {pushRoute} from './push.js';
 import {googleConfig,authRoute,session,googlePicture} from './auth.js';
 const PUBLIC_ASSETS=new Set([
  '/','/index.html','/app.js','/style.css','/model.js','/quantity-view.js','/universe.js',
  '/universe-model.js','/demo.js','/example-map.js','/mind-map.js','/mind-map.css','/map-import.js',
  '/onboarding.css','/onboarding.js','/birth-music.js','/onboarding-sky.js','/origin-framing.js','/origin-preview.js',
- '/manifest.webmanifest','/icons/jiku.svg','/icons/jiku-180.png','/icons/jiku-192.png','/icons/jiku-512.png'
+ '/manifest.webmanifest','/sw.js','/icons/jiku.svg','/icons/jiku-180.png','/icons/jiku-192.png','/icons/jiku-512.png'
 ]);
 // ASSET_MAP is embedded at build time. Authentication runs before serving assets.
 export default {async fetch(request,env){
@@ -13,6 +14,7 @@ export default {async fetch(request,env){
   if(u.origin!==c.origin)return new Response(null,{status:421});
   const auth=await authRoute(request,c);if(auth)return auth;
   const user=await session(request,c);
+  if(u.pathname.startsWith('/api/push/'))return pushRoute(request,env,c.origin,user);
   if(u.pathname==='/api/session')return Response.json(user?{mode:'google',user:{id:user.sub,email:user.email,name:user.name,picture:googlePicture(user.picture)}}:{mode:'google',user:null},{status:user?200:401,headers:{'Cache-Control':'no-store'}});
   if(!user&&!PUBLIC_ASSETS.has(u.pathname))return new Response(null,{status:401,headers:{'Cache-Control':'no-store'}});
  }else if(u.pathname==='/api/session')return Response.json({mode:'local'},{headers:{'Cache-Control':'no-store'}});

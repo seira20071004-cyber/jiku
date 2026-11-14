@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {seed,applyMode,clearMode,quantitySummary,setQuantity,removeQuantity,validate,deleteNode,moveNode,modeTotals} from '../dist/model.js';
+import {seed,applyMode,clearMode,quantitySummary,setQuantity,removeQuantity,validate,deleteNode,moveNode,modeTotals,saveEveningPlan,completeEveningPlan} from '../dist/model.js';
 const today='2026-11-08';
 function configured(){const s=seed();s.settings.read.measurement={unit:'pages',dailyAmount:10,weeklyTarget:50};s.settings.project.measurement={unit:'hours',dailyAmount:1,weeklyTarget:5};return s}
 const apply=(s,mode,date=today,todayKey=today)=>applyMode(s,date,mode,todayKey);
@@ -16,3 +16,28 @@ test('何もしなかった日は自動量を外し、実際に修正した量�
 test('モードのスナップショットをバックアップで往復でき、不正な量を拒否する',()=>{const s=configured();apply(s,'full');validate(JSON.parse(JSON.stringify(s)));s.records[today].quantityMenu[0].setting.measurement={unit:'hours',dailyAmount:-1};assert.throws(()=>validate(s));assert.throws(()=>applyMode(configured(),'2026-11-09','full',today))});
 
 test('モードは休む日 ⊆ 忙しい日 ⊆ 余裕がある日の順に累積する',()=>{const s=configured();s.settings.shadow.measurement={unit:'minutes',dailyAmount:5,weeklyTarget:null};apply(s,'rest');assert.deepEqual(Object.keys(s.logs[today]),['read']);apply(s,'busy');assert.deepEqual(Object.keys(s.logs[today]).sort(),['project','read']);apply(s,'full');assert.deepEqual(Object.keys(s.logs[today]).sort(),['project','read','shadow']);for(const mode of ['rest','busy','full']){apply(s,mode);assert.equal(s.logs[today].read.quantity.amount,10)};validate(s)});
+
+test('夕方の予定は達成するまで実績に入らず、選んだ時点の固定量が一度だけ入る',()=>{
+ const s=configured();
+ saveEveningPlan(s,today,'busy');
+ assert.equal(s.records[today].mode,'none');
+ assert(!s.logs[today]);
+ s.settings.read.measurement.dailyAmount=20;
+ assert.equal(completeEveningPlan(s,today),2);
+ assert.equal(s.logs[today].read.quantity.amount,10);
+ assert.equal(s.logs[today].read.source,'confirmed-plan');
+ assert.equal(completeEveningPlan(s,today),0);
+ applyMode(s,today,'full',today);
+ assert.equal(Object.keys(s.logs[today]).length,2);
+ validate(JSON.parse(JSON.stringify(s)));
+});
+test('夕方の達成を確定するとき手入力した実績があれば予定量を追加しない',()=>{
+ const s=configured();
+ saveEveningPlan(s,today,'full');
+ setQuantity(s,today,'read',7,today);
+ assert.equal(completeEveningPlan(s,today),0);
+ assert.equal(s.logs[today].read.quantity.amount,7);
+ assert(!s.logs[today].project);
+ assert.equal(s.records[today].mode,'full');
+ assert.equal(s.records[today].eveningDone,true);
+});

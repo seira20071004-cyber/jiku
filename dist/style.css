@@ -831,3 +831,11 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 .home-pace-warnings li + li { border-top:1px solid #d49a6633; }
 .home-pace-warnings button { width:100%; min-height:42px; padding:5px 1px; color:inherit; text-align:start; }
 .home-pace-warnings button small { display:block; }
+.evening-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.mind-map-mode .evening-actions button { flex:0 1 auto; min-height:38px; padding:5px 14px; }
+.evening-actions button:first-child { background:#49356a; color:#fff0ff; }
+
+.evening-tasks { list-style:none; margin:0; padding:0; }
+.evening-tasks:empty { display:none; }
+.mind-map-mode .evening-tasks button { display:flex; align-items:center; justify-content:space-between; width:100%; text-align:left; gap:12px; }
+.evening-tasks button span:last-child { color:#c9b7e3; text-align:right; }
