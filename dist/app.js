@@ -517,6 +517,7 @@ function mapActions(){
  return `<div class="mind-map-tools">
   ${nodeKind(state,node.id)==='action'?`<button data-space-detail="${esc(node.id)}">タスクの詳細</button>`:''}
   ${mapEditing?'<button type="button" data-do="map-import">AIで作成・取り込み</button>':''}
+  <button type="button" data-do="map-print">印刷・PDF</button>
   <button data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
  </div>`;
 }
@@ -598,6 +599,69 @@ function mindMapPage(){
  </section>`;
 }
 
+function printableMap(root){
+ const date=today.replaceAll('-','/');
+ function branch(node){
+  const task=nodeKind(state,node.id)==='action';
+  const settings=task?setting(state,node.id):null;
+  const event=settings&&isEventTask(settings);
+  const completed=event&&eventCompletionDate(state,node.id);
+  const measure=settings?.measurement;
+  let details='';
+  if(event){
+   details=completed?`完了 ${completed}`:settings.eventDate?`予定 ${settings.eventDate}`:'日付未定';
+  }else if(measure){
+   const metrics=[measure,...(measure.extras||[])].map(metric=>{
+    const {label}=unitInfo(metric);
+    return [[metric.totalTarget,'全体'],[metric.weeklyTarget,'週'],[metric.dailyAmount,'1日']]
+     .filter(([value])=>value!=null).map(([value,period])=>period+' '+numberText(value)+label).join(' · ');
+   }).filter(Boolean);
+   if(measure.deadline)metrics.push('期限 '+measure.deadline);
+   metrics.push(settings.modes.includes('rest')?'毎日取り組む':settings.modes.includes('busy')?'忙しい日も':'余裕がある日だけ');
+   details=metrics.join(' ／ ');
+  }
+  const children=visibleChildren(state,node.id);
+  return `<li>
+   <div class="map-print-node">
+    <span class="map-print-kind">${event?'イベント':task?'タスク':'目標'}</span>
+    <strong>${esc(node.name)}</strong>
+    ${node.description?`<p>${esc(node.description)}</p>`:''}
+    ${details?`<p class="map-print-details">${esc(details)}</p>`:''}
+   </div>
+   ${children.length?`<ul>${children.map(branch).join('')}</ul>`:''}
+  </li>`;
+ }
+ const path=nodePath(state,root.id).slice(0,-1);
+ return `<article class="map-print-document">
+  <header><p>Jiku · マインドマップ <time datetime="${today}">${date}</time></p>
+   <h1>${esc(root.name)}</h1>
+   ${path.length?`<p>${esc(path.map(node=>node.name).join(' › '))}</p>`:''}
+   ${root.description?`<p>${esc(root.description)}</p>`:''}
+  </header>
+  <ul class="map-print-tree">${nodeKind(state,root.id)==='action'?branch(root):visibleChildren(state,root.id).map(branch).join('')}</ul>
+ </article>`;
+}
+function mapPrintDialog(){
+ const root=state.nodes.find(node=>node.parentId===null),selected=selectedMapNode();
+ modal(`<form id="map-print-form">
+  <div class="dialog-title"><h2>マインドマップを印刷</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <label>印刷する範囲<select name="print-scope"><option value="${esc(root.id)}">マップ全体</option>
+   ${selected.id!==root.id?`<option value="${esc(selected.id)}">${esc(selected.name)}</option>`:''}
+  </select></label>
+  <p>印刷画面で、プリンターかPDF保存を選べます。</p>
+  <div class="map-print-preview" tabindex="0" aria-label="印刷プレビュー">${printableMap(root)}</div>
+  <div class="dialog-actions"><button type="submit" class="primary">印刷・PDF保存</button></div>
+ </form>`);
+}
+function printMap(form){
+ document.getElementById('jiku-print-output')?.remove();
+ const sheet=document.createElement('div');
+ sheet.id='jiku-print-output';
+ sheet.append(form.querySelector('.map-print-document').cloneNode(true));
+ document.body.append(sheet);
+ window.addEventListener('afterprint',()=>sheet.remove(),{once:true});
+ window.print();
+}
 function mapImportDialog(){
  const root=state.nodes.find(node=>node.parentId===null),selected=selectedMapNode();
  const parents=state.nodes.filter(node=>canPlace(state,'new',node.id));
@@ -973,6 +1037,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  }
  if(d.do==='app-audio'){void toggleAppAudio();return}
  if(d.do==='planet-pulse'){pulsePlanet(b);return}
+ if(d.do==='map-print'){mapPrintDialog();return}
  if(d.do==='map-import'){mapImportDialog();return}
  if(d.copyMapPrompt){
   const field=b.form.querySelector(`[data-import-prompt="${d.copyMapPrompt}"]`);
@@ -1072,6 +1137,7 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
   $('[data-do="analysis-conditions"]')?.focus({preventScroll:true});
   return;
  }
+ if(e.target.id==='map-print-form'){printMap(e.target);return}
  if(e.target.id==='map-import-form'){
   handleMapImport(e.target,e.submitter?.value);
   return;
@@ -1124,7 +1190,11 @@ document.addEventListener('input',event=>{
  if(event.target.name==='parent')updateImportPrompt(form);
  if(['parent','plan'].includes(event.target.name))clearMapImportPreview(form);
 });
-document.addEventListener('change',async e=>{if(e.target.name==='node-kind'){
+document.addEventListener('change',async e=>{if(e.target.name==='print-scope'&&e.target.form?.id==='map-print-form'){
+ const node=state.nodes.find(node=>node.id===e.target.value);
+ if(node)e.target.form.querySelector('.map-print-preview').innerHTML=printableMap(node);
+ return;
+ }if(e.target.name==='node-kind'){
  const form=e.target.closest('form'),box=form.querySelector('.goal-action-fields'),active=e.target.value==='action';
  box.hidden=box.disabled=!active;
  form.querySelector('[data-node-name-label]').textContent=active?'タスク名':'目標名';
