@@ -1,3 +1,4 @@
+import {planningPrompt,jsonTemplate,previewMapImport} from './map-import.js';
 import {createBirthMusic} from './birth-music.js?v=2';
 import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,planetArt} from './onboarding.js';
 import {createExampleDraft, exampleMap} from './example-map.js';
@@ -515,6 +516,7 @@ function mapActions(){
  const node=selectedMapNode();
  return `<div class="mind-map-tools">
   ${nodeKind(state,node.id)==='action'?`<button data-space-detail="${esc(node.id)}">タスクの詳細</button>`:''}
+  ${mapEditing?'<button type="button" data-do="map-import">AIで作成・取り込み</button>':''}
   <button data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
  </div>`;
 }
@@ -596,6 +598,90 @@ function mindMapPage(){
  </section>`;
 }
 
+function mapImportDialog(){
+ const root=state.nodes.find(node=>node.parentId===null),selected=selectedMapNode();
+ const parents=state.nodes.filter(node=>canPlace(state,'new',node.id));
+ const target=parents.find(node=>node.id===selected.id)||parents.find(node=>node.id===selected.parentId)||root;
+ modal(`<form id="map-import-form">
+  <div class="dialog-title"><h2>AIで作成・取り込み</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <label>追加先の目標<select name="parent">${parents.map(node=>`<option value="${esc(node.id)}" ${node.id===target.id?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
+  <p data-import-depth class="muted"></p>
+  <details class="map-import-step"><summary>1. AIとマインドマップを考える</summary>
+   <textarea aria-label="マインドマップを考えるプロンプト" data-import-prompt="planning" readonly rows="6"></textarea>
+   <button type="button" class="text-button" data-copy-map-prompt="planning">相談用プロンプトをコピー</button>
+  </details>
+  <details class="map-import-step"><summary>2. 決まった内容をJSONにする</summary>
+   <p>計画が決まったら、同じAIの会話に下のテンプレートを送ります。</p>
+   <textarea aria-label="JSON出力テンプレート" data-import-prompt="template" readonly rows="6">${esc(jsonTemplate)}</textarea>
+   <button type="button" class="text-button" data-copy-map-prompt="template">JSONテンプレートをコピー</button>
+  </details>
+  <label>3. AIが出力したJSON<textarea name="plan" required rows="6" spellcheck="false" placeholder="ここにJSONを貼り付け"></textarea></label>
+  <p class="map-import-error" role="alert" hidden></p>
+  <div data-import-preview hidden></div>
+  <div class="dialog-actions">
+   <button class="primary" type="submit" name="action" value="preview">内容を確認</button>
+   <button class="primary" type="submit" name="action" value="apply" hidden>マップに追加</button>
+  </div>
+ </form>`);
+ updateImportPrompt($('#map-import-form'));
+}
+function updateImportPrompt(form){
+ const parent=form.elements.namedItem('parent').value;
+ const path=nodePath(state,parent);
+ const levels=LEVELS.length-path.length;
+ form.querySelector('[data-import-depth]').textContent=`追加できる深さは、選んだ目標の下に最大${levels}階層です。`;
+ form.querySelector('[data-import-prompt="planning"]').value=planningPrompt+
+  `\n\n追加先の目標（私が選択済み）: ${path.map(node=>node.name).join(' › ')}\n追加できる深さ: ここから下に最大${levels}階層。`;
+}
+function clearMapImportPreview(form){
+ form.querySelector('[data-import-preview]').hidden=true;
+ form.querySelector('.map-import-error').hidden=true;
+ form.querySelector('[value="apply"]').hidden=true;
+ delete form.dataset.previewed;
+}
+function mapImportTree(nodes){
+ return `<ul>${nodes.map(item=>{
+  const m=item.measurement;
+  const metric=m?`<small>合計 ${numberText(m.totalTarget)}分 · 週 ${numberText(m.weeklyTarget)}分 · 日 ${numberText(m.dailyAmount)}分 · ${m.deadline} · ${{full:'余裕がある日だけ',busy:'忙しい日も',rest:'毎日'}[item.mode]}</small>`:'';
+  const extras=m?.extras.map(extra=>{
+   const unit=unitInfo(extra).label;
+   return `<small>${esc(unit)}　合計 ${numberText(extra.totalTarget)} · 週 ${numberText(extra.weeklyTarget)} · 日 ${numberText(extra.dailyAmount)}</small>`;
+  }).join('')||'';
+  return `<li><strong>${item.kind==='goal'?'目標':'タスク'} · ${esc(item.name)}</strong><small>${esc(item.purpose)}</small>
+   ${item.symbolName?`<small>ブラックホール名 · ${esc(item.symbolName)}</small>`:''}${metric}${extras}${item.children.length?mapImportTree(item.children):''}</li>`;
+ }).join('')}</ul>`;
+}
+function handleMapImport(form,action){
+ const data=new FormData(form);
+ const preview=form.querySelector('[data-import-preview]');
+ const error=form.querySelector('.map-import-error');
+ try{
+  const result=previewMapImport(state,String(data.get('plan')),String(data.get('parent')));
+  error.hidden=true;
+  if(action==='apply'&&form.dataset.previewed==='true'){
+   const previous=state;
+   state=result.next;
+   const points=earnEnergy('edit',today);
+   if(!save()){state=previous;return;}
+   mapSelection=result.nodes[0].id;
+   close();
+   render();
+   $('.mind-map [aria-current]')?.scrollIntoView({block:'nearest'});
+   energyToast(`目標${result.counts.goal}件、タスク${result.counts.task}件を追加しました`,points);
+   return;
+  }
+  preview.innerHTML=`<h3>追加予定：目標${result.counts.goal}件・タスク${result.counts.task}件</h3>${mapImportTree(result.nodes)}`;
+  preview.hidden=false;
+  form.dataset.previewed='true';
+  form.querySelector('[value="apply"]').hidden=false;
+  preview.scrollIntoView({block:'nearest'});
+ }catch(problem){
+  clearMapImportPreview(form);
+  error.textContent=problem.message;
+  error.hidden=false;
+  error.scrollIntoView({block:'nearest'});
+ }
+}
 function journeys(){
  const events=state.nodes.filter(node=>nodeKind(state,node.id)==='action'&&isEventTask(setting(state,node.id)));
  const planned=[],history=[];
@@ -810,6 +896,7 @@ function readTaskSettings(form){
  const measurement={
   unit:'minutes',dailyAmount:amount(event?'event-minutes':'daily-minutes'),
   totalTarget:amount('total-minutes'),weeklyTarget:amount('weekly-minutes'),
+  ...(data.get('task-deadline')?{deadline:String(data.get('task-deadline'))}:{}),
   extras:readExtraSettings(form)
  };
  return event?{eventDate:String(data.get('event-date')||''),measurement}:{measurement,mode:data.get('task-level')};
@@ -862,6 +949,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
     for(const [range,value] of Object.entries({total:pace.totalTarget,weekly:pace.weeklyTarget,daily:pace.dailyAmount})){
      fields.querySelector(`[name="${time?range+'-minutes':'extra-'+range}"]`).value=value;
     }
+    if(time)b.form.elements.namedItem('task-deadline').value=box.querySelector('[data-calc-date]').value;
     output.textContent+=' → 反映しました';apply.hidden=true;
    }
   }catch(error){output.textContent=error.message;apply.hidden=true;}
@@ -885,6 +973,15 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  }
  if(d.do==='app-audio'){void toggleAppAudio();return}
  if(d.do==='planet-pulse'){pulsePlanet(b);return}
+ if(d.do==='map-import'){mapImportDialog();return}
+ if(d.copyMapPrompt){
+  const field=b.form.querySelector(`[data-import-prompt="${d.copyMapPrompt}"]`);
+  Promise.resolve().then(()=>navigator.clipboard.writeText(field.value)).then(
+   ()=>toast('コピーしました。外部AIの会話に貼り付けてください。'),
+   ()=>{field.focus();field.select();toast('選択した文章をコピーしてください。');}
+  );
+  return;
+ }
  if(d.do==='journeys'){journeys();return}
  if(d.do==='new-journey'){journeyForm();return}
  if(d.journeyEvent){openJourneyEvent(d.journeyEvent);return}
@@ -975,6 +1072,10 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
   $('[data-do="analysis-conditions"]')?.focus({preventScroll:true});
   return;
  }
+ if(e.target.id==='map-import-form'){
+  handleMapImport(e.target,e.submitter?.value);
+  return;
+ }
  if(e.target.id==='journey-form'){
   const data=new FormData(e.target),previous=structuredClone(state);
   try {
@@ -1016,6 +1117,12 @@ document.addEventListener('input',e=>{
  const box=e.target.closest('.target-calculator');
  box.querySelector('[data-apply-target]').hidden=true;
  box.querySelector('output').textContent='';
+});
+document.addEventListener('input',event=>{
+ const form=event.target.form;
+ if(form?.id!=='map-import-form')return;
+ if(event.target.name==='parent')updateImportPrompt(form);
+ if(['parent','plan'].includes(event.target.name))clearMapImportPreview(form);
 });
 document.addEventListener('change',async e=>{if(e.target.name==='node-kind'){
  const form=e.target.closest('form'),box=form.querySelector('.goal-action-fields'),active=e.target.value==='action';

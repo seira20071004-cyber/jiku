@@ -30,6 +30,7 @@ function quantitySettingsFields(m){
    ${minuteInput('1週間の目標時間','weekly-minutes',weeklyTargetForEdit(m),false)}
    ${minuteInput('1日の目標時間','daily-minutes',m.dailyAmount)}
   </div>
+  <label>達成期限（任意）<input type="date" name="task-deadline" value="${esc(m.deadline??'')}"></label>
   ${targetCalculator({time:true,total:m.totalTarget})}
  </section>`;
 }

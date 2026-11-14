@@ -759,3 +759,17 @@ button.achievement-card:hover { background:radial-gradient(ellipse at center,#33
 @media (prefers-reduced-motion:reduce) {
  .map-insertion { animation:none; }
 }
+
+#map-import-form select,#map-import-form textarea {
+ width:100%; color-scheme:dark; color:#eee4f9; background:#1a2031; border:1px solid #645874;
+}
+#map-import-form .map-import-step { border-top:1px solid #6458746e; padding:8px 0; }
+.map-import-step summary { cursor:pointer; min-height:32px; padding-block:7px; color:#e1d2f0; }
+.map-import-step p,#map-import-form [data-import-depth] { margin:3px 0 9px; font-size:12px; }
+.map-import-error { color:#ffc3cc; }
+[data-import-preview] { max-height:36dvh; overflow:auto; margin:12px 0; }
+[data-import-preview] ul { list-style:none; padding-inline-start:12px; }
+[data-import-preview] > ul { padding-inline-start:0; }
+[data-import-preview] li { margin:8px 0; padding:5px 0 5px 9px; border-inline-start:1px solid #8067a8; overflow-wrap:anywhere; }
+[data-import-preview] small { display:block; margin:3px 0; color:#d2c2e7; }
+#map-import-form [hidden] { display:none; }

@@ -22,7 +22,7 @@ export function validate(s){if(!s||s.version!==1||!Array.isArray(s.nodes)||!s.se
 export const UNITS={pages:{label:'ページ',dimension:'pages',factor:1},hours:{label:'時間',dimension:'time',factor:60},minutes:{label:'分',dimension:'time',factor:1},count:{label:'回',dimension:'count',factor:1},questions:{label:'問',dimension:'questions',factor:1},words:{label:'単語',dimension:'words',factor:1},items:{label:'個',dimension:'items',factor:1}};
 export const rounded=n=>Math.round((n+Number.EPSILON)*1e6)/1e6;
 export function measurement(s,id){return setting(s,id).measurement||{unit:'count',weeklyTarget:null}}
-export function validateMeasurement(m){if(m?.dailyAmount!=null&&(!Number.isFinite(m.dailyAmount)||m.dailyAmount<.001||m.dailyAmount>1000000))throw Error('タスクの量は0.001以上で入力してください');if(!m||(!Object.hasOwn(UNITS,m.unit)&&m.unit!=='custom'))throw Error('記録する単位を選んでください');if(m.unit==='custom'&&(typeof m.customUnit!=='string'||!m.customUnit.trim()||m.customUnit.trim().length>12))throw Error('単位は1〜12文字で入力してください');for(const [key,label] of [['totalTarget','全体'],['weeklyTarget','週'],['monthlyTarget','月']]){const target=m[key];if(target!=null&&(!Number.isFinite(target)||target<=0||target>1000000))throw Error(label+'の目標量は0より大きい数にしてください')}if(m.extras!=null){
+export function validateMeasurement(m){if(m?.dailyAmount!=null&&(!Number.isFinite(m.dailyAmount)||m.dailyAmount<.001||m.dailyAmount>1000000))throw Error('タスクの量は0.001以上で入力してください');if(!m||(!Object.hasOwn(UNITS,m.unit)&&m.unit!=='custom'))throw Error('記録する単位を選んでください');if(m.unit==='custom'&&(typeof m.customUnit!=='string'||!m.customUnit.trim()||m.customUnit.trim().length>12))throw Error('単位は1〜12文字で入力してください');for(const [key,label] of [['totalTarget','全体'],['weeklyTarget','週'],['monthlyTarget','月']]){const target=m[key];if(target!=null&&(!Number.isFinite(target)||target<=0||target>1000000))throw Error(label+'の目標量は0より大きい数にしてください')}if(m.deadline!=null&&!validDateKey(m.deadline))throw Error('達成期限の日付を確認してください');if(m.extras!=null){
  if(!Array.isArray(m.extras)||m.extras.length>12)throw Error('追加の単位を確認してください');
  const dimensions=new Set();
  for(const extra of m.extras){
@@ -49,7 +49,7 @@ export function timeMeasurement(m){
  const unit=unitInfo(m);
  if(unit.dimension!=='time')return {unit:'minutes',dailyAmount:null,totalTarget:null,weeklyTarget:null,monthlyTarget:null,extras:[m]};
  const convert=amount=>amount==null?null:rounded(amount*unit.factor);
- return {unit:'minutes',dailyAmount:convert(m.dailyAmount),totalTarget:convert(m.totalTarget),weeklyTarget:convert(m.weeklyTarget),monthlyTarget:convert(m.monthlyTarget),extras:m.extras};
+ return {unit:'minutes',deadline:m.deadline,dailyAmount:convert(m.dailyAmount),totalTarget:convert(m.totalTarget),weeklyTarget:convert(m.weeklyTarget),monthlyTarget:convert(m.monthlyTarget),extras:m.extras};
 }
 export function taskRecordFields(s,key,id){
  const old=s.logs[key]?.[id]?.quantity;
