@@ -5,7 +5,7 @@ import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,res
 import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 import {createDemoUniverse} from './demo.js';
-import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,numberText,hoursText} from './quantity-view.js';
+import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,analysisPeriodLabel,numberText,hoursText} from './quantity-view.js';
 import {createUniverse} from './universe.js';
 import {UNIVERSE_ORIGIN,LEVELS,nodePath,nodeDepth,visibleChildren,canPlace,freshUniverse,migrateUniverse,completeUniverse,reorderNode,writeGoal,boundedMonth,universeGrowth,featureDays,featureProgress,canConfirmMap} from './universe-model.js';
 import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion,catchupTasks,saveCatchupPromise,saveEveningPlan,completeEveningPlan,modeItems} from './model.js';
@@ -492,8 +492,8 @@ function analysisWorkspace(){
    <div class="analysis-map-scroll">${personalMap({selection:quantityScope==='all'?root.id:quantityScope,analysis:true})}</div>
   </div>
   ${panelDivider('analysis','マインドマップとグラフの高さを調節','analysis-map-pane analysis-chart-pane')}
-  <div class="analysis-period"><label for="analysis-weeks">分析する期間</label><output for="analysis-weeks">${statsWeeks===52?'1年':statsWeeks+'週間'}</output>
-   <input id="analysis-weeks" type="range" min="1" max="52" step="1" value="${statsWeeks}" aria-valuetext="${statsWeeks===52?'1年':statsWeeks+'週間'}">
+  <div class="analysis-period"><label for="analysis-weeks">分析する期間</label><output for="analysis-weeks">${analysisPeriodLabel(statsWeeks)}</output>
+   <input id="analysis-weeks" type="range" min="1" max="52" step="1" value="${statsWeeks}" aria-valuetext="${analysisPeriodLabel(statsWeeks)}">
    <small>1週間</small><small>1年</small>
   </div>
   <div class="analysis-result-scroll" id="analysis-chart-pane">${analysisResult()}</div>
@@ -1632,7 +1632,7 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
 document.addEventListener('input',e=>{
  if(e.target.id==='analysis-weeks'){
   statsWeeks=Number(e.target.value);
-  const label=statsWeeks===52?'1年':statsWeeks+'週間';
+  const label=analysisPeriodLabel(statsWeeks);
   $('.analysis-period output').textContent=label;
   e.target.setAttribute('aria-valuetext',label);
   return;

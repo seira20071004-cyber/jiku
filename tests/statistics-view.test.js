@@ -27,8 +27,8 @@ test('階層を合計し、超過と不足が累計で相殺される',()=>{
  assert.deepEqual(items.get(task).weekly,[{actual:1.2,target:1},{actual:.8,target:1}]);
  const chart=analysisChart(state,{...period,scope:task});
  assert(chart.indexOf('achievement-ring')<chart.indexOf('analysis-trend'));
- assert.match(chart,/11\/7まで、実績1.2時間、期間内の累計達成率120%/);
- assert.match(chart,/11\/14まで、実績0.8時間、期間内の累計達成率100%/);
+ assert.match(chart,/11\/7まで、実績1.2時間、2週間の累計達成率120%/);
+ assert.match(chart,/11\/14まで、実績0.8時間、2週間の累計達成率100%/);
  assert.match(chart,/class="rate-surpassed" cx=/);
  assert.doesNotMatch(chart,/<table/);
  const overview=analysisChart(state,{...period,scope:task,overview:true});

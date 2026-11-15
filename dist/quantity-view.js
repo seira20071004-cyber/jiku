@@ -2,6 +2,7 @@ import {weeklyTaskSections,weeklyAchievement,timeGoalProgress} from './universe-
 import {UNITS,MODES,taskLevel,modeTotals,unitInfo,quantitySummary,setting,leaves,ancestry,descendants,shiftDate,weekStart,isEventTask,eventCompletionDate,goalIds,timeMeasurement,taskRecordFields} from './model.js';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const numberText=n=>new Intl.NumberFormat('ja-JP',{maximumFractionDigits:3}).format(n);
+export const analysisPeriodLabel=weeks=>weeks===52?'1年':weeks+'週間';
 function minuteInput(label,name,value='',required=true){
  return `<label>${label}<span class="task-week-target-entry"><input type="number" inputmode="decimal" name="${name}" min="0.001" max="1000000" step="any" ${required?'required':''} value="${esc(value??'')}" aria-label="${label}"><span>分</span></span></label>`;
 }
@@ -239,6 +240,7 @@ const percentText=(actual,target)=>target>0?numberText(percent(actual,target))+'
 const shortDate=date=>Number(date.slice(5,7))+'/'+Number(date.slice(8));
 
 function trendChart(item,periods,dueTargets,end){
+ const rateLabel=analysisPeriodLabel(periods.length)+'の累計達成率';
  let actualSoFar=0,targetSoFar=0,dueSoFar=0;
  const values=item.weekly.map(({actual,target},index)=>{
   if(target>0){actualSoFar+=actual;targetSoFar+=target;dueSoFar+=dueTargets[index];}
@@ -254,8 +256,8 @@ function trendChart(item,periods,dueTargets,end){
  const points=values.flatMap(({rate,tone},index)=>rate===null?[]:[{x:x(index),y:y(rate,maxRate),rate,tone}]);
  return `<section class="analysis-trend" aria-label="取り組んだ量と達成率の推移">
   <h3>取り組んだ量と達成率の推移</h3>
-  <div class="trend-legend"><span>目標時間</span><span>実績時間</span><span>期間内の累計達成率</span><span class="analysis-reference-key">100%ライン</span></div>
-  <div class="trend-plot" tabindex="0" role="img" aria-label="${esc(values.map(value=>`${shortDate(value.to)}まで、実績${hoursText(value.actual)}、期間内の累計達成率${value.rate===null?'未設定':value.rate+'%'}`).join('。'))}">
+  <div class="trend-legend"><span>目標時間</span><span>実績時間</span><span>${rateLabel}</span><span class="analysis-reference-key">100%ライン</span></div>
+  <div class="trend-plot" tabindex="0" role="img" aria-label="${esc(values.map(value=>`${shortDate(value.to)}まで、実績${hoursText(value.actual)}、${rateLabel}${value.rate===null?'未設定':value.rate+'%'}`).join('。'))}">
    <svg viewBox="0 0 ${width} 204" style="--plot-min:${values.length<=4?0:width}px" aria-hidden="true">
     ${[0,.25,.5,.75,1].map(fraction=>{
      const position=y(fraction,1);
