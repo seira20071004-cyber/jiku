@@ -63,16 +63,58 @@ async function toggleAppAudio(){
  }finally{appAudioChanging=false;}
 }
 function toast(t){$('#toast').textContent=t;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),3500)}
+const splitSizes={analysis:33,editor:33};
+const splitMin=20,splitMax=75;
+function panelDivider(kind,label,controls){
+ return `<div class="panel-divider" data-panel-divider="${kind}" role="separator" tabindex="0"
+  aria-label="${label}" aria-orientation="horizontal" aria-controls="${controls}"
+  aria-valuemin="${splitMin}" aria-valuemax="${splitMax}" aria-valuenow="${splitSizes[kind]}"></div>`;
+}
+function bindPanelDivider(divider){
+ if(!divider)return;
+ const kind=divider.dataset.panelDivider;
+ const layout=divider.parentElement;
+ const setSize=value=>{
+  const size=Math.round(Math.max(splitMin,Math.min(splitMax,value)));
+  splitSizes[kind]=size;
+  layout.style.setProperty('--map-share',size+'fr');
+  layout.style.setProperty('--detail-share',(100-size)+'fr');
+  divider.setAttribute('aria-valuenow',size);
+  divider.setAttribute('aria-valuetext','マインドマップの高さ '+size+'%');
+ };
+ setSize(splitSizes[kind]);
+ let drag=null;
+ divider.addEventListener('pointerdown',event=>{
+  if(event.button!==0||drag)return;
+  const height=layout.firstElementChild.offsetHeight+layout.lastElementChild.offsetHeight;
+  if(!height)return;
+  drag={id:event.pointerId,y:event.clientY,height,size:splitSizes[kind]};
+  divider.setPointerCapture(event.pointerId);
+  divider.focus({preventScroll:true});
+ });
+ divider.addEventListener('pointermove',event=>{
+  if(drag?.id===event.pointerId)setSize(drag.size+(event.clientY-drag.y)*100/drag.height);
+ });
+ divider.addEventListener('lostpointercapture',()=>{drag=null;});
+ divider.addEventListener('keydown',event=>{
+  const values={ArrowUp:splitSizes[kind]-5,ArrowDown:splitSizes[kind]+5,Home:splitMin,End:splitMax};
+  if(!Object.hasOwn(values,event.key))return;
+  event.preventDefault();
+  setSize(values[event.key]);
+ });
+}
 function modal(html,{mapId=null,addition=null}={}){
  const dialog=$('#dialog');
  dialog.classList.toggle('map-editor-dialog',Boolean(mapId));
  dialog.innerHTML=mapId?`<div class="map-editor-layout">
-  <section class="map-editor-preview" aria-label="編集中のマインドマップ"
+  <section class="map-editor-preview" id="editor-map-pane" aria-label="編集中のマインドマップ"
    ${addition?`data-add-parent="${esc(mapId)}" data-add-kind="${esc(addition)}"`:''}>${personalMap({selection:mapId,preview:true,addition:addition&&{parent:mapId,kind:addition}})}</section>
-  <section class="map-editor-fields">${html}</section>
+  ${panelDivider('editor','マインドマップと編集欄の高さを調節','editor-map-pane editor-fields-pane')}
+  <section class="map-editor-fields" id="editor-fields-pane">${html}</section>
  </div>`:html;
  if(!dialog.open)dialog.showModal();
  if(mapId){
+  bindPanelDivider(dialog.querySelector('[data-panel-divider="editor"]'));
   const preview=dialog.querySelector('.map-editor-preview');
   const card=preview.querySelector('.map-insertion')||preview.querySelector('[aria-current="true"]');
   if(card)preview.scrollTop=Math.max(0,card.getBoundingClientRect().top-preview.getBoundingClientRect().top-16);
@@ -96,6 +138,7 @@ function render(){clearTimeout(guideTimer);clearInterval(starWorldTimer);
  const progress=featureProgress(state,today);
  const page=guideSession?treePage():{tree:mindMapPage,stats:statsPage,projects:projectsPage,catchup:catchupPage,star:starWorldPage}[view]();
  $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k||(view==='star'&&k==='tree')?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''} ${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?'aria-disabled="true"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong>${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?`<small>${featureDays[k]}日で解放</small>`:''}</button>`).join('')}</nav>`;bindTree();scheduleGuide();maybeAskReminderSetup();
+ bindPanelDivider($('#app [data-panel-divider="analysis"]'));
  if(view==='star'&&!guideSession)starWorldTimer=setInterval(updateStarWorld,1000);
 }
 function modeCards(key){const current=state.records[key]?.mode;return `<div class="mode-grid">${Object.entries(MODES).filter(([k])=>k!=='none').map(([k,m])=>`<button class="mode-card ${current===k?'selected':''} ${k}" data-mode="${k}" data-date="${key}"><span class="mode-icon">${m.icon}</span><span><strong>${m.label}</strong><small>${m.description}</small></span><span class="radio">${current===k?'✓':''}</span></button>`).join('')}</div>`}
@@ -444,15 +487,16 @@ function analysisWorkspace(){
  </div>`;
  const root=state.nodes.find(node=>node.parentId===null);
  return `<div class="analysis-workspace">
-  <div class="analysis-map" aria-label="分析する目標">
+  <div class="analysis-map" id="analysis-map-pane" aria-label="分析する目標">
    <h2>何の分析をしますか？</h2>
    <div class="analysis-map-scroll">${personalMap({selection:quantityScope==='all'?root.id:quantityScope,analysis:true})}</div>
   </div>
+  ${panelDivider('analysis','マインドマップとグラフの高さを調節','analysis-map-pane analysis-chart-pane')}
   <div class="analysis-period"><label for="analysis-weeks">分析する期間</label><output for="analysis-weeks">${statsWeeks===52?'1年':statsWeeks+'週間'}</output>
    <input id="analysis-weeks" type="range" min="1" max="52" step="1" value="${statsWeeks}" aria-valuetext="${statsWeeks===52?'1年':statsWeeks+'週間'}">
    <small>1週間</small><small>1年</small>
   </div>
-  <div class="analysis-result-scroll">${analysisResult()}</div>
+  <div class="analysis-result-scroll" id="analysis-chart-pane">${analysisResult()}</div>
  </div>`;
 }
 function refreshAnalysis(){
