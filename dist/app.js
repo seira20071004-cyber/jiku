@@ -825,28 +825,34 @@ function mapImportDialog(){
  const target=parents.find(node=>node.id===selected.id)||parents.find(node=>node.id===selected.parentId)||root;
  modal(`<form id="map-import-form">
   <div class="dialog-title"><h2>AIで作成・取り込み</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <p>AIと自分のマインドマップを考えましょう。</p>
   <label>追加先の目標<select name="parent">${parents.map(node=>`<option value="${esc(node.id)}" ${node.id===target.id?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
   <p data-import-depth class="muted"></p>
-  <section class="map-import-step"><h3>1. AIとマインドマップを考える</h3>
+  <section class="map-import-step"><h3>Step 1｜AIとマインドマップを考える</h3>
+   <p>このプロンプトをAIに送り、自分の目標や、目標につながる日々のタスクを一緒に深く考えます。</p>
    <button type="button" class="primary" data-copy-map-prompt="planning">相談用プロンプトをコピー</button>
    <details><summary>プロンプトを表示</summary>
     <textarea aria-label="マインドマップを考えるプロンプト" data-import-prompt="planning" readonly rows="4"></textarea>
    </details>
   </section>
-  <section class="map-import-step"><h3>2. 決まった内容をJSONにする</h3>
-   <p>計画が決まったら、同じAIの会話に下のテンプレートを送ります。</p>
+  <section class="map-import-step"><h3>Step 2｜決まった内容の形式を整える</h3>
+   <p>内容が決まったら、次のプロンプトを同じAIの会話に送り、Jikuで読み込める形式（JSON）に整えます。</p>
    <button type="button" class="primary" data-copy-map-prompt="template">JSONテンプレートをコピー</button>
    <details><summary>テンプレートを表示</summary>
     <textarea aria-label="JSON出力テンプレート" data-import-prompt="template" readonly rows="4">${esc(jsonTemplate)}</textarea>
    </details>
   </section>
   <p class="map-import-copy-status" role="status" aria-live="polite"></p>
-  <label>3. AIが出力したJSON<textarea name="plan" required rows="6" spellcheck="false" placeholder="ここにJSONを貼り付け"></textarea></label>
+  <section class="map-import-step">
+   <h3>Step 3｜Jikuに貼り付けて反映する</h3>
+   <p>AIが出力した内容を下に貼り付け、「内容を確認」を押します。内容を確認したら「Jikuに反映する」を押してください。</p>
+   <label>AIが出力した内容<textarea name="plan" required rows="6" spellcheck="false" placeholder="ここに貼り付け"></textarea></label>
+  </section>
   <p class="map-import-error" role="alert" hidden></p>
   <div data-import-preview hidden></div>
   <div class="dialog-actions">
    <button class="primary" type="submit" name="action" value="preview">内容を確認</button>
-   <button class="primary" type="submit" name="action" value="apply" hidden>マップに追加</button>
+   <button class="primary" type="submit" name="action" value="apply" hidden>Jikuに反映する</button>
   </div>
  </form>`);
  updateImportPrompt($('#map-import-form'));
