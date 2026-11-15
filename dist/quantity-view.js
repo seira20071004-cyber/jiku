@@ -6,10 +6,11 @@ function minuteInput(label,name,value='',required=true){
  return `<label>${label}<span class="task-week-target-entry"><input type="number" inputmode="decimal" name="${name}" min="0.001" max="1000000" step="any" ${required?'required':''} value="${esc(value??'')}" aria-label="${label}"><span>分</span></span></label>`;
 }
 function targetCalculator({time=false,total=null}={}){
+ const amount=total===null?'':time?total/60:total;
  return `${time?'<div id="time-plan-calculator" class="target-calculator" hidden>':'<details class="target-calculator"><summary>逆算して計算する</summary>'}
   <p>今日から期限まで、毎日均等に取り組む場合の目安です。</p>
   <div class="task-target-grid">
-   <label>${time?'上位目標に必要な時間（分）':'上位目標に必要な量'}<input data-calc-total type="number" inputmode="decimal" step="any" value="${esc(total??'')}"></label>
+   <label>${time?'目標達成にかかる時間（時間）':'上位目標に必要な量'}<input data-calc-total type="number" inputmode="decimal" step="any" value="${esc(amount)}" ${time?'placeholder="例：12.5"':''}></label>
    <label>いつまでに達成したいか<input data-calc-date type="date"></label>
   </div>
   <div class="target-calculator-actions"><button type="button" data-calculate-target>計算する</button>

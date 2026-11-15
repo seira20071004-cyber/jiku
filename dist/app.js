@@ -827,15 +827,20 @@ function mapImportDialog(){
   <div class="dialog-title"><h2>AIで作成・取り込み</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
   <label>追加先の目標<select name="parent">${parents.map(node=>`<option value="${esc(node.id)}" ${node.id===target.id?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
   <p data-import-depth class="muted"></p>
-  <details class="map-import-step"><summary>1. AIとマインドマップを考える</summary>
-   <textarea aria-label="マインドマップを考えるプロンプト" data-import-prompt="planning" readonly rows="6"></textarea>
-   <button type="button" class="text-button" data-copy-map-prompt="planning">相談用プロンプトをコピー</button>
-  </details>
-  <details class="map-import-step"><summary>2. 決まった内容をJSONにする</summary>
+  <section class="map-import-step"><h3>1. AIとマインドマップを考える</h3>
+   <button type="button" class="primary" data-copy-map-prompt="planning">相談用プロンプトをコピー</button>
+   <details><summary>プロンプトを表示</summary>
+    <textarea aria-label="マインドマップを考えるプロンプト" data-import-prompt="planning" readonly rows="4"></textarea>
+   </details>
+  </section>
+  <section class="map-import-step"><h3>2. 決まった内容をJSONにする</h3>
    <p>計画が決まったら、同じAIの会話に下のテンプレートを送ります。</p>
-   <textarea aria-label="JSON出力テンプレート" data-import-prompt="template" readonly rows="6">${esc(jsonTemplate)}</textarea>
-   <button type="button" class="text-button" data-copy-map-prompt="template">JSONテンプレートをコピー</button>
-  </details>
+   <button type="button" class="primary" data-copy-map-prompt="template">JSONテンプレートをコピー</button>
+   <details><summary>テンプレートを表示</summary>
+    <textarea aria-label="JSON出力テンプレート" data-import-prompt="template" readonly rows="4">${esc(jsonTemplate)}</textarea>
+   </details>
+  </section>
+  <p class="map-import-copy-status" role="status" aria-live="polite"></p>
   <label>3. AIが出力したJSON<textarea name="plan" required rows="6" spellcheck="false" placeholder="ここにJSONを貼り付け"></textarea></label>
   <p class="map-import-error" role="alert" hidden></p>
   <div data-import-preview hidden></div>
@@ -845,6 +850,21 @@ function mapImportDialog(){
   </div>
  </form>`);
  updateImportPrompt($('#map-import-form'));
+}
+async function copyMapPrompt(button){
+ const form=button.form;
+ const field=form.querySelector(`[data-import-prompt="${button.dataset.copyMapPrompt}"]`);
+ const status=form.querySelector('.map-import-copy-status');
+ try{
+  await navigator.clipboard.writeText(field.value);
+  status.textContent='コピーしました。外部AIの会話に貼り付けてください。';
+ }catch{
+  field.closest('details').open=true;
+  field.focus({preventScroll:true});
+  field.select();
+  field.scrollIntoView({block:'nearest'});
+  status.textContent='文章を選択しました。端末のメニューからコピーしてください。';
+ }
 }
 function updateImportPrompt(form){
  const parent=form.elements.namedItem('parent').value;
@@ -1399,11 +1419,16 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   const box=b.closest('.target-calculator'),fields=box.closest('[data-target-fields]'),time=fields.dataset.targetFields==='time';
   const output=box.querySelector('output'),apply=box.querySelector('[data-apply-target]');
   try{
-   const pace=paceForDeadline(Number(box.querySelector('[data-calc-total]').value),today,box.querySelector('[data-calc-date]').value);
+   const amount=box.querySelector('[data-calc-total]').valueAsNumber;
+   const total=time?Number((amount*60).toFixed(6)):amount;
+   if(time&&(!Number.isFinite(total)||total<.001||total>1000000))throw Error('目標達成にかかる時間を、0より大きい有効な時間で入力してください。');
+   const pace=paceForDeadline(total,today,box.querySelector('[data-calc-date]').value);
    if(pace.dailyAmount<.001)throw Error('1日の目安が0.001未満です。期限や単位を見直してください');
    const unit=time?'分':fields.querySelector('[name="extra-unit"]').selectedOptions[0]?.textContent;
    const suffix=unit&&unit!=='選択してください'&&unit!=='自由入力'?unit:fields.querySelector('[name="extra-custom-unit"]')?.value.trim()||'';
-   output.textContent=`残り${pace.days}日 · 週 ${numberText(pace.weeklyTarget)}${suffix} / 日 ${numberText(pace.dailyAmount)}${suffix}`;
+   const hours=new Intl.NumberFormat('ja-JP',{maximumSignificantDigits:4,notation:'standard'});
+   const format=value=>time?hours.format(value/60)+'時間':numberText(value)+suffix;
+   output.textContent=`残り${pace.days}日 · 週 ${format(pace.weeklyTarget)} / 日 ${format(pace.dailyAmount)}`;
    apply.hidden=false;
    if(b===apply){
     for(const [range,value] of Object.entries({total:pace.totalTarget,weekly:pace.weeklyTarget,daily:pace.dailyAmount})){
@@ -1455,14 +1480,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.starAction){void commitStarAction(d.starAction,d.starFriend);return}
  if(d.do==='map-print'){mapPrintDialog();return}
  if(d.do==='map-import'){mapImportDialog();return}
- if(d.copyMapPrompt){
-  const field=b.form.querySelector(`[data-import-prompt="${d.copyMapPrompt}"]`);
-  Promise.resolve().then(()=>navigator.clipboard.writeText(field.value)).then(
-   ()=>toast('コピーしました。外部AIの会話に貼り付けてください。'),
-   ()=>{field.focus();field.select();toast('選択した文章をコピーしてください。');}
-  );
-  return;
- }
+ if(d.copyMapPrompt){void copyMapPrompt(b);return}
  if((d.do==='journeys'||d.do==='new-journey'||d.journeyEvent)&&!featureUnlocked('projects')){explainFeatureLock('projects');return}
  if(d.do==='journeys'){journeys();return}
  if(d.do==='new-journey'){journeyForm();return}

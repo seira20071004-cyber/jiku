@@ -903,3 +903,17 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .star-friends li p { margin:3px 0 0; font-size:11px; }
 .star-friends button { min-height:40px; padding-inline:7px; border:1px solid #9985bd60; border-radius:8px; color:#ead4ff; white-space:nowrap; }
 .star-world-controls button:disabled { opacity:.56; cursor:default; }
+
+#map-import-form .map-import-step h3 { margin:0 0 8px; font-size:14px; }
+#map-import-form [data-copy-map-prompt] { min-height:44px; text-align:left; }
+#map-import-form .map-import-copy-status { min-height:1.4em; color:#cce8da; }
+@media (max-width:600px), (pointer:coarse) {
+ #dialog :is(input:not([type=radio],[type=checkbox],[type=range],[type=hidden]),select,textarea),
+ .birth-screen :is(input:not([type=radio],[type=checkbox],[type=hidden]),select,textarea) {
+  font-size:16px;
+ }
+ #dialog .map-editor-fields { scroll-padding-block:12px; }
+ #dialog .target-calculator .task-target-grid { grid-template-columns:minmax(0,1fr); gap:5px; }
+ #dialog .target-calculator-actions button { min-height:44px; }
+ .home-universe-art { touch-action:manipulation; }
+}
