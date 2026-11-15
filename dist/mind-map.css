@@ -196,3 +196,13 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
 }
 .map-node[data-map-select] { touch-action:manipulation; }
 .map-edit-hint { margin:0 0 5px; color:#d3c6e4; font-size:12px; }
+
+[data-map-level="1"] { --map-level-tint:34%; }
+[data-map-level="2"] { --map-level-tint:25%; }
+[data-map-level="3"] { --map-level-tint:16%; }
+[data-map-level="4"] { --map-level-tint:7%; }
+.map-node[data-map-level]:not(.map-root),
+.map-branch-header[data-map-level] {
+  background:color-mix(in srgb,var(--map-tone) var(--map-level-tint),#111528);
+}
+.map-node.map-root[data-map-level="0"] { background:linear-gradient(120deg,#64508b,#484871); }

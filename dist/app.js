@@ -595,7 +595,7 @@ function personalMap({selection=mapSelection,preview=false,analysis=false,additi
   }
   const task=nodeKind(state,node.id)==='action',level=Math.min(depth,LEVELS.length-1);
   const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):'';
-  return `<button class="map-node ${style}" ${analysis?'data-analysis-target':'data-map-select'}="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''} ${mapEditing&&!preview&&!analysis?'aria-keyshortcuts="F2"':''}
+  return `<button class="map-node ${style}" data-map-level="${level}" ${analysis?'data-analysis-target':'data-map-select'}="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''} ${mapEditing&&!preview&&!analysis?'aria-keyshortcuts="F2"':''}
     ${overview?`aria-expanded="${node.id===branchRoot?.id}" aria-controls="${branchId}"`:''}>
     <span aria-hidden="true">${task?'✓':hierarchyMarks[level]}</span>
     <span>${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong></span>
@@ -623,7 +623,7 @@ function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
  const children=childrenFor(root.id);
  const lanes=children.length>1?[children.filter((_,i)=>i%2===0),children.filter((_,i)=>i%2===1)]:[children];
  return `<section id="${branchId}" class="map-subview map-galaxy-view" aria-labelledby="${branchId}-name" data-map-tone="${tone}">
-  <header class="map-branch-header"><span aria-hidden="true">${hierarchyMarks[Math.min(depth,4)]}</span><h2 id="${branchId}-name">${esc(root.name)}</h2></header>
+  <header class="map-branch-header" data-map-level="${Math.min(depth,4)}"><span aria-hidden="true">${hierarchyMarks[Math.min(depth,4)]}</span><h2 id="${branchId}-name">${esc(root.name)}</h2></header>
   ${children.length?`<div class="map-galaxy-tree ${lanes.length===1?'single-lane':''}">${lanes.map(nodes=>
    `<ul class="map-branch-lane">${nodes.map(node=>branch(node,depth+1)).join('')}</ul>`).join('')}</div>`:
    '<p class="map-galaxy-empty">まだ下位の目標やタスクはありません。</p>'}
