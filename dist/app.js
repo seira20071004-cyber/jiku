@@ -1,6 +1,6 @@
 import {facilityCosts,storageHours,starFriends,starWorldSnapshot,developStar} from './star-world.js';
 import {planningPrompt,jsonTemplate,previewMapImport} from './map-import.js';
-import {createBirthMusic} from './birth-music.js?v=3';
+import {createBirthMusic} from './birth-music.js?v=4';
 import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,resumeGuestDraft,saveGuestDraft,planetArt} from './onboarding.js';
 import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
@@ -8,7 +8,7 @@ import {createDemoUniverse} from './demo.js';
 import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,analysisPeriodLabel,numberText,hoursText} from './quantity-view.js';
 import {createUniverse} from './universe.js';
 import {UNIVERSE_ORIGIN,LEVELS,nodePath,nodeDepth,visibleChildren,canPlace,freshUniverse,migrateUniverse,completeUniverse,reorderNode,writeGoal,boundedMonth,universeGrowth,featureDays,featureProgress,canConfirmMap} from './universe-model.js';
-import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,recordEventCompletion,undoEventCompletion,catchupTasks,saveCatchupPromise,saveEveningPlan,completeEveningPlan,modeItems} from './model.js';
+import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,timeMeasurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,setJourneyDeparture,recordEventCompletion,undoEventCompletion,catchupTasks,saveCatchupPromise,saveEveningPlan,completeEveningPlan,modeItems} from './model.js';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let account=null,googleSite=document.documentElement.dataset.auth==='google';
 try{
@@ -36,14 +36,14 @@ let inJourneyHangar=false;
 let starWorldTimer;
 function save(){if(guideSession||mapPreviewReturn||(guest&&!demoMode))return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 const icon=name=>({tree:'✧',stats:'◴',projects:'☄',catchup:'↗'}[name]);
-const names={tree:'ホーム',stats:'統計',projects:'旅に出る',catchup:'遅れを取り戻す'};
+const names={tree:'ホーム',stats:'統計',projects:'計画を立てる',catchup:'遅れを取り戻す'};
 function featureUnlocked(feature){
  const {confirmed,days}=featureProgress(state,today);
  return confirmed&&days>=featureDays[feature];
 }
 function explainFeatureLock(feature){
  const {confirmed,days}=featureProgress(state,today);
- const label=feature==='gacha'?'宇宙エネルギーのガチャ':feature==='projects'?'旅の機能':names[feature];
+ const label=feature==='gacha'?'宇宙エネルギーのガチャ':feature==='projects'?'計画を立てる機能':names[feature];
  toast(confirmed?`${label}はあと${Math.max(0,featureDays[feature]-days)}日の記録で解放されます。`:
   'ホームでマインドマップを確認し、「この内容で始める」を押してください。');
 }
@@ -143,6 +143,8 @@ function render(){clearTimeout(guideTimer);clearInterval(starWorldTimer);
  const editingHome=view==='tree'&&mapEditing&&!guideSession;
  const analyzing=view==='stats'&&statsTab==='graph'&&analysisStarted&&!guideSession;
  const page=guideSession?treePage():{tree:mindMapPage,stats:statsPage,projects:projectsPage,catchup:catchupPage,star:starWorldPage}[view]();
+ appAudio?.setScene(guideSession?'space':inUnderworld?'underworld':
+  view==='projects'?(inJourneyHangar?'hangar':'bridge'):'space');
  $('#app').innerHTML=`<main class="workspace view-${view}${editingHome?' is-map-editing':''}${analyzing?' is-analyzing':''}"><header class="topbar">${editingHome?
  '<button type="button" class="text-button map-edit-exit" data-map-edit-mode>← 編集を閉じる</button>':
  '<a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>'}${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k||(view==='star'&&k==='tree')?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''} ${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?'aria-disabled="true"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong>${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?`<small>${featureDays[k]}日で解放</small>`:''}</button>`).join('')}</nav>`;bindTree();scheduleGuide();maybeAskReminderSetup();
@@ -642,16 +644,14 @@ function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
 
 function leaveUnderworld(){
  inUnderworld=false;
- appAudio?.setUnderworld(false);
  if(underworldAudioStarted&&appAudioOn&&!appAudioChanging)void toggleAppAudio();
  underworldAudioStarted=false;
 }
 async function enterUnderworld(){
  inUnderworld=true;
- appAudio?.setUnderworld(true);
  const wasPlaying=appAudioOn;
- const start=wasPlaying?null:toggleAppAudio();
  render();
+ const start=wasPlaying?null:toggleAppAudio();
  $('#catchup-title')?.focus({preventScroll:true});
  if(start){
   await start;
@@ -962,37 +962,53 @@ function handleMapImport(form,action){
   error.scrollIntoView({block:'nearest'});
  }
 }
+function missionSchedule(departure,arrival){
+ if(!departure&&!arrival)return '日程未定';
+ const label=(date,title)=>date?`<time datetime="${esc(date)}" aria-label="${title} ${esc(date)}">${esc(date)}</time>`:'未定';
+ return `${label(departure,'出発予定日')} <span aria-hidden="true">&gt;</span> ${label(arrival,'帰還予定日')}`;
+}
 function projectsPage(){
  const events=state.nodes.filter(node=>nodeKind(state,node.id)==='action'&&isEventTask(setting(state,node.id)));
- const planned=[],history=[];
+ const planned=[],inFlight=[],history=[];
  for(const node of events){
+  const action=setting(state,node.id);
   const done=eventCompletionDate(state,node.id);
-  (done?history:planned).push({node,date:done||setting(state,node.id).eventDate});
+  (done?history:action.journeyDeparture?inFlight:planned).push({node,action,done});
  }
- planned.sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
- history.sort((a,b)=>b.date.localeCompare(a.date));
+ planned.sort((a,b)=>(a.action.eventDate||'9999').localeCompare(b.action.eventDate||'9999'));
+ inFlight.sort((a,b)=>a.action.journeyDeparture.localeCompare(b.action.journeyDeparture));
+ history.sort((a,b)=>b.done.localeCompare(a.done));
  if(!inJourneyHangar)return `<section class="journey-page" aria-labelledby="projects-title">
   <div class="journey-scene journey-bridge">
+   ${inFlight.length?`<div class="journey-flight-window" aria-hidden="true">${inFlight.slice(0,3).map(()=>'<i class="journey-ship"></i>').join('')}</div>`:''}
    <div class="journey-console">
     <h1 id="projects-title">司令室</h1>
-    <p>出発予定 <strong>${planned.length}件</strong></p>
-    <button type="button" class="journey-launch" data-do="enter-hangar">旅に出る<span aria-hidden="true">→</span></button>
+    <p>任務予定 <strong>${planned.length}件</strong> ・ 航行中 <strong>${inFlight.length}件</strong></p>
+    ${inFlight.length?`<ul class="journey-flight-names" aria-label="航行中の任務">${inFlight.slice(0,3).map(({node})=>`<li>${esc(node.name)}</li>`).join('')}</ul>`:''}
+    <button type="button" class="journey-launch" data-do="enter-hangar">格納庫へ<span aria-hidden="true">→</span></button>
    </div>
   </div>
  </section>`;
  const list=(items,empty)=>items.length
-  ?`<ul class="journey-list">${items.map(({node,date})=>`<li><button type="button" data-journey-event="${esc(node.id)}"><strong>${esc(node.name)}</strong><span>${esc(date||'日付未定')} ›</span></button></li>`).join('')}</ul>`
+  ?`<ul class="journey-list">${items.map(({node,action,done})=>`<li>
+   <button type="button" data-journey-event="${esc(node.id)}">
+    <strong>${esc(node.name)}</strong>
+    <small>${done?`帰還 <time datetime="${esc(done)}">${esc(done)}</time>`:missionSchedule(action.eventDate,action.journeyReturnDate)}</small>
+   </button>
+   ${!done&&!action.journeyDeparture?`<button class="journey-departure" type="button" data-journey-launch="${esc(node.id)}" aria-label="${esc(node.name)}へ出発する">出発する</button>`:''}
+  </li>`).join('')}</ul>`
   :`<p class="muted">${empty}</p>`;
  return `<section class="journey-page journey-page-hangar" aria-labelledby="projects-title">
   <div class="journey-scene journey-hangar">
    <button class="journey-return" type="button" data-do="leave-hangar">← 司令室に戻る</button>
    <div class="journey-console">
     <h1 id="projects-title" tabindex="-1">格納庫</h1>
-    <button type="button" class="journey-launch" data-do="new-journey">旅を追加<span aria-hidden="true">＋</span></button>
+    <button type="button" class="journey-launch" data-do="new-journey">任務を追加<span aria-hidden="true">＋</span></button>
    </div>
   </div>
-  <div class="journey-sections"><section><h2>出発予定</h2>${list(planned,'出発予定の旅はありません。')}</section>
-  <section><h2>旅の記録</h2>${list(history,'完了した旅はここに残ります。')}</section></div>
+  <div class="journey-sections"><section><h2>任務予定</h2>${list(planned,'予定している任務はありません。')}</section>
+  ${inFlight.length?`<section><h2>航行中</h2>${list(inFlight,'')}</section>`:''}
+  <section><h2>完了した任務</h2>${list(history,'完了した任務がここに並びます。')}</section></div>
  </section>`;
 }
 function journeys(){
@@ -1002,22 +1018,27 @@ function journeys(){
  if(location.hash!=='#projects')location.hash='projects';
  render();
 }
-function journeyForm(){
+function journeyForm(id='new'){
+ const draft=state.nodes.find(node=>node.id===id);
+ const action=setting(state,id);
  const selected=selectedMapNode();
- const parentId=nodeKind(state,selected.id)==='goal'&&canPlace(state,'new',selected.id)?selected.id:selected.parentId;
- const options=state.nodes.filter(node=>nodeKind(state,node.id)==='goal'&&canPlace(state,'new',node.id));
- modal(`<form id="journey-form">
-  <div class="dialog-title"><h2>旅を追加</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
-  <label>旅の名前<input name="name" required maxlength="80" placeholder="例：ハッカソンに参加する"></label>
-  <label>旅の目的<textarea name="description" required maxlength="1000" rows="2"></textarea></label>
+ const parentId=draft?.parentId??(nodeKind(state,selected.id)==='goal'&&canPlace(state,'new',selected.id)?selected.id:selected.parentId);
+ const options=state.nodes.filter(node=>node.id===parentId||(nodeKind(state,node.id)==='goal'&&canPlace(state,id,node.id)));
+ modal(`<form id="journey-form" data-id="${esc(id)}">
+  <div class="dialog-title"><h2>${draft?'任務を編集':'任務を追加'}</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <label>任務名<input name="name" required maxlength="80" placeholder="例：ハッカソンに参加する" value="${esc(draft?.name)}"></label>
+  <label>任務の目的<textarea name="description" required maxlength="1000" rows="2">${esc(draft?.description)}</textarea></label>
   <label>繋がっている上位目標<select name="parent" required>${options.map(node=>`<option value="${esc(node.id)}" ${node.id===parentId?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
-  <label>日付（任意）<input name="event-date" type="date"></label>
-  <label>取り組む予定の時間（分）<input name="event-minutes" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" required></label>
+  <div class="journey-date-fields">
+   <label>出発予定日（任意）<input name="event-date" type="date" value="${esc(action.eventDate)}"></label>
+   <label>帰還予定日（任意）<input name="journey-return" type="date" value="${esc(action.journeyReturnDate)}"></label>
+  </div>
+  <label>取り組む予定の時間（分）<input name="event-minutes" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" value="${esc(timeMeasurement(measurement(state,id)).dailyAmount)}" required></label>
   <div class="dialog-actions"><button type="button" class="text-button" data-do="journeys">‹ 格納庫に戻る</button><button type="submit" class="primary">保存する</button></div>
  </form>`);
 }
 function openJourneyEvent(id){
- modal(eventPanel(state,id,today,today));
+ modal(eventPanel(state,id,today,today,{mission:true}));
  $('#dialog').insertAdjacentHTML('afterbegin','<button type="button" class="text-button journey-back" data-do="journeys">‹ 格納庫に戻る</button>');
  const form=$('#event-form');
  if(form)form.dataset.journey='true';
@@ -1545,17 +1566,31 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.do==='map-import'){mapImportDialog();return}
  if(d.importGo){showMapImportStep(b.form,d.importGo);return}
  if(d.copyMapPrompt){void copyMapPrompt(b);return}
- if((d.do==='journeys'||d.do==='new-journey'||d.journeyEvent)&&!featureUnlocked('projects')){explainFeatureLock('projects');return}
+ if((d.do==='journeys'||d.do==='new-journey'||d.journeyEvent||d.editJourney||d.journeyLaunch||d.cancelJourneyDeparture)&&!featureUnlocked('projects')){explainFeatureLock('projects');return}
+ if(d.journeyLaunch||d.cancelJourneyDeparture){
+  const id=d.journeyLaunch||d.cancelJourneyDeparture;
+  const previous=state.settings[id]&&{...state.settings[id]};
+  try{
+   setJourneyDeparture(state,id,d.journeyLaunch?today:null);
+   if(!save()){state.settings[id]=previous;return}
+   appAudio?.cue(d.journeyLaunch?'hangar':'navigate');
+   journeys();
+   [...document.querySelectorAll('[data-journey-event]')].find(button=>button.dataset.journeyEvent===id)?.focus();
+   toast(d.journeyLaunch?'宇宙船が出発しました':'出発を取り消しました');
+  }catch(error){toast(error.message)}
+  return;
+ }
  if(d.do==='enter-hangar'||d.do==='leave-hangar'){
   if(!featureUnlocked('projects')){explainFeatureLock('projects');return}
   inJourneyHangar=d.do==='enter-hangar';
-  appAudio?.cue?.('navigate');
+  appAudio?.cue(inJourneyHangar?'hangar':'navigate');
   render();
   $(inJourneyHangar?'#projects-title':'[data-do="enter-hangar"]')?.focus({preventScroll:true});
   return;
  }
  if(d.do==='journeys'){journeys();return}
  if(d.do==='new-journey'){journeyForm();return}
+ if(d.editJourney){journeyForm(d.editJourney);return}
  if(d.journeyEvent){openJourneyEvent(d.journeyEvent);return}
  if(d.do==='planet-energy'){appAudio?.cue?.('navigate');showPlanetEnergy();return}
  if(d.do==='energy-draw'){drawPlanetPrize();return}
@@ -1699,15 +1734,17 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
  }
  if(e.target.id==='journey-form'){
   if(!featureUnlocked('projects')){explainFeatureLock('projects');return;}
-  const data=new FormData(e.target),previous=structuredClone(state);
+  const data=new FormData(e.target),previous=structuredClone(state),id=e.target.dataset.id;
+  const metrics=id==='new'?{unit:'minutes'}:timeMeasurement(measurement(state,id));
   try {
-   writeGoal(state,{name:data.get('name'),purpose:data.get('description'),parentId:data.get('parent'),
+   writeGoal(state,{id,name:data.get('name'),purpose:data.get('description'),parentId:data.get('parent'),
     kind:'action',eventDate:String(data.get('event-date')||''),
-    measurement:{unit:'minutes',dailyAmount:Number(data.get('event-minutes'))}});
+    journeyReturnDate:String(data.get('journey-return')||''),
+    measurement:{...metrics,dailyAmount:Number(data.get('event-minutes'))}});
    const points=earnEnergy('edit',today);
    if(!save()){state=previous;return}
    journeys();
-   energyToast('旅を追加しました',points);
+   energyToast(id==='new'?'任務を追加しました':'任務を更新しました',points);
   }catch(error){state=previous;toast(error.message)}
   return;
  }
@@ -1723,7 +1760,7 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
   if(!fromJourney)close();
   render();
   if(fromJourney)journeys();
-  energyToast(fromJourney?'旅を完了しました':'イベントの完了を記録しました',points);
+  energyToast(fromJourney?'帰還を記録しました':'イベントの完了を記録しました',points);
  }catch(error){state=previous;toast(error.message)}
 }if(e.target.id==='quantity-form'){
  const data=new FormData(e.target),previous=structuredClone(state);

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
- seed,applyMode,quantitySummary,recordEventCompletion,undoEventCompletion,validate,setTaskRecord
+ seed,applyMode,quantitySummary,recordEventCompletion,undoEventCompletion,validate,setTaskRecord,setJourneyDeparture
 } from '../dist/model.js';
 import {writeGoal} from '../dist/universe-model.js';
 import {weeklyPanel} from '../dist/quantity-view.js';
@@ -54,4 +54,27 @@ test('月間目標だけのタスクは月の履歴で集計され、週の目�
  assert.equal(week.rows[0].target,null);
  assert.equal(month.rows[0].target,10);
  assert.equal(month.rows[0].amount,.5);
+});
+
+test('任務の日程と出発を保持し、帰還後は航行中から外れる',()=>{
+ const state=seed();
+ const mission={name:'ハッカソン',purpose:'チーム開発を試す',parentId:'dev',kind:'action',
+  eventDate:'2026-11-30',journeyReturnDate:'2026-12-13',measurement:{unit:'minutes',dailyAmount:90}};
+ assert.throws(()=>writeGoal(state,{...mission,journeyReturnDate:'2026-11-29'}),/帰還予定日は出発予定日以降/);
+ const id=writeGoal(state,mission);
+ setJourneyDeparture(state,id,'2026-11-30');
+ setJourneyDeparture(state,id,'2026-12-01');
+ const saved=validate(JSON.parse(JSON.stringify(state)));
+ assert.equal(saved.settings[id].journeyDeparture,'2026-11-30');
+ assert.equal(saved.settings[id].journeyReturnDate,'2026-12-13');
+ const {journeyReturnDate,...eventEdit}=mission;
+ writeGoal(saved,{...eventEdit,id,name:'冬のハッカソン'});
+ assert.equal(saved.settings[id].journeyReturnDate,journeyReturnDate);
+ setJourneyDeparture(saved,id,null);
+ assert.equal(saved.settings[id].journeyDeparture,undefined);
+ setJourneyDeparture(saved,id,'2026-11-30');
+ recordEventCompletion(saved,id,'2026-12-13','2026-12-13');
+ assert.equal(saved.settings[id].journeyDeparture,undefined);
+ assert.equal(saved.settings[id].journeyReturnDate,journeyReturnDate);
+ assert.throws(()=>setJourneyDeparture(saved,id,'2026-12-13'));
 });

@@ -27,7 +27,10 @@ function validateCatchupPromises(promises){
    typeof promise.unit!=='string'||promise.unit.length>12)throw Error('取り戻す期限の記録が正しくありません');
  }
 }
-export function validate(s){if(!s||s.version!==1||!Array.isArray(s.nodes)||!s.settings||!s.records||!s.logs||!s.reviews||!Array.isArray(s.pending))throw Error('対応していないデータ形式です');validateCatchupPromises(s.catchupPromises);if(s.nodes.length<1||s.nodes.length>1000||s.nodes.filter(n=>n.parentId===null).length!==1||new Set(s.nodes.map(n=>n.id)).size!==s.nodes.length)throw Error('木の構造が正しくありません');for(const n of s.nodes){if(typeof n.id!=='string'||typeof n.name!=='string'||!n.name.trim())throw Error('目標の形式が正しくありません');const seen=new Set([n.id]);let p=n.parentId;while(p!==null){if(seen.has(p))throw Error('木が循環しています');seen.add(p);const parent=s.nodes.find(x=>x.id===p);if(!parent)throw Error('親目標が見つかりません');p=parent.parentId}}const check=a=>{if(!a||![0,1,2].includes(a.priority)||!['continuous','once'].includes(a.type)||!['active','paused','completed'].includes(a.status)||!Array.isArray(a.modes)||a.modes.some(m=>!['full','busy','rest'].includes(m)))throw Error('行動設定が正しくありません');if(a.measurement)validateMeasurement(a.measurement);if(isEventTask(a))validateEventDate(a.eventDate)};Object.values(s.settings).forEach(check);s.pending.forEach(p=>{check(p.setting);if(typeof p.id!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(p.effective))throw Error('予約設定が正しくありません')});for(const [k,r] of Object.entries(s.records)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!MODES[r.mode])throw Error('記録が正しくありません');if((r.plannedMode!=null&&!['full','busy','rest'].includes(r.plannedMode))||(r.eveningDone!=null&&typeof r.eveningDone!=='boolean'))throw Error('今日の予定が正しくありません');if(r.quantityMenu){if(!Array.isArray(r.quantityMenu)||r.quantityMenu.length>1000)throw Error('モードの量の設定が正しくありません');for(const item of r.quantityMenu){if(!item||typeof item.id!=='string'||typeof item.name!=='string'||!Array.isArray(item.goalIds)||!item.goalIds.every(x=>typeof x==='string')||!Array.isArray(item.goalPath)||!item.goalPath.every(x=>typeof x==='string'))throw Error('モードの履歴が正しくありません');check(item.setting)}}if(r.quantityExcluded&&(!Array.isArray(r.quantityExcluded)||!r.quantityExcluded.every(x=>typeof x==='string')))throw Error('記録の調整が正しくありません')}for(const [k,logs] of Object.entries(s.logs)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!logs||typeof logs!=='object'||Object.values(logs).some(l=>!l||typeof l.name!=='string'))throw Error('実行記録が正しくありません');for(const l of Object.values(logs)){if(l.quantity){validateQuantityValue(l.quantity);validateExtraQuantities(l.quantity.extras)}if(l.eventMinutes!=null)validateDuration(l.eventMinutes);validateExtraQuantities(l.eventQuantities);if(l.goalIds&&(!Array.isArray(l.goalIds)||l.goalIds.some(id=>typeof id!=='string')))throw Error('目標の履歴が正しくありません')}}return s}
+export function validate(s){if(!s||s.version!==1||!Array.isArray(s.nodes)||!s.settings||!s.records||!s.logs||!s.reviews||!Array.isArray(s.pending))throw Error('対応していないデータ形式です');validateCatchupPromises(s.catchupPromises);if(s.nodes.length<1||s.nodes.length>1000||s.nodes.filter(n=>n.parentId===null).length!==1||new Set(s.nodes.map(n=>n.id)).size!==s.nodes.length)throw Error('木の構造が正しくありません');for(const n of s.nodes){if(typeof n.id!=='string'||typeof n.name!=='string'||!n.name.trim())throw Error('目標の形式が正しくありません');const seen=new Set([n.id]);let p=n.parentId;while(p!==null){if(seen.has(p))throw Error('木が循環しています');seen.add(p);const parent=s.nodes.find(x=>x.id===p);if(!parent)throw Error('親目標が見つかりません');p=parent.parentId}}const check=a=>{if(!a||![0,1,2].includes(a.priority)||!['continuous','once'].includes(a.type)||!['active','paused','completed'].includes(a.status)||!Array.isArray(a.modes)||a.modes.some(m=>!['full','busy','rest'].includes(m)))throw Error('行動設定が正しくありません');if(a.measurement)validateMeasurement(a.measurement);if(isEventTask(a)){
+ validateJourneyDates(a.eventDate,a.journeyReturnDate);
+ if(a.journeyDeparture!==undefined&&!validDateKey(a.journeyDeparture))throw Error('出発の記録が正しくありません');
+ }};Object.values(s.settings).forEach(check);s.pending.forEach(p=>{check(p.setting);if(typeof p.id!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(p.effective))throw Error('予約設定が正しくありません')});for(const [k,r] of Object.entries(s.records)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!MODES[r.mode])throw Error('記録が正しくありません');if((r.plannedMode!=null&&!['full','busy','rest'].includes(r.plannedMode))||(r.eveningDone!=null&&typeof r.eveningDone!=='boolean'))throw Error('今日の予定が正しくありません');if(r.quantityMenu){if(!Array.isArray(r.quantityMenu)||r.quantityMenu.length>1000)throw Error('モードの量の設定が正しくありません');for(const item of r.quantityMenu){if(!item||typeof item.id!=='string'||typeof item.name!=='string'||!Array.isArray(item.goalIds)||!item.goalIds.every(x=>typeof x==='string')||!Array.isArray(item.goalPath)||!item.goalPath.every(x=>typeof x==='string'))throw Error('モードの履歴が正しくありません');check(item.setting)}}if(r.quantityExcluded&&(!Array.isArray(r.quantityExcluded)||!r.quantityExcluded.every(x=>typeof x==='string')))throw Error('記録の調整が正しくありません')}for(const [k,logs] of Object.entries(s.logs)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!logs||typeof logs!=='object'||Object.values(logs).some(l=>!l||typeof l.name!=='string'))throw Error('実行記録が正しくありません');for(const l of Object.values(logs)){if(l.quantity){validateQuantityValue(l.quantity);validateExtraQuantities(l.quantity.extras)}if(l.eventMinutes!=null)validateDuration(l.eventMinutes);validateExtraQuantities(l.eventQuantities);if(l.goalIds&&(!Array.isArray(l.goalIds)||l.goalIds.some(id=>typeof id!=='string')))throw Error('目標の履歴が正しくありません')}}return s}
 
 export const UNITS={pages:{label:'ページ',dimension:'pages',factor:1},hours:{label:'時間',dimension:'time',factor:60},minutes:{label:'分',dimension:'time',factor:1},count:{label:'回',dimension:'count',factor:1},questions:{label:'問',dimension:'questions',factor:1},words:{label:'単語',dimension:'words',factor:1},items:{label:'個',dimension:'items',factor:1}};
 export const rounded=n=>Math.round((n+Number.EPSILON)*1e6)/1e6;
@@ -318,8 +321,23 @@ export function isEventTask(action){return Object.hasOwn(action,'eventDate')}
 export function validateEventDate(date){
  if(date!==''&&!validDateKey(date))throw Error('イベントの日付を確認してください');
 }
+export function validateJourneyDates(departure,arrival){
+ validateEventDate(departure);
+ if(arrival&&!validDateKey(arrival))throw Error('帰還予定日を確認してください');
+ if(departure&&arrival&&arrival<departure)throw Error('帰還予定日は出発予定日以降にしてください');
+}
 export function eventCompletionDate(s,id){
  return Object.keys(s.logs).find(date=>s.logs[date][id]?.eventCompleted);
+}
+export function setJourneyDeparture(s,id,departure){
+ const action=setting(s,id);
+ if(nodeKind(s,id)!=='action'||!isEventTask(action)||eventCompletionDate(s,id))throw Error('出発する旅を確認してください');
+ if(departure){
+  if(!validDateKey(departure))throw Error('出発日を確認してください');
+  action.journeyDeparture??=departure;
+ }else{
+  delete action.journeyDeparture;
+ }
 }
 export function recordEventCompletion(s,id,date,todayKey=dateKey(),minutes=timeMeasurement(measurement(s,id)).dailyAmount,extraAmounts){
  const node=s.nodes.find(n=>n.id===id),action=setting(s,id);
@@ -336,6 +354,7 @@ export function recordEventCompletion(s,id,date,todayKey=dateKey(),minutes=timeM
   goalIds:goalIds(s,id),recordedAt:new Date().toISOString(),source:'manual',...completion
  };
  s.settings[id]={...action,status:'completed'};
+ delete s.settings[id].journeyDeparture;
 }
 export function undoEventCompletion(s,id){
  const date=eventCompletionDate(s,id);

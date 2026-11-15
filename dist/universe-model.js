@@ -1,4 +1,4 @@
-import {nodeKind,setting,modesForLevel,validateMeasurement,isEventTask,validateEventDate,eventCompletionDate,validateDuration,unitInfo,rounded,dateKey,recordMode,validDateKey} from './model.js';
+import {nodeKind,setting,modesForLevel,validateMeasurement,isEventTask,validateJourneyDates,eventCompletionDate,validateDuration,unitInfo,rounded,dateKey,recordMode,validDateKey} from './model.js';
 // Navigation and editing rules are independent of the visual scene and historic logs.
 export const UNIVERSE_ORIGIN='@universe-origin';
 export const LEVELS=['宇宙','銀河','恒星系','惑星','衛星'];
@@ -59,17 +59,18 @@ export function sceneLayout(nodes,width=1000,height=700){const portrait=width/he
 
 export function shouldPromptDailyMode(s,day){return s.universe?.onboarded===true&&!s.records[day]&&s.universe.lastModePrompt!==day}
 
-export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurement,mode='full',eventDate,symbolName}){
+export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurement,mode='full',eventDate,journeyReturnDate,symbolName}){
  name=String(name||'').trim();purpose=String(purpose||'').trim();if(!name||name.length>80)throw Error('名前を1〜80文字で入力してください');if(!purpose||purpose.length>1000)throw Error(kind==='action'?'上位目標につながる理由を入力してください':'この目標にした目的を入力してください');if(!['goal','action'].includes(kind))throw Error('目標かタスクを選んでください');
  const n=s.nodes.find(n=>n.id===id),isNew=id==='new';if(!isNew&&!n)throw Error('目標が見つかりません');const isRoot=!isNew&&n.parentId===null;
  if(!isRoot){if(!parentId||!s.nodes.some(p=>p.id===parentId))throw Error('つながっている上位目標を選んでください');if((isNew||parentId!==n.parentId)&&!canPlace(s,id,parentId))throw Error('上位目標を確認してください。宇宙から衛星までの5階層以内で、目標につなげられます。')}
+ const returnDate=journeyReturnDate??(n?setting(s,id).journeyReturnDate:undefined);
  if(kind==='action'){
   if(isRoot||(!isNew&&s.nodes.some(c=>c.parentId===id)))throw Error('下位目標のあるものは目標として保存してください');
   validateMeasurement(measurement);
   if(unitInfo(measurement).dimension!=='time')throw Error('取り組む時間を入力してください');
   validateDuration(measurement.dailyAmount);
   if(measurement.extras?.some(metric=>metric.dailyAmount==null))throw Error('追加で記録する量を入力してください');
-  if(eventDate!==undefined)validateEventDate(eventDate);
+  if(eventDate!==undefined)validateJourneyDates(eventDate,returnDate);
   else{
    if(measurement.totalTarget==null&&measurement.weeklyTarget==null&&measurement.monthlyTarget==null)throw Error('全体または1週間の目標時間を入力してください');
    if(!['rest','busy','full'].includes(mode))throw Error('タスクのモードを選んでください');
@@ -79,11 +80,16 @@ export function writeGoal(s,{id='new',name,purpose,parentId,kind='goal',measurem
  if(kind==='action'){
   const previous=setting(s,target.id);
   const base={...previous};delete base.eventDate;delete base.measurement;
+  delete base.journeyReturnDate;
+  if(eventDate===undefined)delete base.journeyDeparture;
   const changedFormat=isEventTask(previous)!==(eventDate!==undefined);
   if(changedFormat)s.pending=s.pending.filter(item=>item.id!==target.id);
   s.settings[target.id]=eventDate!==undefined
-   ?{...base,type:'once',eventDate,measurement:structuredClone(measurement),modes:[],status:eventCompletionDate(s,target.id)?'completed':'active'}
+   ?{...base,type:'once',eventDate,...(returnDate?{journeyReturnDate:returnDate}:{}),measurement:structuredClone(measurement),modes:[],status:eventCompletionDate(s,target.id)?'completed':'active'}
    :{...base,...(changedFormat?{type:'continuous',status:'active'}:{}),measurement:structuredClone(measurement),modes:modesForLevel(mode)};
+ }else if(s.settings[target.id]){
+  delete s.settings[target.id].journeyDeparture;
+  delete s.settings[target.id].journeyReturnDate;
  }
  return target.id;
 }

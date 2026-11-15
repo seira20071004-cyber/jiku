@@ -70,20 +70,25 @@ export function taskSettingsFields(s,id){
  </section>
  ${event?'':taskLevelFields(action)}`;
 }
-export function eventPanel(s,id,date,today){
+export function eventPanel(s,id,date,today,{mission=false}={}){
  const node=s.nodes.find(n=>n.id===id),action=setting(s,id),done=eventCompletionDate(s,id);
  const m=timeMeasurement(action.measurement||{unit:'minutes'});
- const displayDate=done||(action.eventDate&&action.eventDate<=today?action.eventDate:date);
+ const displayDate=done||(!mission&&action.eventDate&&action.eventDate<=today?action.eventDate:date);
  const log=done?s.logs[done][id]:null;
- return `<div class="dialog-title"><div><div class="eyebrow">イベント</div><h2>${esc(node.name)}</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+ const inFlight=mission&&action.journeyDeparture&&!done;
+ const status=done?(mission?'帰還 · ':'完了 · ')+esc(done):
+  inFlight?'航行中 · 出発 '+esc(action.journeyDeparture):
+  action.eventDate?'予定 · '+esc(action.eventDate):'日付未定';
+ return `<div class="dialog-title"><div><div class="eyebrow">${mission?'任務':'イベント'}</div><h2>${esc(node.name)}</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div>
  ${node.description?`<p class="space-description">${esc(node.description)}</p>`:''}
- <p class="event-state">${done?'完了 · '+esc(done):action.eventDate?'予定 · '+esc(action.eventDate):'日付未定'}${log?.eventMinutes?' · '+hoursText(log.eventMinutes/60):''}${(log?.eventQuantities||[]).map(q=>' · '+numberText(q.amount)+esc(unitInfo(q.measurement).label)).join('')}</p>
+ <p class="event-state">${status}${mission&&!done&&action.journeyReturnDate?' · 帰還予定 '+esc(action.journeyReturnDate):''}${log?.eventMinutes?' · '+hoursText(log.eventMinutes/60):''}${(log?.eventQuantities||[]).map(q=>' · '+numberText(q.amount)+esc(unitInfo(q.measurement).label)).join('')}</p>
+ ${inFlight?`<button class="text-button" data-cancel-journey-departure="${esc(id)}">出発を取り消す</button>`:''}
  ${done?`<button class="text-button" data-undo-event="${esc(id)}">完了を取り消す</button>`:`<form id="event-form" data-id="${esc(id)}">
-  <label>完了した日<input name="event-completed-date" type="date" required max="${today}" value="${displayDate}"></label>
+  <label>${mission?'帰還した日':'完了した日'}<input name="event-completed-date" type="date" required max="${today}" value="${displayDate}"></label>
   ${minuteInput('取り組んだ時間','record-minutes',m.dailyAmount)}
   ${extraRecordFields(m.extras,m.extras?.map(metric=>metric.dailyAmount))}
-  <div class="dialog-actions"><button class="primary" type="submit">完了を記録</button></div></form>`}
- <button class="text-button" data-edit="${esc(id)}">イベントの設定を編集 →</button>`;
+  <div class="dialog-actions"><button class="primary" type="submit">${mission?'帰還を記録':'完了を記録'}</button></div></form>`}
+ <button class="text-button" ${mission?'data-edit-journey':'data-edit'}="${esc(id)}">${mission?'任務を編集':'イベントの設定を編集'} →</button>`;
 }
 export function modePickerContent(s,key){const current=s.records[key]?.plannedMode||s.records[key]?.mode;return `<div class="dialog-title"><div><div class="eyebrow">${Number(key.slice(5,7))}月${Number(key.slice(8))}日</div><h2>今日は、どのペース？</h2></div><button class="round-button" data-do="close" aria-label="閉じる">×</button></div><p class="mode-picker-note">今日のペースを選び、できたらホームの「達成」を押します。</p><div class="quick-mode-options">${['full','busy','rest'].map(k=>{const m=MODES[k],summary=modeTotals(s,k);return `<button data-mode="${k}" data-date="${key}" class="quick-mode ${k} ${current===k?'chosen':''}"><span class="quick-mode-icon">${m.icon}</span><div><strong>${m.label}</strong><small>${summary.count?[...summary.groups].sort((a,b)=>Number(b.dimension==='time')-Number(a.dimension==='time')).map(g=>g.dimension==='time'?hoursText(g.total):numberText(g.total)+esc(g.unit)).join(' ・ '):'固定量を設定したタスクはありません'}</small></div><i>${current===k?'✓':'→'}</i></button>`}).join('')}</div>${Object.values(s.logs[key]||{}).some(l=>l.quantity&&l.source!=='mode')?'<p class="footnote">この日だけ修正した量は、そのまま残ります。</p>':''}<div class="mode-picker-footer"><button class="text-button" data-configure-leaves>タスクの量を設定する</button><button class="text-button quiet" data-do="close">あとで</button></div>`}
 export function recordPanel(s,id,date,today){
