@@ -16,13 +16,13 @@ export const jsonTemplate = `先ほど私が了承したマインドマップを
   "nodes": [
     {
       "kind": "goal",
-      "name": "応用情報技術者試験に合格する",
-      "purpose": "技術の基礎力を高めるため",
+      "name": "応用情報合格",
+      "purpose": "技術の基礎力を高める",
       "children": [
         {
           "kind": "task",
-          "name": "過去問を解く",
-          "purpose": "出題傾向を把握し、苦手分野を特定するため",
+          "name": "過去問演習",
+          "purpose": "苦手分野を見つける",
           "mode": "busy",
           "deadline": "2027-04-01",
           "time": { "total": 1800, "weekly": 300, "daily": 60 },
@@ -34,6 +34,7 @@ export const jsonTemplate = `先ほど私が了承したマインドマップを
 }
 
 - 上の名前、日付、数値は例です。実際に合意した内容に置き換えてください。
+- マインドマップでひと目で読めるよう、目標・タスクの name は単語か短いフレーズ（日本語なら目安は20文字以内）にしてください。purpose も上位目標とのつながりを短い一文にまとめてください。意味のある固有名詞や重要な条件は残し、日付・数量・単位・親子関係は合意した内容を保ってください。
 - nodesには、Jikuで選ぶ追加先の「直下」に置く項目だけを並べます。追加先の目標自体は出力しません。上位目標とのつながりは children の入れ子で表現します。
 - goalには kind、name、purpose、children を指定します。子がない場合は children: []。最上位の目標の直下にある目標でブラックホール名を決めていれば、任意の symbolName も指定できます。
 - taskには kind、name、purpose、mode、deadline、time、extras を指定します。子は持てません。modeは full（余裕がある日だけ）、busy（忙しい日も）、rest（毎日）のいずれかです。deadlineは YYYY-MM-DD。

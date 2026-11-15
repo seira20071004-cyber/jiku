@@ -823,39 +823,54 @@ function mapImportDialog(){
  const root=state.nodes.find(node=>node.parentId===null),selected=selectedMapNode();
  const parents=state.nodes.filter(node=>canPlace(state,'new',node.id));
  const target=parents.find(node=>node.id===selected.id)||parents.find(node=>node.id===selected.parentId)||root;
- modal(`<form id="map-import-form">
+ modal(`<form id="map-import-form" data-step="1">
   <div class="dialog-title"><h2>AIで作成・取り込み</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
-  <p>AIと自分のマインドマップを考えましょう。</p>
-  <label>追加先の目標<select name="parent">${parents.map(node=>`<option value="${esc(node.id)}" ${node.id===target.id?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
-  <p data-import-depth class="muted"></p>
-  <section class="map-import-step"><h3>Step 1｜AIとマインドマップを考える</h3>
+  <section class="map-import-step" data-import-step="1"><h3 tabindex="-1">Step 1｜AIとマインドマップを考える</h3>
+   <p>AIと自分のマインドマップを考えましょう。</p>
+   <label>追加先の目標<select name="parent">${parents.map(node=>`<option value="${esc(node.id)}" ${node.id===target.id?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
+   <p data-import-depth class="muted"></p>
    <p>このプロンプトをAIに送り、自分の目標や、目標につながる日々のタスクを一緒に深く考えます。</p>
    <button type="button" class="primary" data-copy-map-prompt="planning">相談用プロンプトをコピー</button>
    <details><summary>プロンプトを表示</summary>
     <textarea aria-label="マインドマップを考えるプロンプト" data-import-prompt="planning" readonly rows="4"></textarea>
    </details>
+   <div class="dialog-actions"><button type="button" class="primary" data-import-go="2">次へ</button></div>
   </section>
-  <section class="map-import-step"><h3>Step 2｜決まった内容の形式を整える</h3>
+  <section class="map-import-step" data-import-step="2" hidden><h3 tabindex="-1">Step 2｜決まった内容の形式を整える</h3>
    <p>内容が決まったら、次のプロンプトを同じAIの会話に送り、Jikuで読み込める形式（JSON）に整えます。</p>
    <button type="button" class="primary" data-copy-map-prompt="template">JSONテンプレートをコピー</button>
    <details><summary>テンプレートを表示</summary>
     <textarea aria-label="JSON出力テンプレート" data-import-prompt="template" readonly rows="4">${esc(jsonTemplate)}</textarea>
    </details>
+   <div class="dialog-actions"><button type="button" class="text-button" data-import-go="1">戻る</button><button type="button" class="primary" data-import-go="3">次へ</button></div>
   </section>
   <p class="map-import-copy-status" role="status" aria-live="polite"></p>
-  <section class="map-import-step">
-   <h3>Step 3｜Jikuに貼り付けて反映する</h3>
+  <section class="map-import-step" data-import-step="3" hidden>
+   <h3 tabindex="-1">Step 3｜Jikuに貼り付けて反映する</h3>
    <p>AIが出力した内容を下に貼り付け、「内容を確認」を押します。内容を確認したら「Jikuに反映する」を押してください。</p>
-   <label>AIが出力した内容<textarea name="plan" required rows="6" spellcheck="false" placeholder="ここに貼り付け"></textarea></label>
+   <label>AIが出力した内容<textarea name="plan" required disabled rows="6" spellcheck="false" placeholder="ここに貼り付け"></textarea></label>
+   <p class="map-import-error" role="alert" hidden></p>
+   <div data-import-preview hidden></div>
+   <div class="dialog-actions">
+    <button type="button" class="text-button" data-import-go="2">戻る</button>
+    <button class="primary" type="submit" name="action" value="preview" disabled>内容を確認</button>
+    <button class="primary" type="submit" name="action" value="apply" disabled hidden>Jikuに反映する</button>
+   </div>
   </section>
-  <p class="map-import-error" role="alert" hidden></p>
-  <div data-import-preview hidden></div>
-  <div class="dialog-actions">
-   <button class="primary" type="submit" name="action" value="preview">内容を確認</button>
-   <button class="primary" type="submit" name="action" value="apply" hidden>Jikuに反映する</button>
-  </div>
  </form>`);
  updateImportPrompt($('#map-import-form'));
+}
+function showMapImportStep(form,step){
+ const page=form.querySelector(`[data-import-step="${step}"]`);
+ if(!page)return;
+ form.dataset.step=step;
+ form.querySelectorAll('[data-import-step]').forEach(section=>{section.hidden=section!==page;});
+ form.querySelector('[name="plan"]').disabled=step!=='3';
+ form.querySelector('[value="preview"]').disabled=step!=='3';
+ form.querySelector('[value="apply"]').disabled=step!=='3'||form.dataset.previewed!=='true';
+ form.querySelector('.map-import-copy-status').textContent='';
+ form.closest('dialog').scrollTop=0;
+ page.querySelector('h3').focus({preventScroll:true});
 }
 async function copyMapPrompt(button){
  const form=button.form;
@@ -884,6 +899,7 @@ function clearMapImportPreview(form){
  form.querySelector('[data-import-preview]').hidden=true;
  form.querySelector('.map-import-error').hidden=true;
  form.querySelector('[value="apply"]').hidden=true;
+ form.querySelector('[value="apply"]').disabled=true;
  delete form.dataset.previewed;
 }
 function mapImportTree(nodes){
@@ -899,6 +915,7 @@ function mapImportTree(nodes){
  }).join('')}</ul>`;
 }
 function handleMapImport(form,action){
+ if(form.dataset.step!=='3')return;
  const data=new FormData(form);
  const preview=form.querySelector('[data-import-preview]');
  const error=form.querySelector('.map-import-error');
@@ -921,6 +938,7 @@ function handleMapImport(form,action){
   preview.hidden=false;
   form.dataset.previewed='true';
   form.querySelector('[value="apply"]').hidden=false;
+  form.querySelector('[value="apply"]').disabled=false;
   preview.scrollIntoView({block:'nearest'});
  }catch(problem){
   clearMapImportPreview(form);
@@ -1486,6 +1504,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.starAction){void commitStarAction(d.starAction,d.starFriend);return}
  if(d.do==='map-print'){mapPrintDialog();return}
  if(d.do==='map-import'){mapImportDialog();return}
+ if(d.importGo){showMapImportStep(b.form,d.importGo);return}
  if(d.copyMapPrompt){void copyMapPrompt(b);return}
  if((d.do==='journeys'||d.do==='new-journey'||d.journeyEvent)&&!featureUnlocked('projects')){explainFeatureLock('projects');return}
  if(d.do==='journeys'){journeys();return}
