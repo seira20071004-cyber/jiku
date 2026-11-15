@@ -6,16 +6,17 @@ await build({entryPoints:['src/origin-preview.js'],outfile:'dist/origin-preview.
 await writeFile('dist/three-LICENSE.txt',await readFile('node_modules/three/LICENSE','utf8'));
 const types={
   txt:'text/plain; charset=utf-8',html:'text/html; charset=utf-8',css:'text/css; charset=utf-8',js:'text/javascript; charset=utf-8',
-  webmanifest:'application/manifest+json',svg:'image/svg+xml',png:'image/png'
+  webmanifest:'application/manifest+json',svg:'image/svg+xml',png:'image/png',webp:'image/webp'
 };
 const assets={};
 for(const name of [
   'index.html','sw.js','style.css','app.js','onboarding.js','onboarding-sky.js','birth-music.js','origin-framing.js','origin-preview.js','onboarding.css',
   'model.js','star-world.js','quantity-view.js','tree3d.js','universe.js','universe-model.js','demo.js','example-map.js','mind-map.js','mind-map.css','map-import.js','three-LICENSE.txt',
-  'manifest.webmanifest','icons/jiku.svg','icons/jiku-180.png','icons/jiku-192.png','icons/jiku-512.png'
+  'manifest.webmanifest','icons/jiku.svg','icons/jiku-180.png','icons/jiku-192.png','icons/jiku-512.png',
+  'images/journey-bridge.webp','images/journey-hangar.webp'
 ]){
   const extension=name.split('.').pop();
-  assets['/'+name]={body:await readFile('dist/'+name,extension==='png'?'base64':'utf8'),type:types[extension]};
+  assets['/'+name]={body:await readFile('dist/'+name,['png','webp'].includes(extension)?'base64':'utf8'),type:types[extension]};
 }
 const auth=await readFile('worker/auth.js','utf8');
 const push=await readFile('worker/push.js','utf8');

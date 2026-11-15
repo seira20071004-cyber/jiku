@@ -32,17 +32,18 @@ let treeScene=null,treeView=null,showGoalLabels=true,statsTab='calendar',statsWe
 let view='tree',today=dateKey(),selected=today,month=today.slice(0,7),focus=null,zoom=1,pan={x:0,y:0};
 let guideSession=null,guideTimer,mapPreviewReturn=null,onboardingResume=null;
 let mapSelection=null,mapEditing=false;
+let inJourneyHangar=false;
 let starWorldTimer;
 function save(){if(guideSession||mapPreviewReturn||(guest&&!demoMode))return true;if(storageLocked){toast('元の保存データを保護しています。バックアップを確認してください。');return false}try{localStorage.setItem(storageKey,JSON.stringify(state));return true}catch{toast('保存できませんでした。設定からバックアップを保存してください。');return false}}
 const icon=name=>({tree:'✧',stats:'◴',projects:'☄',catchup:'↗'}[name]);
-const names={tree:'ホーム',stats:'統計',projects:'プロジェクト',catchup:'遅れを取り戻す'};
+const names={tree:'ホーム',stats:'統計',projects:'旅に出る',catchup:'遅れを取り戻す'};
 function featureUnlocked(feature){
  const {confirmed,days}=featureProgress(state,today);
  return confirmed&&days>=featureDays[feature];
 }
 function explainFeatureLock(feature){
  const {confirmed,days}=featureProgress(state,today);
- const label=feature==='gacha'?'宇宙エネルギーのガチャ':names[feature];
+ const label=feature==='gacha'?'宇宙エネルギーのガチャ':feature==='projects'?'旅の機能':names[feature];
  toast(confirmed?`${label}はあと${Math.max(0,featureDays[feature]-days)}日の記録で解放されます。`:
   'ホームでマインドマップを確認し、「この内容で始める」を押してください。');
 }
@@ -137,6 +138,7 @@ function render(){clearTimeout(guideTimer);clearInterval(starWorldTimer);
   history.replaceState(null,'',url);
  }
  if(view!=='catchup'&&inUnderworld)leaveUnderworld();
+ if(view!=='projects')inJourneyHangar=false;
  const progress=featureProgress(state,today);
  const editingHome=view==='tree'&&mapEditing&&!guideSession;
  const analyzing=view==='stats'&&statsTab==='graph'&&analysisStarted&&!guideSession;
@@ -969,18 +971,33 @@ function projectsPage(){
  }
  planned.sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
  history.sort((a,b)=>b.date.localeCompare(a.date));
+ if(!inJourneyHangar)return `<section class="journey-page" aria-labelledby="projects-title">
+  <div class="journey-scene journey-bridge">
+   <div class="journey-console">
+    <h1 id="projects-title">司令室</h1>
+    <p>出発予定 <strong>${planned.length}件</strong></p>
+    <button type="button" class="journey-launch" data-do="enter-hangar">旅に出る<span aria-hidden="true">→</span></button>
+   </div>
+  </div>
+ </section>`;
  const list=(items,empty)=>items.length
   ?`<ul class="journey-list">${items.map(({node,date})=>`<li><button type="button" data-journey-event="${esc(node.id)}"><strong>${esc(node.name)}</strong><span>${esc(date||'日付未定')} ›</span></button></li>`).join('')}</ul>`
   :`<p class="muted">${empty}</p>`;
- return `<section class="tab-page" aria-labelledby="projects-title">
-  <header><h1 id="projects-title">プロジェクト</h1>
-   <button type="button" class="primary" data-do="new-journey">＋ プロジェクトを追加</button></header>
-  <div class="journey-sections"><section><h2>これからのプロジェクト</h2>${list(planned,'予定はありません。')}</section>
-  <section><h2>完了したプロジェクト</h2>${list(history,'完了したプロジェクトがここに残ります。')}</section></div>
+ return `<section class="journey-page journey-page-hangar" aria-labelledby="projects-title">
+  <div class="journey-scene journey-hangar">
+   <button class="journey-return" type="button" data-do="leave-hangar">← 司令室に戻る</button>
+   <div class="journey-console">
+    <h1 id="projects-title" tabindex="-1">格納庫</h1>
+    <button type="button" class="journey-launch" data-do="new-journey">旅を追加<span aria-hidden="true">＋</span></button>
+   </div>
+  </div>
+  <div class="journey-sections"><section><h2>出発予定</h2>${list(planned,'出発予定の旅はありません。')}</section>
+  <section><h2>旅の記録</h2>${list(history,'完了した旅はここに残ります。')}</section></div>
  </section>`;
 }
 function journeys(){
  close();
+ inJourneyHangar=true;
  view='projects';
  if(location.hash!=='#projects')location.hash='projects';
  render();
@@ -990,18 +1007,18 @@ function journeyForm(){
  const parentId=nodeKind(state,selected.id)==='goal'&&canPlace(state,'new',selected.id)?selected.id:selected.parentId;
  const options=state.nodes.filter(node=>nodeKind(state,node.id)==='goal'&&canPlace(state,'new',node.id));
  modal(`<form id="journey-form">
-  <div class="dialog-title"><h2>プロジェクトを追加</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
-  <label>プロジェクト名<input name="name" required maxlength="80" placeholder="例：ハッカソンに参加する"></label>
-  <label>プロジェクトの目的<textarea name="description" required maxlength="1000" rows="2"></textarea></label>
+  <div class="dialog-title"><h2>旅を追加</h2><button type="button" class="round-button" data-do="close" aria-label="閉じる">×</button></div>
+  <label>旅の名前<input name="name" required maxlength="80" placeholder="例：ハッカソンに参加する"></label>
+  <label>旅の目的<textarea name="description" required maxlength="1000" rows="2"></textarea></label>
   <label>繋がっている上位目標<select name="parent" required>${options.map(node=>`<option value="${esc(node.id)}" ${node.id===parentId?'selected':''}>${esc(nodePath(state,node.id).map(part=>part.name).join(' › '))}</option>`).join('')}</select></label>
   <label>日付（任意）<input name="event-date" type="date"></label>
   <label>取り組む予定の時間（分）<input name="event-minutes" type="number" inputmode="decimal" min="0.001" max="1000000" step="any" required></label>
-  <div class="dialog-actions"><button type="button" class="text-button" data-do="journeys">‹ プロジェクト一覧</button><button type="submit" class="primary">保存する</button></div>
+  <div class="dialog-actions"><button type="button" class="text-button" data-do="journeys">‹ 格納庫に戻る</button><button type="submit" class="primary">保存する</button></div>
  </form>`);
 }
 function openJourneyEvent(id){
  modal(eventPanel(state,id,today,today));
- $('#dialog').insertAdjacentHTML('afterbegin','<button type="button" class="text-button journey-back" data-do="journeys">‹ プロジェクト一覧</button>');
+ $('#dialog').insertAdjacentHTML('afterbegin','<button type="button" class="text-button journey-back" data-do="journeys">‹ 格納庫に戻る</button>');
  const form=$('#event-form');
  if(form)form.dataset.journey='true';
 }
@@ -1529,6 +1546,14 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.importGo){showMapImportStep(b.form,d.importGo);return}
  if(d.copyMapPrompt){void copyMapPrompt(b);return}
  if((d.do==='journeys'||d.do==='new-journey'||d.journeyEvent)&&!featureUnlocked('projects')){explainFeatureLock('projects');return}
+ if(d.do==='enter-hangar'||d.do==='leave-hangar'){
+  if(!featureUnlocked('projects')){explainFeatureLock('projects');return}
+  inJourneyHangar=d.do==='enter-hangar';
+  appAudio?.cue?.('navigate');
+  render();
+  $(inJourneyHangar?'#projects-title':'[data-do="enter-hangar"]')?.focus({preventScroll:true});
+  return;
+ }
  if(d.do==='journeys'){journeys();return}
  if(d.do==='new-journey'){journeyForm();return}
  if(d.journeyEvent){openJourneyEvent(d.journeyEvent);return}
@@ -1682,7 +1707,7 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
    const points=earnEnergy('edit',today);
    if(!save()){state=previous;return}
    journeys();
-   energyToast('プロジェクトを追加しました',points);
+   energyToast('旅を追加しました',points);
   }catch(error){state=previous;toast(error.message)}
   return;
  }
@@ -1698,7 +1723,7 @@ document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-sub
   if(!fromJourney)close();
   render();
   if(fromJourney)journeys();
-  energyToast(fromJourney?'プロジェクトを完了しました':'イベントの完了を記録しました',points);
+  energyToast(fromJourney?'旅を完了しました':'イベントの完了を記録しました',points);
  }catch(error){state=previous;toast(error.message)}
 }if(e.target.id==='quantity-form'){
  const data=new FormData(e.target),previous=structuredClone(state);

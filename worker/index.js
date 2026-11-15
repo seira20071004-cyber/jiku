@@ -4,6 +4,7 @@ const PUBLIC_ASSETS=new Set([
  '/','/index.html','/app.js','/style.css','/model.js','/star-world.js','/quantity-view.js','/universe.js',
  '/universe-model.js','/demo.js','/example-map.js','/mind-map.js','/mind-map.css','/map-import.js',
  '/onboarding.css','/onboarding.js','/birth-music.js','/onboarding-sky.js','/origin-framing.js','/origin-preview.js',
+ '/images/journey-bridge.webp','/images/journey-hangar.webp',
  '/manifest.webmanifest','/sw.js','/icons/jiku.svg','/icons/jiku-180.png','/icons/jiku-192.png','/icons/jiku-512.png'
 ]);
 // ASSET_MAP is embedded at build time. Authentication runs before serving assets.
@@ -20,7 +21,7 @@ export default {async fetch(request,env){
  }else if(u.pathname==='/api/session')return Response.json({mode:'local'},{headers:{'Cache-Control':'no-store'}});
  if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405});
  const path=u.pathname==='/'?'/index.html':u.pathname;const asset=Object.hasOwn(ASSET_MAP,path)?ASSET_MAP[path]:null;if(!asset)return new Response('Not found',{status:404});
- const body=request.method==='HEAD'?null:asset.type==='image/png'?Uint8Array.from(atob(asset.body),byte=>byte.charCodeAt(0)):
+ const body=request.method==='HEAD'?null:['image/png','image/webp'].includes(asset.type)?Uint8Array.from(atob(asset.body),byte=>byte.charCodeAt(0)):
   path==='/index.html'?asset.body.replace('<html lang="ja">','<html lang="ja" data-auth="google">'):asset.body;
  return new Response(body,{headers:{'Content-Type':asset.type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin'}});
 }};
