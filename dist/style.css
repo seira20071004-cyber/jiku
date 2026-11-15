@@ -923,3 +923,8 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
 .map-editor-dialog .map-editor-layout { flex:1; height:auto; min-height:0; }
 .map-edit-exit { min-height:44px; padding-inline:4px; color:#ebdbff; white-space:nowrap; }
 .map-editor-fields .dialog-title [data-do="close"] { display:none; }
+
+.workspace.is-map-editing { padding-bottom:env(safe-area-inset-bottom); }
+.is-map-editing + .bottom-nav,
+.is-map-editing .topbar :is(.header-actions,.demo-toolbar),
+.is-map-editing :is(.home-universe,.mind-map-mode,.map-confirm,.mind-map-header .mind-map-tools) { display:none; }
