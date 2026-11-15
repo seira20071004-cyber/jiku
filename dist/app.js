@@ -139,8 +139,9 @@ function render(){clearTimeout(guideTimer);clearInterval(starWorldTimer);
  if(view!=='catchup'&&inUnderworld)leaveUnderworld();
  const progress=featureProgress(state,today);
  const editingHome=view==='tree'&&mapEditing&&!guideSession;
+ const analyzing=view==='stats'&&statsTab==='graph'&&analysisStarted&&!guideSession;
  const page=guideSession?treePage():{tree:mindMapPage,stats:statsPage,projects:projectsPage,catchup:catchupPage,star:starWorldPage}[view]();
- $('#app').innerHTML=`<main class="workspace view-${view}${editingHome?' is-map-editing':''}"><header class="topbar">${editingHome?
+ $('#app').innerHTML=`<main class="workspace view-${view}${editingHome?' is-map-editing':''}${analyzing?' is-analyzing':''}"><header class="topbar">${editingHome?
  '<button type="button" class="text-button map-edit-exit" data-map-edit-mode>← 編集を閉じる</button>':
  '<a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>'}${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k||(view==='star'&&k==='tree')?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''} ${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?'aria-disabled="true"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong>${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?`<small>${featureDays[k]}日で解放</small>`:''}</button>`).join('')}</nav>`;bindTree();scheduleGuide();maybeAskReminderSetup();
  bindPanelDivider($('#app [data-panel-divider="analysis"]'));
@@ -488,12 +489,19 @@ function analysisResult(){
 function analysisWorkspace(){
  if(!analysisStarted)return `<div class="analysis-overview">
   ${analysisResult()}
-  <button class="primary" type="button" data-do="start-analysis">分析を開始する</button>
+  <button class="analysis-launch" type="button" data-do="start-analysis">
+   <span class="analysis-launch-icon" aria-hidden="true">✦</span>
+   <span>分析を開始する</span>
+   <span class="analysis-launch-arrow" aria-hidden="true">→</span>
+  </button>
  </div>`;
  const root=state.nodes.find(node=>node.parentId===null);
  return `<div class="analysis-workspace">
   <div class="analysis-map" id="analysis-map-pane" aria-label="分析する目標">
-   <h2>何の分析をしますか？</h2>
+   <div class="analysis-map-heading">
+    <button class="analysis-exit" type="button" data-do="exit-analysis"><span aria-hidden="true">←</span> 統計に戻る</button>
+    <h2>何の分析をしますか？</h2>
+   </div>
    <div class="analysis-map-scroll">${personalMap({selection:quantityScope==='all'?root.id:quantityScope,analysis:true})}</div>
   </div>
   ${panelDivider('analysis','マインドマップとグラフの高さを調節','analysis-map-pane analysis-chart-pane')}
@@ -512,9 +520,9 @@ function statsPage(){
  const tabs=[['calendar','カレンダー'],['graph','分析']];
  const calendar=statsTab==='calendar';
  return `<section class="statistics-workspace weekly-workspace stats-dashboard">
-  <div class="statistics-toolbar"><div class="statistics-tabs" role="group" aria-label="統計の表示">
+  ${!calendar&&analysisStarted?'':`<div class="statistics-toolbar"><div class="statistics-tabs" role="group" aria-label="統計の表示">
    ${tabs.map(([id,label])=>`<button type="button" aria-pressed="${statsTab===id}" data-stat-tab="${id}">${label}</button>`).join('')}
-  </div></div>
+  </div></div>`}
   <div class="statistics-content ${calendar?'calendar-content':'quantity-content'}">${calendar?calendarPage()+calendarModeChart():analysisWorkspace()}</div>
  </section>`;
 }
@@ -1483,7 +1491,14 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
   if(!featureUnlocked('stats'))return;
   analysisStarted=true;
   render();
-  $('[data-analysis-target]')?.focus({preventScroll:true});
+  $('[data-analysis-target][aria-current="true"]')?.focus({preventScroll:true});
+  return;
+ }
+ if(d.do==='exit-analysis'){
+  analysisStarted=false;
+  quantityScope='all';
+  render();
+  $('[data-do="start-analysis"]')?.focus({preventScroll:true});
   return;
  }
  if(d.analysisTarget){
