@@ -570,7 +570,8 @@ function mapActions(){
 }
 function personalMap({selection=mapSelection,preview=false,analysis=false,addition=null}={}){
  const selected=state.nodes.find(node=>node.id===selection)||state.nodes.find(node=>node.parentId===null);
- const root=state.nodes.find(node=>node.parentId===null);
+ const branchId=analysis?'analysis-map-branch':preview?'editor-map-branch':'home-map-branch';
+ const path=nodePath(state,selected.id),root=path[0];
  const childrenFor=id=>{
   const children=visibleChildren(state,id);
   if(addition?.parent===id){
@@ -580,7 +581,10 @@ function personalMap({selection=mapSelection,preview=false,analysis=false,additi
   }
   return children;
  };
- const card=(node,depth,style='')=>{
+ const galaxies=childrenFor(root.id);
+ const branchRoot=path[1];
+ const tone=galaxies.findIndex(node=>node.id===branchRoot?.id) % 5;
+ const card=(node,depth,style='',overview=false)=>{
   if(node.insertion){
    const label=addition.kind==='action'?'新しいタスク':'新しい目標';
    return `<div class="map-node map-insertion ${style}" role="status"><span aria-hidden="true">＋</span>
@@ -588,22 +592,37 @@ function personalMap({selection=mapSelection,preview=false,analysis=false,additi
   }
   const task=nodeKind(state,node.id)==='action',level=Math.min(depth,LEVELS.length-1);
   const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):'';
-  return `<button type="button" class="map-node ${style}" ${analysis?'data-analysis-target':'data-map-select'}="${esc(node.id)}"
-    ${node.id===selected.id?'aria-current="true"':''} ${mapEditing&&!preview&&!analysis?'aria-keyshortcuts="F2"':''}>
+  return `<button class="map-node ${style}" ${analysis?'data-analysis-target':'data-map-select'}="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''} ${mapEditing&&!preview&&!analysis?'aria-keyshortcuts="F2"':''}
+    ${overview?`aria-expanded="${node.id===branchRoot?.id}" aria-controls="${branchId}"`:''}>
     <span aria-hidden="true">${task?'✓':hierarchyMarks[level]}</span>
     <span>${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong></span>
-  </button>`;
+  </button>
+  `;
  };
- function branch(node,depth,tone){
-  const children=node.insertion?[]:childrenFor(node.id);
-  return `<li data-map-depth="${Math.min(depth,4)}" ${depth===1?`data-map-tone="${tone}"`:''}>
-   ${card(node,depth,depth===0?'map-root':'')}
-   ${children.length?`<ul>${children.map((child,index)=>branch(child,depth+1,index%5)).join('')}</ul>`:''}
+ const overview=mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
+  tone:index % 5,card:card(node,1,'',true)
+ })),{radial:true,label:'マインドマップ全体'});
+ if(!branchRoot)return overview+`<div id="${branchId}" hidden></div>`;
+ return overview+mapBranchPanel(branchRoot,{childrenFor,card,branchId,tone});
+}
+function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
+ function branch(node,level){
+  if(node.insertion)return `<li>${card(node,level,'map-branch-row')}</li>`;
+  const children=childrenFor(node.id);
+  const kind=nodeKind(state,node.id)==='action'?'task':'goal';
+  return `<li class="map-branch-${kind}">
+   ${card(node,level,'map-branch-row')}
+   ${children.length?`<ul>${children.map(child=>branch(child,level+1)).join('')}</ul>`:''}
   </li>`;
  }
- return `<div class="connected-map" role="group" aria-label="マインドマップ全体">
-  <ul>${branch(root,0)}</ul>
- </div>`;
+ const children=childrenFor(root.id);
+ const lanes=children.length>1?[children.filter((_,i)=>i%2===0),children.filter((_,i)=>i%2===1)]:[children];
+ return `<section id="${branchId}" class="map-subview map-galaxy-view" aria-labelledby="${branchId}-name" data-map-tone="${tone}">
+  <header class="map-branch-header"><span aria-hidden="true">${hierarchyMarks[Math.min(depth,4)]}</span><h2 id="${branchId}-name">${esc(root.name)}</h2></header>
+  ${children.length?`<div class="map-galaxy-tree ${lanes.length===1?'single-lane':''}">${lanes.map(nodes=>
+   `<ul class="map-branch-lane">${nodes.map(node=>branch(node,depth+1)).join('')}</ul>`).join('')}</div>`:
+   '<p class="map-galaxy-empty">まだ下位の目標やタスクはありません。</p>'}
+ </section>`;
 }
 
 function leaveUnderworld(){
@@ -1332,15 +1351,22 @@ function openMindMap(){
  render();
  $('.mind-map [aria-current]')?.scrollIntoView({block:'nearest'});
 }
-function selectConnectedMapNode(button){
- const map=button.closest('.connected-map');
- map.querySelector('.map-node[aria-current="true"]')?.removeAttribute('aria-current');
- button.setAttribute('aria-current','true');
-}
 function selectMapNode(button){
- mapSelection=button.dataset.mapSelect;
- selectConnectedMapNode(button);
+ const scroll=$('.mind-map-scroll');
+ const fromOverview=button.closest('.map-diagram-overview');
+ const wasExpanded=button.getAttribute('aria-expanded')==='true';
+ const nodeId=button.dataset.mapSelect;
+ mapSelection=wasExpanded?null:nodeId;
+ const scrollTop=scroll.scrollTop;
+ scroll.innerHTML=personalMap();
  $('.mind-map-footer .mind-map-tools').outerHTML=mapActions();
+ scroll.scrollTop=scrollTop;
+ const cards=Array.from(scroll.querySelectorAll('.map-node[data-map-select]'));
+ cards.find(card=>card.dataset.mapSelect===nodeId)?.focus({preventScroll:true});
+ if(fromOverview&&!wasExpanded){
+  const heading=scroll.querySelector('#home-map-branch-name');
+  heading?.scrollIntoView({block:'nearest'});
+ }
 }
 function leafPanel(id,key=today){
  if(!state.nodes.some(n=>n.id===id))return;
@@ -1458,7 +1484,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.analysisTarget){
   if(!featureUnlocked('stats'))return;
   quantityScope=reportScope(d.analysisTarget);
-  selectConnectedMapNode(b);
+  const map=$('.analysis-map-scroll'),position=map.scrollTop;
+  map.innerHTML=personalMap({selection:d.analysisTarget,analysis:true});
+  map.scrollTop=position;
+  const target=[...map.querySelectorAll('[data-analysis-target]')].find(button=>button.dataset.analysisTarget===d.analysisTarget);
+  target?.focus({preventScroll:true});
+  const branch=$('#analysis-map-branch');
+  if(b.hasAttribute('aria-expanded')&&branch&&!branch.hidden)map.scrollTop=branch.offsetTop;
   $('.analysis-result-scroll').scrollTop=0;
   refreshAnalysis();
   return;
@@ -1485,7 +1517,17 @@ document.addEventListener('click',e=>{const b=e.target.closest('button,[data-do]
  if(d.mapSelect){
   appAudio?.cue?.('navigate');
   const preview=b.closest('.map-editor-preview');
-  if(preview)selectConnectedMapNode(b);
+  if(preview){
+   const expanded=b.getAttribute('aria-expanded')==='true';
+   const selection=expanded?null:d.mapSelect;
+   const top=preview.scrollTop;
+   const {addParent,addKind}=preview.dataset;
+   preview.innerHTML=personalMap({selection,preview:true,addition:addParent?{parent:addParent,kind:addKind}:null});
+   const current=preview.querySelector('[aria-current="true"]');
+   preview.scrollTop=top;
+   current?.focus({preventScroll:true});
+   if(b.hasAttribute('aria-expanded')&&!expanded)preview.querySelector('.map-branch-header')?.scrollIntoView({block:'nearest'});
+  }else if(mapEditing&&e.detail>0)handleMapEditTap(b);
   else selectMapNode(b);
   return;
  }
@@ -1545,30 +1587,50 @@ let lastTitleTap;
 function mapEditButton(target){
  return mapEditing?target.closest('.mind-map-scroll [data-map-select]'):null;
 }
+function editMapItem(id){
+ addParent=null;
+ splitSizes.editor=50;
+ editor(id);
+}
+let pendingMapTap;
+function handleMapEditTap(button){
+ const id=button.dataset.mapSelect;
+ if(pendingMapTap?.button===button){
+  clearTimeout(pendingMapTap.timer);
+  pendingMapTap=null;
+  selectMapNode(button);
+  editMapItem(id);
+  return;
+ }
+ clearTimeout(pendingMapTap?.timer);
+ pendingMapTap={button,timer:setTimeout(()=>{
+  pendingMapTap=null;
+  if(button.isConnected&&mapEditing&&!$('#dialog').open)selectMapNode(button);
+ },370)};
+}
 document.addEventListener('keydown',event=>{
  const button=mapEditButton(event.target);
  if(button&&(event.key==='F2'||(event.key==='Enter'&&button.hasAttribute('aria-current')))){
   event.preventDefault();
-  addParent=null;
-  editor(button.dataset.mapSelect);
+  editMapItem(button.dataset.mapSelect);
   return;
  }
  if(event.key==='Escape'&&!$('.space-vista')?.hidden)closeScenery();
 });
 document.addEventListener('pointerup',event=>{
  if(event.pointerType!=='touch'&&event.pointerType!=='pen')return;
- const button=mapEditButton(event.target)||event.target.closest('[data-edit-title]');
+ const button=event.target.closest('[data-edit-title]');
  if(!button){lastTitleTap=null;return}
  const now=performance.now();
  if(lastTitleTap?.button===button&&now-lastTitleTap.time<=420){
   lastTitleTap=null;
   addParent=null;
-  editor(button.dataset.mapSelect||button.dataset.editTitle);
+  editor(button.dataset.editTitle);
  }else lastTitleTap={button,time:now};
 });
 document.addEventListener('dblclick',event=>{
- const button=mapEditButton(event.target)||event.target.closest('[data-edit-title]');
- if(button&&!$('#dialog').open){addParent=null;editor(button.dataset.mapSelect||button.dataset.editTitle);}
+ const button=event.target.closest('[data-edit-title]');
+ if(button&&!$('#dialog').open){addParent=null;editor(button.dataset.editTitle);}
 });
 document.addEventListener('error',e=>{if(e.target.matches?.('[data-account-photo]'))e.target.remove()},true);
 document.addEventListener('submit',e=>{if(e.target.hasAttribute('data-native-submit'))return;e.preventDefault();
