@@ -917,3 +917,9 @@ body{overflow:hidden}#app{height:100dvh}.workspace{display:flex;flex-direction:c
  #dialog .target-calculator-actions button { min-height:44px; }
  .home-universe-art { touch-action:manipulation; }
 }
+
+#dialog.map-editor-dialog[open] { display:flex; flex-direction:column; }
+.map-editor-topbar { flex:none; padding-inline:12px; border-bottom:1px solid #564568; }
+.map-editor-dialog .map-editor-layout { flex:1; height:auto; min-height:0; }
+.map-edit-exit { min-height:44px; padding-inline:4px; color:#ebdbff; white-space:nowrap; }
+.map-editor-fields .dialog-title [data-do="close"] { display:none; }

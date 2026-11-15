@@ -106,7 +106,9 @@ function bindPanelDivider(divider){
 function modal(html,{mapId=null,addition=null}={}){
  const dialog=$('#dialog');
  dialog.classList.toggle('map-editor-dialog',Boolean(mapId));
- dialog.innerHTML=mapId?`<div class="map-editor-layout">
+ dialog.innerHTML=mapId?`<div class="map-editor-topbar">
+  <button type="button" class="text-button map-edit-exit" data-do="close">← 編集を閉じる</button>
+ </div><div class="map-editor-layout">
   <section class="map-editor-preview" id="editor-map-pane" aria-label="編集中のマインドマップ"
    ${addition?`data-add-parent="${esc(mapId)}" data-add-kind="${esc(addition)}"`:''}>${personalMap({selection:mapId,preview:true,addition:addition&&{parent:mapId,kind:addition}})}</section>
   ${panelDivider('editor','マインドマップと編集欄の高さを調節','editor-map-pane editor-fields-pane')}
@@ -137,7 +139,9 @@ function render(){clearTimeout(guideTimer);clearInterval(starWorldTimer);
  if(view!=='catchup'&&inUnderworld)leaveUnderworld();
  const progress=featureProgress(state,today);
  const page=guideSession?treePage():{tree:mindMapPage,stats:statsPage,projects:projectsPage,catchup:catchupPage,star:starWorldPage}[view]();
- $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar"><a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k||(view==='star'&&k==='tree')?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''} ${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?'aria-disabled="true"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong>${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?`<small>${featureDays[k]}日で解放</small>`:''}</button>`).join('')}</nav>`;bindTree();scheduleGuide();maybeAskReminderSetup();
+ $('#app').innerHTML=`<main class="workspace view-${view}"><header class="topbar">${view==='tree'&&mapEditing&&!guideSession?
+ '<button type="button" class="text-button map-edit-exit" data-map-edit-mode>← 編集を閉じる</button>':
+ '<a class="brand" href="#tree" data-map-back aria-label="Jiku ホーム">Jiku<span>●</span></a>'}${mapPreviewReturn?'<div class="demo-toolbar"><button data-map-exit>プレビューを終了</button></div>':guideSession?.preview?'<div class="demo-toolbar"><button data-guide="dismiss">'+(guideSession.draft?'案内をスキップ':'プレビューを終了')+'</button></div>':demoMode?'<div class="demo-toolbar"><span>サンプル</span><button data-do="test-demo-mode">モードを試す</button><button data-do="exit-demo">自分のデータへ ↗</button></div>':''}<div class="header-actions">${appAudio&&!guideSession?`<button class="app-audio" type="button" data-do="app-audio" aria-label="音楽と効果音" aria-pressed="${appAudioOn}" title="音楽と効果音">${appAudioOn?'♪':'♫'}</button>`:''}<button ${guideSession?'hidden':''} class="avatar" data-do="settings" aria-label="Googleアカウントと設定" title="Googleアカウントと設定">${accountAvatar()}</button></div></header><div class="content">${page}</div></main><nav class="bottom-nav" aria-label="メインメニュー" ${guideSession?'inert':''}>${Object.entries(names).map(([k,v])=>`<button class="nav ${view===k||(view==='star'&&k==='tree')?'active':''}" data-view="${k}" ${view===k?'aria-current="page"':''} ${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?'aria-disabled="true"':''}><span aria-hidden="true">${icon(k)}</span><strong>${v}</strong>${k!=='tree'&&(!progress.confirmed||progress.days<featureDays[k])?`<small>${featureDays[k]}日で解放</small>`:''}</button>`).join('')}</nav>`;bindTree();scheduleGuide();maybeAskReminderSetup();
  bindPanelDivider($('#app [data-panel-divider="analysis"]'));
  if(view==='star'&&!guideSession)starWorldTimer=setInterval(updateStarWorld,1000);
 }
@@ -561,10 +565,8 @@ function selectedMapNode(){
 }
 function mapActions(){
  const node=selectedMapNode();
- const canAdd=mapEditing&&nodeKind(state,node.id)==='goal'&&nodeDepth(state,node.id)<LEVELS.length-1;
  return `<div class="mind-map-tools">
   ${nodeKind(state,node.id)==='action'?`<button data-space-detail="${esc(node.id)}">タスクの詳細</button>`:''}
-  ${canAdd?`<button type="button" data-space-add="${esc(node.id)}" aria-label="${esc(node.name)}に目標やタスクを追加">＋ 追加</button>`:''}
   ${mapEditing?'<button type="button" data-do="map-import">AIで作成・取り込み</button>':''}
  </div>`;
 }
@@ -597,7 +599,9 @@ function personalMap({selection=mapSelection,preview=false,analysis=false,additi
     <span aria-hidden="true">${task?'✓':hierarchyMarks[level]}</span>
     <span>${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong></span>
   </button>
-  `;
+  ${mapEditing&&!preview&&!analysis&&!task&&depth<LEVELS.length-1?`<div class="map-inline-tools">
+   <button type="button" data-space-add="${esc(node.id)}" aria-label="${esc(node.name)}に目標やタスクを追加">＋</button>
+  </div>`:''}`;
  };
  const overview=mapDiagram(card(root,0,'map-root'),galaxies.map((node,index)=>({
   tone:index % 5,card:card(node,1,'',true)
@@ -728,7 +732,7 @@ function mindMapPage(){
   <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1>
    <div class="mind-map-tools" role="group" aria-label="マインドマップの操作">
     <button type="button" data-do="map-print">PDF</button>
-    <button type="button" data-map-edit-mode aria-pressed="${mapEditing}">${mapEditing?'編集を終了':'編集'}</button>
+    ${mapEditing?'':'<button type="button" data-map-edit-mode>編集</button>'}
    </div>
   </header>
   ${mapEditing?'<p class="map-edit-hint">項目をダブルタップで編集できます。</p>':''}
