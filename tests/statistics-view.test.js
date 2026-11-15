@@ -9,9 +9,25 @@ test('目標内の集計はその目標の見出しで表示し、異なる単�
 import {recordMode,modeDistribution} from '../dist/model.js';
 test('記録なしと何もしなかった日は同じモード・割合にまとめ、未来を数えず記録を変更しない',()=>{const s=seed();s.records={'2026-11-02':{mode:'full'},'2026-11-03':{mode:'none'},'2026-11-04':{mode:'busy'},'2026-11-05':{mode:'rest'},'2026-11-10':{mode:'full'}};const before=JSON.stringify(s);assert.equal(recordMode(s,'2026-11-03'),'none');assert.equal(recordMode(s,'2026-11-06'),'none');assert.deepEqual(modeDistribution(s,'2026-11-02','2026-11-15','2026-11-09'),{counts:{full:1,busy:1,rest:1,none:5},days:8});assert.deepEqual(modeDistribution(s,'2026-11-10','2026-11-15','2026-11-09'),{counts:{full:0,busy:0,rest:0,none:0},days:0});assert.equal(JSON.stringify(s),before)});
 
-import {analysisData,analysisChart,achievementTone} from '../dist/quantity-view.js';
+import {analysisData,analysisChart,achievementTone,mapAchievementRates} from '../dist/quantity-view.js';
 import {freshUniverse,writeGoal,featureDays,featureProgress,canConfirmMap} from '../dist/universe-model.js';
 import {setTaskRecord} from '../dist/model.js';
+test('マインドマップは直近1か月の時間達成率を集計して境界値で色分けする',()=>{
+ const state=freshUniverse(),today='2026-11-15';
+ const cases=[[19,'red'],[20,'orange'],[29,'orange'],[30,''],[80,''],[81,'blue'],[100,'blue'],[101,'green']];
+ const ids=cases.map(([rate])=>{
+  const id=writeGoal(state,{name:rate+'%',purpose:'達成率を確認する',parentId:'root',kind:'action',
+   measurement:{unit:'minutes',dailyAmount:30,weeklyTarget:700}});
+  setTaskRecord(state,'2026-10-16',id,31*rate+1,[],today);
+  setTaskRecord(state,'2026-10-15',id,700,[],today);
+  return id;
+ });
+ const empty=writeGoal(state,{name:'次の目標',purpose:'目標値のない項目を確認する',parentId:'root'});
+ const rates=mapAchievementRates(state,today);
+ assert.deepEqual(ids.map(id=>rates.get(id)),cases.map(([rate,tone])=>({label:rate+'%',tone})));
+ assert.deepEqual(rates.get('root'),{label:'58%',tone:''});
+ assert.deepEqual(rates.get(empty),{label:'—',tone:''});
+});
 test('階層を合計し、超過と不足が累計で相殺される',()=>{
  const state=freshUniverse();
  const goal=writeGoal(state,{name:'健康',purpose:'元気に過ごす',parentId:'root'});

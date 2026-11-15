@@ -5,7 +5,7 @@ import {mountOnboarding,onboardingDraft,pendingUniverse,clearPendingUniverse,res
 import {createExampleDraft, exampleMap} from './example-map.js';
 import {mapDiagram} from './mind-map.js';
 import {createDemoUniverse} from './demo.js';
-import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,analysisPeriodLabel,numberText,hoursText} from './quantity-view.js';
+import {taskSettingsFields,extraMetricFields,eventPanel,modePickerContent,recordPanel,weeklyPanel,analysisChart,analysisPeriodLabel,mapAchievementRates,numberText,hoursText} from './quantity-view.js';
 import {createUniverse} from './universe.js';
 import {UNIVERSE_ORIGIN,LEVELS,nodePath,nodeDepth,visibleChildren,canPlace,freshUniverse,migrateUniverse,completeUniverse,reorderNode,writeGoal,boundedMonth,universeGrowth,featureDays,featureProgress,canConfirmMap} from './universe-model.js';
 import {MODES,dateKey,shiftDate,weekStart,seed,leaves,descendants,moveNode,deleteNode,setting,applyPending,plan,toggleLog,ancestry,stats,validate,measurement,timeMeasurement,unitInfo,setTaskRecord,removeQuantity,quantitySummary,validDateKey,paceForDeadline,applyMode,clearMode,modesForLevel,nodeKind,recordMode,modeDistribution,isEventTask,eventCompletionDate,setJourneyDeparture,recordEventCompletion,undoEventCompletion,catchupTasks,saveCatchupPromise,saveEveningPlan,completeEveningPlan,modeItems} from './model.js';
@@ -599,6 +599,11 @@ function personalMap({selection=mapSelection,preview=false,analysis=false,additi
  const galaxies=childrenFor(root.id);
  const branchRoot=path[1];
  const tone=galaxies.findIndex(node=>node.id===branchRoot?.id) % 5;
+ const rates=analysis?null:mapAchievementRates(state,today);
+ const rateBadge=id=>{
+  const rate=rates?.get(id);
+  return rate?`<span class="map-achievement" data-rate-tone="${rate.tone}" aria-hidden="true">${rate.label}</span>`:'';
+ };
  const card=(node,depth,style='',overview=false)=>{
   if(node.insertion){
    const label=addition.kind==='action'?'新しいタスク':'新しい目標';
@@ -607,10 +612,13 @@ function personalMap({selection=mapSelection,preview=false,analysis=false,additi
   }
   const task=nodeKind(state,node.id)==='action',level=Math.min(depth,LEVELS.length-1);
   const label=task?(isEventTask(setting(state,node.id))?'イベント':'タスク'):'';
+  const rate=rates?.get(node.id);
   return `<button class="map-node ${style}" data-map-level="${level}" ${analysis?'data-analysis-target':'data-map-select'}="${esc(node.id)}" ${node.id===selected.id?'aria-current="true"':''} ${mapEditing&&!preview&&!analysis?'aria-keyshortcuts="F2"':''}
+    ${rate?`aria-description="直近1か月の達成率 ${rate.label==='—'?'目標未設定':rate.label}"`:''}
     ${overview?`aria-expanded="${node.id===branchRoot?.id}" aria-controls="${branchId}"`:''}>
     <span aria-hidden="true">${task?'✓':hierarchyMarks[level]}</span>
-    <span>${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong></span>
+    <span class="map-node-label">${label?`<small>${label}</small>`:''}<strong>${esc(node.name)}</strong></span>
+    ${rateBadge(node.id)}
   </button>
   ${mapEditing&&!preview&&!analysis&&!task&&depth<LEVELS.length-1?`<div class="map-inline-tools">
    <button type="button" data-space-add="${esc(node.id)}" aria-label="${esc(node.name)}に目標やタスクを追加">＋</button>
@@ -620,9 +628,9 @@ function personalMap({selection=mapSelection,preview=false,analysis=false,additi
   tone:index % 5,card:card(node,1,'',true)
  })),{radial:true,label:'マインドマップ全体'});
  if(!branchRoot)return overview+`<div id="${branchId}" hidden></div>`;
- return overview+mapBranchPanel(branchRoot,{childrenFor,card,branchId,tone});
+ return overview+mapBranchPanel(branchRoot,{childrenFor,card,branchId,tone,rateBadge});
 }
-function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
+function mapBranchPanel(root,{childrenFor,card,branchId,tone,rateBadge,depth=1}){
  function branch(node,level){
   if(node.insertion)return `<li>${card(node,level,'map-branch-row')}</li>`;
   const children=childrenFor(node.id);
@@ -635,7 +643,7 @@ function mapBranchPanel(root,{childrenFor,card,branchId,tone,depth=1}){
  const children=childrenFor(root.id);
  const lanes=children.length>1?[children.filter((_,i)=>i%2===0),children.filter((_,i)=>i%2===1)]:[children];
  return `<section id="${branchId}" class="map-subview map-galaxy-view" aria-labelledby="${branchId}-name" data-map-tone="${tone}">
-  <header class="map-branch-header" data-map-level="${Math.min(depth,4)}"><span aria-hidden="true">${hierarchyMarks[Math.min(depth,4)]}</span><h2 id="${branchId}-name">${esc(root.name)}</h2></header>
+  <header class="map-branch-header" data-map-level="${Math.min(depth,4)}"><span aria-hidden="true">${hierarchyMarks[Math.min(depth,4)]}</span><h2 id="${branchId}-name">${esc(root.name)}</h2>${rateBadge(root.id)}</header>
   ${children.length?`<div class="map-galaxy-tree ${lanes.length===1?'single-lane':''}">${lanes.map(nodes=>
    `<ul class="map-branch-lane">${nodes.map(node=>branch(node,depth+1)).join('')}</ul>`).join('')}</div>`:
    '<p class="map-galaxy-empty">まだ下位の目標やタスクはありません。</p>'}
@@ -740,7 +748,7 @@ function mindMapPage(){
     `<h2>今日、残りの時間はどのペースでいけそう？</h2>
      <div class="map-mode-buttons">${['full','busy','rest'].map(key=>`<button type="button" data-mode="${key}" data-date="${today}">${MODES[key].label}</button>`).join('')}</div>`}
   </section>
-  <header class="mind-map-header"><h1 id="mind-map-title">マインドマップ</h1>
+  <header class="mind-map-header"><div><h1 id="mind-map-title">マインドマップ</h1><span class="map-achievement-period">達成率 · 直近1か月</span></div>
    <div class="mind-map-tools" role="group" aria-label="マインドマップの操作">
     <button type="button" data-do="map-print">PDF</button>
     ${mapEditing?'':'<button type="button" data-map-edit-mode>編集</button>'}

@@ -182,7 +182,7 @@ function monthShare(start,end){
 }
 
 export function analysisData(state,{start,end,weeks}){
- const periods=Array.from({length:weeks},(_,index)=>{
+ const periods=weeks===undefined?[{from:start,to:end}]:Array.from({length:weeks},(_,index)=>{
   const from=shiftDate(start,index*7);
   return {from,to:shiftDate(from,6)};
  });
@@ -193,8 +193,9 @@ export function analysisData(state,{start,end,weeks}){
  for(const item of items.values())items.get(item.parentId)?.children.push(item);
  const summary=quantitySummary(state,start,end,'all',false);
  const timeRows=new Map(summary.rows.filter(row=>row.dimension==='time').map(row=>[row.id,row.byDate]));
+ const periodDays=periods.map(({from,to})=>(Date.parse(to)-Date.parse(from))/86400000+1);
  const weeksByDate=new Map(periods.flatMap(({from},index)=>
-  Array.from({length:7},(_,offset)=>[shiftDate(from,offset),index])));
+  Array.from({length:periodDays[index]},(_,offset)=>[shiftDate(from,offset),index])));
  const monthShares=periods.map(({from,to})=>monthShare(from,to));
  for(const node of leaves(state)){
   const task=setting(state,node.id);
@@ -202,7 +203,7 @@ export function analysisData(state,{start,end,weeks}){
   const item=items.get(node.id);
   const time=timeMeasurement(task.measurement||{unit:'minutes'});
   item.weekly.forEach((week,index)=>{
-   week.target=(time.weeklyTarget||((time.monthlyTarget||0)*monthShares[index]))/60;
+   week.target=((time.weeklyTarget||0)*periodDays[index]/7||((time.monthlyTarget||0)*monthShares[index]))/60;
   });
   for(const [date,hours] of Object.entries(timeRows.get(node.id)||{})){
    const week=item.weekly[weeksByDate.get(date)];
@@ -226,6 +227,18 @@ export function analysisData(state,{start,end,weeks}){
 }
 
 const percent=(actual,target)=>target>0?Math.round(actual/target*100):null;
+export function mapAchievementRates(state,today){
+ const month=monthOffset(today.slice(0,7),-1);
+ const lastDay=Number(shiftDate(today.slice(0,7)+'-01',-1).slice(8));
+ const day=String(Math.min(Number(today.slice(8)),lastDay)).padStart(2,'0');
+ const start=shiftDate(month+'-'+day,1);
+ const {items}=analysisData(state,{start,end:today});
+ return new Map([...items].map(([id,{actual,target}])=>{
+  const rate=percent(actual,target);
+  const tone=rate===null?'':rate<20?'red':rate<30?'orange':rate>100?'green':rate>80?'blue':'';
+  return [id,{label:rate===null?'—':numberText(rate)+'%',tone}];
+ }));
+}
 function completedDayShare(from,to,today){
  const day=86400000, first=Date.parse(from);
  const length=(Date.parse(to)-first)/day+1;

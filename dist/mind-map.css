@@ -58,7 +58,22 @@
   text-align:center;
   line-height:1.4;
 }
-.map-node > [aria-hidden] { flex:none; color:var(--map-tone); font-size:16px; }
+.map-node > [aria-hidden]:first-child { flex:none; color:var(--map-tone); font-size:16px; }
+.map-node-label { min-width:0; }
+.map-node:has(.map-achievement) > .map-node-label { flex:1; }
+.map-achievement {
+  flex:none;
+  color:#e6e1f4;
+  font-size:clamp(11px,2.7vw,13px);
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.map-achievement[data-rate-tone="red"] { color:#ff8c98; }
+.map-achievement[data-rate-tone="orange"] { color:#ffc080; }
+.map-achievement[data-rate-tone="blue"] { color:#9bcbff; }
+.map-achievement[data-rate-tone="green"] { color:#8ee9b6; }
+.map-achievement-period { display:block; margin-top:2px; color:#c7bbda; font-size:11px; }
 .map-node strong { display:block; font-size:clamp(12px,2.9vw,15px); font-weight:600; overflow-wrap:anywhere; }
 .map-node small { display:block; margin-bottom:2px; color:#bdb8d6; font-size:10px; }
 .map-root {
@@ -105,7 +120,7 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
 @media (max-width:420px) {
   .map-diagram-overview { gap:27px; }
   .map-node { gap:4px; }
-  .map-node > [aria-hidden] { font-size:13px; }
+  .map-node > [aria-hidden]:first-child { font-size:13px; }
 }
 
 .map-galaxy-view {
@@ -123,7 +138,7 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
   width:fit-content; max-width:100%; margin:auto; padding:8px 15px;
   background:#202139; border:1px solid color-mix(in srgb,var(--map-tone) 52%,transparent); border-radius:18px;
 }
-.map-branch-header > span { color:var(--map-tone); }
+.map-branch-header > span:first-child { color:var(--map-tone); }
 .map-branch-header h2 { margin:0; font-size:clamp(15px,4vw,18px); overflow-wrap:anywhere; }
 .map-galaxy-tree ul { list-style:none; padding:0; margin:0; }
 .map-galaxy-tree {
@@ -152,7 +167,7 @@ button.map-node:focus-visible,.map-trail button:focus-visible { outline:2px soli
 .map-galaxy-empty { text-align:center; color:#d4c8e5; }
 @media (max-width:380px) {
   .map-galaxy-tree { --map-lane-padding:3px; }
-  .map-galaxy-tree .map-branch-row > [aria-hidden] { display:none; }
+  .map-galaxy-tree .map-branch-row > [aria-hidden]:first-child { display:none; }
 }
 
 .map-diagram [data-map-tone="4"],
